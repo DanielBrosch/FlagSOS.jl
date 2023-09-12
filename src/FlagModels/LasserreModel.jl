@@ -458,7 +458,7 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
     end
 
 
-    limit = Base.Semaphore(floor(Threads.nthreads() / 2) - 1)
+    limit = Base.Semaphore(max(1,floor(Threads.nthreads() / 2) - 1))
     println()
     for (cm, mu) in collect(enumerate(keys(m.basis)))
         blkSize = length(m.basis[mu])
