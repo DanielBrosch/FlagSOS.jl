@@ -1,6 +1,10 @@
-using LinearAlgebra
-using Combinatorics
+export Graph
 
+""" 
+    $(TYPEDEF)
+
+A model of a graph, given by its adjacency matrix.
+"""
 struct Graph <: Flag
     A::Symmetric{Bool, BitMatrix}
 

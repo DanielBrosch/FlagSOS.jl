@@ -1,6 +1,7 @@
+export modelSize, computeSDP!, modelBlockSizes, buildJuMPModel
 
 """
-AbstractFlagModel{T<:Flag, N, D}
+    AbstractFlagModel{T<:Flag, N, D}
 
 An abstract Flag-SOS model. `T` is the Flag-type used internally, i.e. as variables in the SDP obtained at the end. It may be advantageous to use non-induced Flags internally, even when the model is formulated with induced Flags.
 

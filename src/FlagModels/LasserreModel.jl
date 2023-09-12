@@ -1,6 +1,8 @@
+export addFlag!, LasserreModel
+
 include("../utils/PermutationModuleQuotients.jl")
 
-using SparseArrays: SparseMatrixCSC
+using SparseArrays: SparseMatrixCSC, spzeros, findnz
 
 # Describes a basis for a single graph indexing the SDP. I.e. a basis of the (symmetry reduced) ways to label a graph.
 struct FlagSymmetries{T<:Flag}
@@ -422,9 +424,6 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
 
     t = 1
 
-    # dataLock = ReentrantLock()
-    # counterLock = ReentrantLock()
-
     splitByOverlaps = false
 
     doneCollecting = Threads.Event()
@@ -432,7 +431,6 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
 
     collectData = Channel(Inf; spawn = true) do ch
         for (mu, i, j, blkSize, tmp) in ch
-            # @show ch.n_avail_items
             for G in keys(tmp)
                 if !haskey(m.sdpData, G)
                     m.sdpData[G] = Dict()
@@ -456,7 +454,6 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
                 end
             end
         end
-        # @show "Done"
         notify(doneCollecting)
     end
 
@@ -464,12 +461,9 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
     limit = Base.Semaphore(floor(Threads.nthreads() / 2) - 1)
     println()
     for (cm, mu) in collect(enumerate(keys(m.basis)))
-        # @show mu
         blkSize = length(m.basis[mu])
         ijInd = [(i, j) for i = 1:blkSize for j = i:blkSize]
 
-        # @show blkSize
-        #for (c,(i,j)) in enumerate(ijInd)
         muc = 1
 
         progressPrint = Channel{Nothing}(1000; spawn = true) do ch
@@ -527,22 +521,15 @@ function buildJuMPModel(
     b = modelBlockSizes(m)
     Y = Dict()
 
-    # @warn "FACIAL REDUCTION"
-
     for (mu, n) in b
-        # if mu == AbstractAlgebra.Partition([2,1])
-        #     n = 1
-        # end
         Y[mu] = get(replaceBlocks, mu) do
             name = "Y$mu"
             if n > 1
                 return @variable(jumpModel, [1:n, 1:n], PSD, base_name = name)
-                # return Semidefinite(n)
             else
                 v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
                 @constraint(jumpModel, v[1, 1] >= 0)
                 return v
-                # return Variable(1, Positive())
             end
 
         end

@@ -1,3 +1,4 @@
+export FlagModel, addLasserreBlock!, addForbiddenFlag, addInequality, addInequality_Lasserre, addEquality, buildStandardModel
 
 """
     FlagModel{T <: Flag, N, D} <: AbstractFlagModel{T, N, D}

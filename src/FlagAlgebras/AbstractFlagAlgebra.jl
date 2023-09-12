@@ -14,7 +14,7 @@ include("PartitionOverlaps.jl") # for finite and variable n support
 
 
 """ 
-$(TYPEDEF)
+    $(TYPEDEF)
 
 An abstract Flag.
 """
@@ -23,7 +23,7 @@ abstract type Flag end
 include("QuantumFlag.jl") # Formal linear combinations of flags
 
 """
-$(TYPEDEF)
+    $(TYPEDEF)
 
 A way to describe one predicate value in a Flag. For example, it may describe a single edge of a `Graph`, or a single label of a `PartiallyLabeledFlag`.
 """

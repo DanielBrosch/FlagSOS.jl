@@ -1,3 +1,4 @@
+export QuadraticModule
 
 """
     QuadraticModule{T <: Flag, U <: Flag, B <: AbstractFlagModel{U, N, D}, N, D} <: AbstractFlagModel{T, N, D}
