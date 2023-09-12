@@ -1,3 +1,5 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FlagSOS = "78b365f2-6d95-4275-8db6-8dceb35a712b"
+Hypatia = "b99e6be6-89ff-11e8-14f8-45c827f4f8f2"
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
