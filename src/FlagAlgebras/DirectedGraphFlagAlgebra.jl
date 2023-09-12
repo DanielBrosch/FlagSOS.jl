@@ -1,10 +1,12 @@
-# TODO: Permuting vertices changes direction of edges!
-
-using LinearAlgebra
-using Combinatorics
-
 export DirectedGraph
 
+# TODO: Permuting vertices changes direction of edges!
+
+""" 
+    $(TYPEDEF)
+
+A model of a directed graph, given by its adjacency matrix.
+"""
 struct DirectedGraph{allowDigons} <: Flag
     A::BitMatrix
 
@@ -32,6 +34,8 @@ isValid(A::DirectedGraph{false}) = !any(A.A .&& A.A')
 
 Base.one(::Type{DirectedGraph{allowDigons}}) where {allowDigons} =
     DirectedGraph{allowDigons}()
+
+Base.one(::Type{DirectedGraph}) = one(DirectedGraph{false})
 
 function size(G::DirectedGraph)::Int
     return size(G.A, 1)
@@ -121,6 +125,10 @@ function subFlag(F::DirectedGraph, vertices::AbstractVector{Int})::DirectedGraph
     return DirectedGraph(F.A[vertices, vertices])
 end
 
+function maxPredicateArguments(::Type{DirectedGraph})
+    return 2
+end
+
 function maxPredicateArguments(::Type{DirectedGraph{allowDigons}}) where {allowDigons}
     return 2
 end
@@ -129,6 +137,13 @@ function distinguish(F::DirectedGraph, v::Int, W::BitVector)
     return (sum(F.A[W, v]), sum(F.A[v, W]))
 end
 
+function distinguish(F::DirectedEdgePredicate, v::Int, W::BitVector)
+    return 3 * (v == F.i && W[F.j]) + 5 * (v == F.j && W[F.i])
+end
+
+function permute(pred::DirectedEdgePredicate, p::AbstractVector{Int})
+    DirectedEdgePredicate(p[pred.i], p[pred.j])
+end
 
 function countEdges(F::DirectedGraph)::Vector{Int}
     return [Int(sum(F.A))]

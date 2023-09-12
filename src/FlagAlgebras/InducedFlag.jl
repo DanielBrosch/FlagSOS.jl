@@ -54,7 +54,6 @@ Glues together the two induced Flags `F` and `G`, after applying the permutation
 function glue(F::InducedFlag{T}, G::InducedFlag{T}, p::AbstractVector{Int})::QuantumFlag{InducedFlag{T},Rational{Int}} where {T<:Flag}
     n = size(F)
     m = size(G)
-    # @show p
 
     # Check if the overlap is identical
     commonPartF = [i for (i, c) in enumerate(p[1:n]) if c in 1:m]

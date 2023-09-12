@@ -58,7 +58,8 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Examples" => [
-            "examples/TriangleFreeGraphs.md"
+            "examples/TriangleFreeGraphs.md",
+            "examples/CaccettaHaeggkvist.md"
         ]
     ],
 )

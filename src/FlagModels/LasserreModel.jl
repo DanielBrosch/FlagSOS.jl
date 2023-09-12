@@ -300,21 +300,17 @@ function multiplyPolytabsAndSymmetrize(
 
     # overlap matrices to graphs
     for B in keys(combinedOverlapsReduced)
-        # @show B
         p = zeros(Int64, sum(B) + length(fixVerts1))
         for i in fixVerts1
             p[i] = i
         end
         vecShape1 = vcat(shape1...)
         if length(vecShape1) < sum(B)#length(p)
-            # vecShape1 = vcat(vecShape1, (length(vecShape1)+1):length(p))
             vecShape1 = vcat(vecShape1, setdiff(1:length(p), vecShape1, fixVerts1))
         end
-        # @show vecShape1
 
         vecShape2 = vcat(shape2...)
         if length(vecShape2) < sum(B)#length(p)
-            # vecShape2 = vcat(vecShape2, (length(vecShape2)+1):length(p))
             vecShape2 = vcat(vecShape2, setdiff(1:length(p), vecShape2, fixVerts2))
         end
 

@@ -53,6 +53,9 @@ function addPredicates(::T, ::U, ::Vararg{U}) where {T<:Flag, U<:Predicate}
     error("addPredicates is not defined for Flag type $T and predicate type $U")
     missing
 end
+function addPredicates(F::T) where {T<:Flag}
+    return F
+end
 
 
 function ==(A::T, B::T) where {T<:Flag}

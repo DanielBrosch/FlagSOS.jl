@@ -22,9 +22,10 @@ end
 
 function addForbiddenFlag(m::FlagModel{T,N,D}, F::T) where {T<:Flag, N,D}
     #TODO: If non-induced, forbid all graphs that can be obtained by adding edges, as well.
-    push!(m.forbiddenFlags, F)
+    Fl = labelCanonically(F)
+    push!(m.forbiddenFlags, Fl)
     for ms in m.subModels
-        addForbiddenFlag(ms,F)
+        addForbiddenFlag(ms,Fl)
     end
 end
 
@@ -73,15 +74,16 @@ function addLasserreBlock!(m::FlagModel{T,N,D}, maxEdges; maxVertices = maxEdges
 end
 
 function addInequality(m::FlagModel{T, N, D}, g::QuantumFlag{U, D}, baseModel::B ) where {T<:Flag, U<:Flag, N,D, B<: AbstractFlagModel{U,N,D}}
-    qM = QuadraticModule{T}(baseModel, g)
+    gl = labelCanonically(g)
+    qM = QuadraticModule{T}(baseModel, gl)
     push!(m.subModels, qM)
     return qM
 end
 
 function addInequality_Lasserre(m::FlagModel{T, N, D}, g::QuantumFlag{T, D}, maxEdges; maxVertices = size(g) + floor((maxEdges - countEdges(g)[1])/2) * maxPredicateArguments(T) ) where {T<:Flag, N,D}
-    
-    genMaxEdges = Int(floor((maxEdges - countEdges(g)[1])/2))
-    genMaxVertices = Int(floor((maxVertices - size(g))/2))
+    gl = labelCanonically(g)
+    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])/2))
+    genMaxVertices = Int(floor((maxVertices - size(gl))/2))
     
     lM = LasserreModel{T, N, D}()
     Fs = generateAll(T, genMaxVertices, genMaxEdges)
@@ -92,21 +94,23 @@ function addInequality_Lasserre(m::FlagModel{T, N, D}, g::QuantumFlag{T, D}, max
         end
     end
 
-    qM = QuadraticModule{T}(lM, g)
+    qM = QuadraticModule{T}(lM, gl)
     push!(m.subModels, qM)
     return qM
 end
 
 function addInequality_Lasserre(m::FlagModel{T, N, D}, g::QuantumFlag{PartiallyLabeledFlag{T}, D}, maxEdges; maxVertices = size(g) + floor((maxEdges - countEdges(g)[1])/2) * maxPredicateArguments(T) ) where {T<:Flag, N,D}
     
-    genMaxEdges = Int(floor((maxEdges - countEdges(g)[1])/2))
-    genMaxVertices = Int(floor((maxVertices - size(g))/2))
+    gl = labelCanonically(g)
+
+    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])/2))
+    genMaxVertices = Int(floor((maxVertices - size(gl))/2))
 
     lM = LasserreModel{PartiallyLabeledFlag{T}, N, D}()
 
-    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(g),genMaxEdges])
+    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(gl),genMaxEdges])
 
-    filter!(x->x.n == numLabels(g), Fs)
+    filter!(x->x.n == numLabels(gl), Fs)
 
 
     for F in Fs
@@ -115,7 +119,7 @@ function addInequality_Lasserre(m::FlagModel{T, N, D}, g::QuantumFlag{PartiallyL
         end
     end
 
-    qM = QuadraticModule{T, PartiallyLabeledFlag{T}}(lM, g)
+    qM = QuadraticModule{T, PartiallyLabeledFlag{T}}(lM, gl)
     push!(m.subModels, qM)
     return qM
     
@@ -123,14 +127,16 @@ end
 
 function addEquality(m::FlagModel{T, N, D}, g::QuantumFlag{PartiallyLabeledFlag{T}, D}, maxEdges; maxVertices = size(g) + floor((maxEdges - countEdges(g)[1])/2) * maxPredicateArguments(T) ) where {T<:Flag, N,D}
     
-    genMaxEdges = Int(floor((maxEdges - countEdges(g)[1])))
-    genMaxVertices = Int(floor((maxVertices - size(g))))
+    gl = labelCanonically(g)
 
-    qM = EqualityModule{T, PartiallyLabeledFlag{T}, N, D}(g)
+    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])))
+    genMaxVertices = Int(floor((maxVertices - size(gl))))
 
-    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(g),genMaxEdges])
+    qM = EqualityModule{T, PartiallyLabeledFlag{T}, N, D}(gl)
 
-    filter!(x->x.n == numLabels(g), Fs)
+    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(gl),genMaxEdges])
+
+    filter!(x->x.n == numLabels(gl), Fs)
 
     for F in Fs
         if isAllowed(m, F)
@@ -146,10 +152,12 @@ end
 
 function addEquality(m::FlagModel{T, N, D}, g::QuantumFlag{T, D}, maxEdges; maxVertices = size(g) + floor((maxEdges - countEdges(g)[1])/2) * maxPredicateArguments(T) ) where {T<:Flag, N,D}
     
-    genMaxEdges = Int(floor((maxEdges - countEdges(g)[1])))
-    genMaxVertices = Int(floor((maxVertices - size(g))))
+    gl = labelCanonically(g)
 
-    qM = EqualityModule{T, T, N, D}(g)
+    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])))
+    genMaxVertices = Int(floor((maxVertices - size(gl))))
+
+    qM = EqualityModule{T, T, N, D}(gl)
 
     Fs = generateAll(T, genMaxVertices, genMaxEdges)
 
@@ -179,20 +187,22 @@ function buildJuMPModel(m::FlagModel{T,N,D}, replaceBlocks = Dict(), jumpModel =
         i += 1
     end
 
+    
     if m.objective !== nothing 
-
-        for (G, c) in m.objective.coeff
+        
+        objL = labelCanonically(m.objective)
+        for (G, c) in objL.coeff
             if !iszero(c) && !haskey(variables, G)
                 error("Not all Flags in the objective appear in the model! Add more generators.")
                 return nothing
             end
         end
         for (G,c) in variables
-            if isAllowed(m,G) && (G != T() || T() in keys(m.objective.coeff))
+            if isAllowed(m,G) && (G != T() || T() in keys(objL.coeff))
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
-                # push!(constraints, c == (haskey(m.objective.coeff, G) ? m.objective.coeff[G] : 0))  
-                # push!(constraints, c <= (haskey(m.objective.coeff, G) ? m.objective.coeff[G] : 0))  
-                push!(constraints, @constraint(jumpModel, c == get(m.objective.coeff, G,0)))
+                # push!(constraints, c == (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
+                # push!(constraints, c <= (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
+                push!(constraints, @constraint(jumpModel, c == get(objL.coeff, G,0)))
             end
         end
     end
@@ -222,7 +232,7 @@ function modelBlockSizes(m::FlagModel)
 end
 
 function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag, N, D}
-    obj = m.objective
+    obj = labelCanonically(m.objective)
     vars = union([collect(keys(sM.sdpData)) for sM in m.subModels]...)
     filter!(F->isAllowed(m, F), vars)
     blocks = Dict()

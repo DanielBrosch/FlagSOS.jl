@@ -5,11 +5,12 @@ using Combinatorics
 # Speeds up generation of flags up to isomorphism, as well as Moebius-transforms
 struct EdgeMarkedFlag{T} <: Flag
     F::T
-    marked::Set
+    marked::Set{Predicate}
     EdgeMarkedFlag{T}(F::T) where {T<:Flag} = new(F, Set())
     EdgeMarkedFlag{T}(F::T, marked::Set) where {T<:Flag} = new(F, marked)
-    EdgeMarkedFlag{T}(F::T,marked::Vector{Vector{P}}) where {T<:Flag, P<:Predicate} = new(F, Set(vcat(marked...)))
-    EdgeMarkedFlag{T}(F::T,marked::Vector{P}) where {T<:Flag, P<:Predicate} = new(F, Set(marked))
+    EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag, P<:Predicate} = new(F, Set(vcat(marked...)))
+    EdgeMarkedFlag{T}(F::T, marked::Vector{Vector}) where {T<:Flag} = new(F, Set(vcat(marked...)))
+    EdgeMarkedFlag{T}(F::T, marked::Vector{P}) where {T<:Flag, P<:Predicate} = new(F, Set(marked))
 end
 
 function ==(A::EdgeMarkedFlag, B::EdgeMarkedFlag)
@@ -112,7 +113,6 @@ function moebius(F::EdgeMarkedFlag{T}) where {T<:Flag}
                 tmp2[F3] = get(tmp2, F3, 0) + c2*c3
             end
         end
-        # @show tmp2
         map!(x->Int(x//(flippedEdges+1)),values(tmp2))
         tmp = deepcopy(tmp2)
 

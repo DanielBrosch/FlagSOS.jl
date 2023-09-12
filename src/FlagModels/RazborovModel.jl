@@ -49,7 +49,6 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
             FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
-            @show length(preds)
             
             FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(PartiallyLabeledFlag{T}(FExtended, m), preds)
             razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
