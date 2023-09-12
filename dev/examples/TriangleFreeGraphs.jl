@@ -13,7 +13,7 @@ using Test #src
 edge = Graph(Bool[0 1; 1 0]);
 triangle = Graph(Bool[0 1 1; 1 0 1; 1 1 0]);
 
-# We start with an empty [`FlagModel`](@ref) of type [`Graph`](@ref), where we forbid the triangle graph (and all graphs containing it:
+# We start with an empty [`FlagModel`](@ref) of type [`Graph`](@ref), where we forbid the triangle graph (and all graphs containing it):
 m = FlagModel{Graph}()
 addForbiddenFlag(m, triangle)
 
@@ -22,6 +22,7 @@ addForbiddenFlag(m, triangle)
 addLasserreBlock!(m, 4);
 
 # This results in a semidefinite programming problem with block sizes
+@test modelSize(m).part == Int[5,4,4,2,2,1,1,1] #src
 modelSize(m)
 
 # We want to maximize the `edge` density, which we can do by minimizing its negative
