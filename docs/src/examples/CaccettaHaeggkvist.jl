@@ -1,11 +1,11 @@
 #=
-# Constrained example: Caccetta Haeggkvist
+# Constrained example: Caccetta Haeggkvist conjecture
 The maximum minimum outdegree of a directed graph (without digons) without directed triangles is conjectured to be ``\frac{1}{3}``:
 ```math
 \begin{aligned}
 \frac{1}{3}=\max_{G \text{ directed graph}} &r\\
 \text{s.t.}\enspace & G \text{ has no directed triangles},\\
-& \text{the outdegree of every vertex is at least }r.
+& \text{the relative outdegree of every vertex is at least }r.
 \end{aligned}
 ```
 Here we compute an upper bound using a basic application of flag algebras. A more advanced application of the method lead to current best bound.  
