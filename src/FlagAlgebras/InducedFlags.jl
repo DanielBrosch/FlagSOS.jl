@@ -1,3 +1,5 @@
+export InducedFlag
+
 """
     InducedFlag{T} <: Flag where {T <: Flag}
 

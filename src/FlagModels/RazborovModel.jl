@@ -1,3 +1,4 @@
+export RazborovModel, computeRazborovBasis!
 
 """
     RazborovModel{T<:Flag, N, D} <: AbstractFlagModel{T, N, D}

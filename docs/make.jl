@@ -59,7 +59,8 @@ makedocs(;
         "Home" => "index.md",
         "Examples" => [
             "examples/TriangleFreeGraphs.md",
-            "examples/CaccettaHaeggkvist.md"
+            "examples/CaccettaHaeggkvist.md",
+            "examples/ErrorCorrectingCodes.md"
         ]
     ],
 )

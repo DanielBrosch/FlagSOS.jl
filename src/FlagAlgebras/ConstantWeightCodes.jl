@@ -1,3 +1,4 @@
+export ConstantWeightCode, Hypergraph
 
 using LinearAlgebra
 using Combinatorics
