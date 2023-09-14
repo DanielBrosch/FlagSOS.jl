@@ -24,7 +24,7 @@ directedTriangle = Digraph(Bool[0 1 0; 0 0 1; 1 0 0]);
 
 # We start with an empty [`FlagModel`](@ref) of type [`DirectedGraph`](@ref), where we forbid the directed triangle:
 m = FlagModel{Digraph}()
-addForbiddenFlag(m, directedTriangle)
+addForbiddenFlag!(m, directedTriangle)
 
 # ## Choosing a relaxation
 # Now we need to choose a hierarchy. One option is the Lasserre hierarchy, which we can attach to the model using [`addLasserreBlock!`](@ref).
@@ -42,7 +42,7 @@ e1 = lDigraph(Bool[0 1; 0 0]; n=1)
 e2 = lDigraph(Bool[0 0; 1 0]; n=1)
 eL = lDigraph(Bool[0 1; 0 0]; n=0)
 
-qm2 = FlagSOS.addEquality(m, e1 - eL, 4);
+qm2 = FlagSOS.addEquality!(m, e1 - eL, 4);
 
 # Finally, we compute the coefficients of the SDP.
 computeSDP!(m)

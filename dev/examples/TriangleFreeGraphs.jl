@@ -15,7 +15,7 @@ triangle = Graph(Bool[0 1 1; 1 0 1; 1 1 0]);
 
 # We start with an empty [`FlagModel`](@ref) of type [`Graph`](@ref), where we forbid the triangle graph (and all graphs containing it):
 m = FlagModel{Graph}()
-addForbiddenFlag(m, triangle)
+addForbiddenFlag!(m, triangle)
 
 # ## Choosing a relaxation
 # Now we need to choose a hierarchy. One option is the Lasserre hierarchy, which we can attach to the model using [`addLasserreBlock!`](@ref).
