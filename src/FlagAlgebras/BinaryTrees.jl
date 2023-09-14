@@ -1,5 +1,4 @@
-using LinearAlgebra
-using Combinatorics
+export BinaryTree, BinaryTreeFlag
 
 # vertices = leaves. All other notes have degree 2. Inducibility density
 # In "drawable" leaf order (not nice for flag algebras) 
@@ -9,7 +8,7 @@ struct BinaryTree
     right::Union{BinaryTree,Nothing}
 
     BinaryTree(left, right) = new(false, left, right)
-    BinaryTree(isEmptyTree=true) = new(isEmptyTree, nothing, nothing)
+    BinaryTree(isEmptyTree=false) = new(isEmptyTree, nothing, nothing)
 end
 
 # In any leaf order
@@ -94,7 +93,7 @@ function permute(F::BinaryTreeFlag, p::AbstractVector{Int})
     return BinaryTreeFlag(F.tree, p[F.perm])
 end
 
-Base.one(::Type{BinaryTree}) = BinaryTree()
+Base.one(::Type{BinaryTree}) = BinaryTree(true)
 Base.one(::Type{BinaryTreeFlag}) = BinaryTreeFlag()
 
 function size(G::BinaryTree)::Int
@@ -112,12 +111,12 @@ function size(G::BinaryTreeFlag)::Int
 end
 
 function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
-    if g1 == BinaryTree() && g2 == BinaryTree()
+    if g1 == BinaryTree(true) && g2 == BinaryTree(true)
         return 1//1 * BinaryTreeFlag(g1)
     end
 
-    if g1 == BinaryTree() || g2 == BinaryTree()
-        if g1 == BinaryTree()
+    if g1 == BinaryTree(true) || g2 == BinaryTree(true)
+        if g1 == BinaryTree(true)
             return 1//1 * BinaryTreeFlag(g2)
         else
             return 1//1 * BinaryTreeFlag(g1)
@@ -184,6 +183,12 @@ function glue(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
 end
 
 function generateAll(
+    ::Type{BinaryTreeFlag}, maxVertices::Int, maxPredicates::Vector{Int}=[1]; upToIso=true
+)
+    return BinaryTreeFlag.(generateAll(BinaryTree, maxVertices, maxPredicates; upToIso = upToIso))
+end
+
+function generateAll(
     ::Type{BinaryTree}, maxVertices::Int, maxPredicates::Vector{Int}=[1]; upToIso=true
 )
     function attachAllWays(t::BinaryTree)
@@ -211,7 +216,7 @@ function generateAll(
         end
     end
 
-    return vcat([BinaryTree()], trees...)
+    return vcat([BinaryTree(true)], trees...)
 end
 
 # check if swapping v1 and v2 leaves g invariant
@@ -249,7 +254,7 @@ end
 
 function subFlag(F::BinaryTree, vertices::AbstractVector{Int})
     if length(vertices) == 0
-        return BinaryTree()
+        return BinaryTree(true)
     end
 
     if F.left === nothing
@@ -340,6 +345,11 @@ function aut(F::BinaryTreeFlag)
     return (gen=[F.perm[g] for g in automs.gen], size=automs.size)
 end
 
+function label(F::BinaryTreeFlag)
+    FL = labelCanonically(F)
+    return FL, aut(FL.tree)
+end
+
 function label(F::BinaryTree)
     if F.left === nothing
         return F
@@ -385,6 +395,10 @@ end
 
 function labelCanonically(F::BinaryTree)::BinaryTree
     return label(F)
+end
+
+function labelCanonically(F::BinaryTreeFlag)::BinaryTreeFlag
+    return BinaryTreeFlag(label(F.tree))
 end
 
 function maxPredicateArguments(::Type{BinaryTreeFlag})
