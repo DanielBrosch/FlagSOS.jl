@@ -20,7 +20,7 @@ An abstract Flag.
 """
 abstract type Flag end
 
-include("QuantumFlag.jl") # Formal linear combinations of flags
+include("QuantumFlags.jl") # Formal linear combinations of flags
 
 """
     $(TYPEDEF)
@@ -433,10 +433,10 @@ function isAllowed(F::T, e::P) where {T<:Flag,P<:Predicate}
     return true
 end
 
-include("InducedFlag.jl")
-include("GraphFlagAlgebra.jl")
-include("HypergraphFlagAlgebra.jl")
-include("DirectedGraphFlagAlgebra.jl")
-include("PartiallyLabeledFlag.jl")
+include("InducedFlags.jl")
+include("Graphs.jl")
+include("ConstantWeightCodes.jl")
+include("DirectedGraphs.jl")
+include("PartiallyLabeledFlags.jl")
 include("BinaryTrees.jl")
-include("EdgeMarkedFlag.jl")
+include("EdgeMarkedFlags.jl")
