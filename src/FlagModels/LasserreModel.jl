@@ -12,8 +12,7 @@ struct FlagSymmetries{T<:Flag}
     rowAut::Any
 
     function FlagSymmetries(F::T) where {T<:Flag}
-
-        cV = [i for i = 1:size(F) if isVariableVertex(F, i)]
+        cV = [i for i in 1:size(F) if isVariableVertex(F, i)]
 
         function determineShape(g::T) where {T<:Flag}
             nV = size(g)
@@ -22,7 +21,7 @@ struct FlagSymmetries{T<:Flag}
             for i in cV
                 if !(i in covered)
                     part = [i]
-                    for j in setdiff((i+1):nV, covered)
+                    for j in setdiff((i + 1):nV, covered)
                         if isSym(g, i, j)
                             push!(part, j)
                             push!(covered, j)
@@ -32,7 +31,7 @@ struct FlagSymmetries{T<:Flag}
                     push!(covered, i)
                 end
             end
-            sort!(shape, by = length, rev = true)
+            sort!(shape; by=length, rev=true)
             return shape
         end
 
@@ -44,7 +43,7 @@ struct FlagSymmetries{T<:Flag}
             res = []
             for p in automs
                 s2 = [sort!([p[i] for i in part]) for part in shape]
-                p2 = [findfirst(x -> x == s2[i], shape) for i = 1:length(shape)]
+                p2 = [findfirst(x -> x == s2[i], shape) for i in 1:length(shape)]
                 push!(res, p2)
             end
             return setdiff(unique!(res), [collect(1:length(shape))])
@@ -54,9 +53,9 @@ struct FlagSymmetries{T<:Flag}
         automs = aut(F)
         ge = reduceAutomorphismsToRows(automs.gen, shape)
         s = Integer(automs.size / prod([factorial(length(s)) for s in shape]))
-        rowAut = (gen = ge, size = s, fullGroup = generateGroup(perm.(ge), s))
+        rowAut = (gen=ge, size=s, fullGroup=generateGroup(perm.(ge), s))
 
-        new{T}(F, shape, cV, rowAut)
+        return new{T}(F, shape, cV, rowAut)
     end
 end
 
@@ -64,7 +63,6 @@ struct SpechtFlag{T<:Flag}
     F::FlagSymmetries{T}
     T::AbstractAlgebra.Generic.YoungTableau{Int}
 end
-
 
 """
     LasserreModel{T<:Flag, N, D} <: AbstractFlagModel{T, N, D}
@@ -76,17 +74,21 @@ mutable struct LasserreModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     basis::Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}
     sdpData::Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{D,Int}}}
 
-    LasserreModel{T,N,D}() where {T<:Flag,N,D} = new(
-        FlagSymmetries{T}[],
-        Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}(),
-        Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{D,Int}}}(),
-    )
+    function LasserreModel{T,N,D}() where {T<:Flag,N,D}
+        return new(
+            FlagSymmetries{T}[],
+            Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}(),
+            Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{D,Int}}}(),
+        )
+    end
 
-    LasserreModel{T}() where {T<:Flag} = new{T,:limit,Int}(
-        FlagSymmetries{T}[],
-        Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}(),
-        Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{Int,Int}}}(),
-    )
+    function LasserreModel{T}() where {T<:Flag}
+        return new{T,:limit,Int}(
+            FlagSymmetries{T}[],
+            Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}(),
+            Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{Int,Int}}}(),
+        )
+    end
 end
 
 function modelSize(m::LasserreModel)
@@ -98,7 +100,6 @@ function modelBlockSizes(m::LasserreModel)
 end
 
 function findColSpanningSetV3(A)
-
     F = qr(A, Val(true))
     r = sum(abs.(diag(F.R)) .> 0.00000001)
 
@@ -112,14 +113,14 @@ end
 function addFlag!(
     m::LasserreModel{T,N,D},
     g::U;
-    allowedNumberOfLabels = 0:size(g),
-    maxOutVertices = maxPredicateArguments(T) * size(g),
+    allowedNumberOfLabels=0:size(g),
+    maxOutVertices=maxPredicateArguments(T) * size(g),
 ) where {T<:Flag,N,D,U<:Flag}
     g = labelCanonically(g)
     gS = FlagSymmetries(g)
 
     if gS in m.generators
-        return
+        return nothing
     end
 
     push!(m.generators, gS)
@@ -129,8 +130,9 @@ function addFlag!(
     n = 2 * graphSize
     lambda = nothing
     if graphSize > 0
-        lambda =
-            AbstractAlgebra.Partition(vcat([n - graphSize], [length(p) for p in gS.shape]))
+        lambda = AbstractAlgebra.Partition(
+            vcat([n - graphSize], [length(p) for p in gS.shape])
+        )
     else
         lambda = AbstractAlgebra.Partition([1])
     end
@@ -141,7 +143,7 @@ function addFlag!(
     for mu in biggerShapes(lambda)
         #TODO: check if congruent % 2 is enough (yes according to Flagmatic paper)
         if sum(mu.part[2:end]) in allowedNumberOfLabels &&
-           sum(mu.part[2:end]) + 2 * (size(g) - sum(mu.part[2:end])) <= maxOutVertices #&& sum(mu.part[2:end]) + (length(mu.part) > 1 ? mu.part[2] : 0) + 2*(m.flagType.nV(g) - sum(mu.part[2:end])) <= maxOutVertices # maxLabelled #&& sum(mu.part[2:end]) % 2 == maxLabelled % 2
+            sum(mu.part[2:end]) + 2 * (size(g) - sum(mu.part[2:end])) <= maxOutVertices #&& sum(mu.part[2:end]) + (length(mu.part) > 1 ? mu.part[2] : 0) + 2*(m.flagType.nV(g) - sum(mu.part[2:end])) <= maxOutVertices # maxLabelled #&& sum(mu.part[2:end]) % 2 == maxLabelled % 2
             K = Kostka(mu, lambda)
 
             reynolds = zeros(Int64, K[1], K[1])
@@ -155,12 +157,12 @@ function addFlag!(
                     reynolds += fullGroup[2][p]
                 end
             else
-                for i = 1:K[1]
+                for i in 1:K[1]
                     reynolds[i, i] = 1
                 end
             end
 
-            push!(info, (mu = mu, R = reynolds, basis = [], K = K))
+            push!(info, (mu=mu, R=reynolds, basis=[], K=K))
 
             colSet = findColSpanningSetV3(reynolds)
 
@@ -179,18 +181,16 @@ function addFlag!(
     return info
 end
 
-
 #TODO: Replace with optimized code from crossing project!
 function multiplyPolytabsAndSymmetrize(
     m::LasserreModel{T,N,D},
     sp1::SpechtFlag{U},
     sp2::SpechtFlag{U},
-    maxVert = -1,
-    limit = true,
-    splitByOverlaps = false,
-    useGroups = false,
+    maxVert=-1,
+    limit=true,
+    splitByOverlaps=false,
+    useGroups=false,
 ) where {T<:Flag,N,D,U<:Flag}
-
     fixVerts1 = setdiff(1:size(sp1.F.F), sp1.F.consideredVecs)
     fixVerts2 = setdiff(1:size(sp2.F.F), sp2.F.consideredVecs)
 
@@ -212,14 +212,10 @@ function multiplyPolytabsAndSymmetrize(
     # n = limit ? sum(p1.part) : (fixedN > -1 ? fixedN : Polynomial([[1] => 1]))
     # la = vcat([n - sum(p1.part[2:end])], p1.part[2:end])
 
-
     n = limit ? sum(sp1.T.part) : (fixedN > -1 ? fixedN : Polynomials.Polynomial([0, 1]))
     la = vcat([n - sum(sp1.T.part[2:end])], sp1.T.part[2:end])
 
-
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
-
-
 
     combinedOverlaps = Dict([])
     for (a, b) in newVariant
@@ -232,9 +228,9 @@ function multiplyPolytabsAndSymmetrize(
 
         # Flagmatic style
         if maxVert == -1 ||
-           sum(shiftedMat[1:end-1, 1:end-1]) +
+            sum(shiftedMat[1:(end - 1), 1:(end - 1)]) +
            2 * max(sum(shiftedMat[:, end]), sum(shiftedMat[end, :])) <= maxVert
-            combinedOverlaps[Int64.(shiftedMat)'] = b // fact
+            combinedOverlaps[Int64.(shiftedMat)'] = b//fact
         end
     end
 
@@ -281,11 +277,11 @@ function multiplyPolytabsAndSymmetrize(
                 minimum([
                     vec(
                         B[
-                            vcat(q.d, length(q.d)+1:size(B, 1)),
-                            vcat(p.d, length(p.d)+1:size(B, 2)),
+                            vcat(q.d, (length(q.d) + 1):size(B, 1)),
+                            vcat(p.d, (length(p.d) + 1):size(B, 2)),
                         ],
-                    ) for p in vcat(grp1, [(d = collect(1:size(B, 2)),)]) for
-                    q in vcat(grp2, [(d = collect(1:size(B, 1)),)])
+                    ) for p in vcat(grp1, [(d=collect(1:size(B, 2)),)]) for
+                    q in vcat(grp2, [(d=collect(1:size(B, 1)),)])
                 ]),
                 size(B),
             )
@@ -316,24 +312,25 @@ function multiplyPolytabsAndSymmetrize(
 
         # @show vecShape2
 
-        correspondingEntries =
-            Matrix{Vector{Int64}}([Int64[] for i = 1:size(B)[1], j = 1:size(B)[2]])
+        correspondingEntries = Matrix{Vector{Int64}}([
+            Int64[] for i in 1:size(B)[1], j in 1:size(B)[2]
+        ])
 
         cur = 1
-        for i = 1:size(B, 1)
-            for j = 1:size(B, 2)
+        for i in 1:size(B, 1)
+            for j in 1:size(B, 2)
                 if B[i, j] > 0
-                    correspondingEntries[i, j] = vecShape2[cur:(cur+B[i, j]-1)]
+                    correspondingEntries[i, j] = vecShape2[cur:(cur + B[i, j] - 1)]
                     cur += B[i, j]
                 end
             end
         end
 
         cur = 1
-        for j = 1:size(B, 2)
-            for i = 1:size(B, 1)
+        for j in 1:size(B, 2)
+            for i in 1:size(B, 1)
                 if B[i, j] > 0
-                    p[vecShape1[cur:(cur+B[i, j]-1)]] = correspondingEntries[i, j]
+                    p[vecShape1[cur:(cur + B[i, j] - 1)]] = correspondingEntries[i, j]
                     cur += B[i, j]
                 end
             end
@@ -363,7 +360,6 @@ function multiplyPolytabsAndSymmetrize(
                 end
             end
         end
-
     end
 
     symmetrizedGraphs = Dict([])
@@ -391,14 +387,12 @@ function multiplyPolytabsAndSymmetrize(
                 symmetrizedGraphs[k] = Dict()
             end
             if haskey(symmetrizedGraphs[k], unSymmetrizedGraphsKeys[i][2:end])
-                symmetrizedGraphs[k][unSymmetrizedGraphsKeys[i][2:end]] +=
-                    resUnsorted[unSymmetrizedGraphsKeys[i]]
+                symmetrizedGraphs[k][unSymmetrizedGraphsKeys[i][2:end]] += resUnsorted[unSymmetrizedGraphsKeys[i]]
                 if iszero(symmetrizedGraphs[k][unSymmetrizedGraphsKeys[i][2:end]])
                     delete!(symmetrizedGraphs[k], unSymmetrizedGraphsKeys[i][2:end])
                 end
             else
-                symmetrizedGraphs[k][unSymmetrizedGraphsKeys[i][2:end]] =
-                    resUnsorted[unSymmetrizedGraphsKeys[i]]
+                symmetrizedGraphs[k][unSymmetrizedGraphsKeys[i][2:end]] = resUnsorted[unSymmetrizedGraphsKeys[i]]
             end
         end
     end
@@ -410,7 +404,6 @@ function multiplyPolytabsAndSymmetrize(
     end
 
     return symmetrizedGraphs
-
 end
 
 function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitByOverlaps = false)
@@ -424,8 +417,7 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
 
     doneCollecting = Threads.Event()
 
-
-    collectData = Channel(Inf; spawn = true) do ch
+    collectData = Channel(Inf; spawn=true) do ch
         for (mu, i, j, blkSize, tmp) in ch
             for G in keys(tmp)
                 if !haskey(m.sdpData, G)
@@ -442,8 +434,9 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
                             m.sdpData[G][overlap] = Dict()
                         end
                         if !haskey(m.sdpData[G][overlap], mu)
-                            m.sdpData[G][overlap][mu] =
-                                spzeros(Rational{Int64}, blkSize, blkSize)
+                            m.sdpData[G][overlap][mu] = spzeros(
+                                Rational{Int64}, blkSize, blkSize
+                            )
                         end
                         m.sdpData[G][overlap][mu][i, j] = tmp[G][overlap]
                     end
@@ -453,16 +446,15 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
         notify(doneCollecting)
     end
 
-
-    limit = Base.Semaphore(max(1,floor(Threads.nthreads() / 2) - 1))
+    limit = Base.Semaphore(max(1, floor(Threads.nthreads() / 2) - 1))
     println()
     for (cm, mu) in collect(enumerate(keys(m.basis)))
         blkSize = length(m.basis[mu])
-        ijInd = [(i, j) for i = 1:blkSize for j = i:blkSize]
+        ijInd = [(i, j) for i in 1:blkSize for j in i:blkSize]
 
         muc = 1
 
-        progressPrint = Channel{Nothing}(1000; spawn = true) do ch
+        progressPrint = Channel{Nothing}(1000; spawn=true) do ch
             updateGap = 0.5
             lastUpdate = time()
             for _ in ch
@@ -505,14 +497,12 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
     end
     close(collectData)
     # @info "Waiting for collection"
-    wait(doneCollecting)
+    return wait(doneCollecting)
     # @info "Notified"
 end
 
 function buildJuMPModel(
-    m::LasserreModel{T,N,D},
-    replaceBlocks = Dict(),
-    jumpModel = Model(),
+    m::LasserreModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model()
 ) where {T,N,D}
     b = modelBlockSizes(m)
     Y = Dict()
@@ -527,7 +517,6 @@ function buildJuMPModel(
                 @constraint(jumpModel, v[1, 1] >= 0)
                 return v
             end
-
         end
     end
 
@@ -549,5 +538,5 @@ function buildJuMPModel(
         graphCoefficients[G] = eG
     end
 
-    return (model = jumpModel, variables = graphCoefficients, blocks = Y, constraints = [])
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=[])
 end

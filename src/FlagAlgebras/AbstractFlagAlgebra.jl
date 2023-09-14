@@ -12,7 +12,6 @@ import Base.hash
 
 include("PartitionOverlaps.jl") # for finite and variable n support
 
-
 """ 
     $(TYPEDEF)
 
@@ -43,24 +42,22 @@ function permute(pred::P, p::AbstractVector{Int}) where {P<:Predicate}
     return nothing
 end
 
-
 """
     addPredicates(::T, ::U, ::Vararg{U} where {T<:Flag,U<:Predicate}
 
 Creates a copy of `F`, and adds all predicates with the given values to the copy. May change the order of vertices of `F`, if necessary (E.g. in the case of `PartiallyLabeledFlag`). The predicates are given as a Vector of Vectors of Predicate-value pairs, sorted by type in a way that `addPredicates` understands.
 """
-function addPredicates(::T, ::U, ::Vararg{U}) where {T<:Flag, U<:Predicate}
+function addPredicates(::T, ::U, ::Vararg{U}) where {T<:Flag,U<:Predicate}
     error("addPredicates is not defined for Flag type $T and predicate type $U")
-    missing
+    return missing
 end
 function addPredicates(F::T) where {T<:Flag}
     return F
 end
 
-
 function ==(A::T, B::T) where {T<:Flag}
     error("Missing comparison operator for $(T)")
-    true
+    return true
 end
 function hash(A::T, h::UInt) where {T<:Flag}
     error("Missing hash function for $(T)")
@@ -83,7 +80,7 @@ The empty Flag of type `T`.
 """
 function Base.one(::Type{T})::T where {T<:Flag}
     error("one is not defined for Flag type $T")
-    missing
+    return missing
 end
 
 """
@@ -93,9 +90,8 @@ The size (number of vertices) of `F`.
 """
 function Base.size(F::T)::Int where {T<:Flag}
     error("size is not defined for Flag type $T")
-    missing
+    return missing
 end
-
 
 """
     :*(F::T, G::T) where {T<:Flag}
@@ -105,9 +101,8 @@ The gluing operation of type `T`. Should, for example, glue unlabeled vertices t
 function Base.:*(F::T, G::T) where {T<:Flag}
     n = size(F)
     m = size(G)
-    glue(F, G, m+1:m+n)
+    return glue(F, G, (m + 1):(m + n))
 end
-
 
 """
     aut(F::T)::NamedTuple{(:gen, :size),Tuple{Vector{Vector{Int64}},Int64}} where {T<:Flag}
@@ -117,10 +112,10 @@ The automorphisms of `F`. Returns a named tuple with fields
 * `size::Int`: The size of the automorphism group of `F`.
 """
 function aut(
-    F::T,
+    F::T
 )::NamedTuple{(:gen, :size),Tuple{Vector{Vector{Int64}},Int64}} where {T<:Flag}
-    grp = label(F; removeIsolated = false)[2]
-    return (gen = grp.gen, size = order(grp))
+    grp = label(F; removeIsolated=false)[2]
+    return (gen=grp.gen, size=order(grp))
 end
 
 """
@@ -139,9 +134,8 @@ Glues together the two Flags `F` and `G`, after applying the permutation `p` to 
 """
 function glue(F::T, G::T, p::AbstractVector{Int}) where {T<:Flag}
     error("glue is not defined for Flag type $T with target type $T")
-    missing
+    return missing
 end
-
 
 """
     glue(Fs::Vararg{T}) where {T<:Flag}
@@ -170,14 +164,7 @@ glue() = nothing
 
 Glues together the flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. This variant of `glue` is for optimizing over finite objects, given by `N` which should be one of the options `:limit`, `:variable` or an integer. The operation assumes the k vertices that are sent on top of each other by `p` correspond to labels, and assumes that the other vertices are unlabeled, i.e. get sent to all `N-k` other vertices. 
 """
-function glueFinite(
-    N,
-    F::T,
-    G::T,
-    p::AbstractVector{Int};
-    labelFlags = true,
-) where {T<:Flag}
-
+function glueFinite(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
     if N == :limit
         return glue(F, G, p)
     end
@@ -190,7 +177,7 @@ function glueFinite(
     # G has vertices 1:size(G)
     # F has vertices p[1:size(F)]
 
-    labelsF = [i for i = 1:size(F) if p[i] <= size(G)]
+    labelsF = [i for i in 1:size(F) if p[i] <= size(G)]
     labelsG = intersect(1:size(G), p[1:size(F)])
 
     @assert length(labelsF) == length(labelsG)
@@ -200,13 +187,12 @@ function glueFinite(
     freeF = setdiff(1:size(F), labelsF)
     freeG = setdiff(1:size(G), labelsG)
 
-
     if length(freeF) == 0 || length(freeG) == 0
         tmp = glue(F, G, p)
         if tmp === nothing
             return QuantumFlag{T,Rational{Int}}()
         end
-        return 1 // 1 * tmp
+        return 1//1 * tmp
     end
 
     freePositions = N - k
@@ -216,11 +202,9 @@ function glueFinite(
 
     ovs = overlaps(lambda, mu, freePositions, false, true)
 
-
-    factor = 1 // sum(x for (x, _) in ovs; init = 0)
+    factor = 1//sum(x for (x, _) in ovs; init=0)
 
     res = QuantumFlag{T,Rational{Int}}()
-
 
     for (c, o) in ovs
         po = deepcopy(p)
@@ -231,9 +215,6 @@ function glueFinite(
 
             # po[freeG[j]] = freeF[i]
             po[freeF[i]] = freeG[j]
-
-
-
         end
         newG = glue(F, G, po)
         if newG !== nothing
@@ -248,17 +229,14 @@ function glueFinite(
     end
 end
 
-
-
 """
     permute(F::T, p::AbstractVector{Int})::T where {T<:Flag}
 
 Permutes the vertices of `F` according to the permutation `p`.
 """
 function permute(F::T, p::AbstractVector{Int}) where {T<:Flag}
-    glue(F, one(T), p)
+    return glue(F, one(T), p)
 end
-
 
 """
     isSym(F::T, v1::Int, v2::Int)::Bool where {T<:Flag}
@@ -267,7 +245,7 @@ Returns true if the permutation which swaps the vertices `v1` and `v2` is an aut
 """
 function isSym(F::T, v1::Int, v2::Int)::Bool where {T<:Flag}
     error("isSym is not defined for Flag type $T")
-    missing
+    return missing
 end
 
 """
@@ -277,7 +255,7 @@ Returns the sub-Flag indexed by `vertices`, which is a subset of `1:size(F)`.
 """
 function subFlag(F::T, vertices::AbstractVector{Int})::T where {T<:Flag}
     error("subFlag is not defined for Flag type $T")
-    missing
+    return missing
 end
 
 """
@@ -288,8 +266,6 @@ Returns the sub-Flag given by the indicator vector `vertices`, which is a `BitVe
 function subFlag(F::T, vertices::BitVector)::T where {T<:Flag}
     return subFlag(F, findall(vertices))
 end
-
-
 
 """
     findUnknownPredicates(F::T, fixed::Vector{Vector{Int}})
@@ -305,13 +281,11 @@ The only unclear predicate here is the edge [2,3], i.e. this function should ret
     [[EdgePredicate(2,3)]]
 """
 function findUnknownPredicates(
-    F::T,
-    fixed::Vector{U} = Vector{Int}[],
+    F::T, fixed::Vector{U}=Vector{Int}[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     error("findUnknownPredicates is not defined for Flag type $T")
     return missing
 end
-
 
 """
     countEdges(F::T)::Vector{Int} where {T<:Flag}
@@ -339,14 +313,13 @@ function removeIsolated(F::T) where {T<:Flag}
     return subFlag(F, .!isoV)
 end
 
-
 """
     vertexColor(::T, ::Int) where {T<:Flag}
 
 Returns the color of vertices in colored Flags. The default is the case of a vertex-transitive Flags-type, where all vertices have color `1`.
 """
 function vertexColor(::T, ::Int) where {T<:Flag}
-    1
+    return 1
 end
 
 """
@@ -368,7 +341,6 @@ function isVariableVertex(F::T, v::Int) where {T<:Flag}
     return true
 end
 
-
 """
     maxPredicateArguments(::Type{T}) where {T<:Flag}
 
@@ -386,16 +358,15 @@ Checks if two flags are isomorphic.
 """
 function isIsomorphic(F::T, G::T) where {T<:Flag}
     # Can be optimized! Do not need to run the full algorithm.
-    labelCanonically(F) == labelCanonically(G)
+    return labelCanonically(F) == labelCanonically(G)
 end
-
 
 """
     isSubFlag(F::T, G::T) where {T<:Flag}
 
 Checks if 'F' appears as sub-flag of 'G'.
 """
-function isSubFlag(F::T, G::T; induced = F isa InducedFlag) where {T<:Flag}
+function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
     # Very basic brute force algorithm
     m = size(F)
     n = size(G)

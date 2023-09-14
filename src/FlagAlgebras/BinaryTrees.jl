@@ -1,7 +1,6 @@
 using LinearAlgebra
 using Combinatorics
 
-
 # vertices = leaves. All other notes have degree 2. Inducibility density
 # In "drawable" leaf order (not nice for flag algebras) 
 struct BinaryTree
@@ -10,7 +9,7 @@ struct BinaryTree
     right::Union{BinaryTree,Nothing}
 
     BinaryTree(left, right) = new(false, left, right)
-    BinaryTree(isEmptyTree = true) = new(isEmptyTree, nothing, nothing)
+    BinaryTree(isEmptyTree=true) = new(isEmptyTree, nothing, nothing)
 end
 
 # In any leaf order
@@ -18,7 +17,7 @@ struct BinaryTreeFlag <: Flag
     tree::BinaryTree
     perm::Vector{Int}
 
-    BinaryTreeFlag(tree, perm) = begin
+    function BinaryTreeFlag(tree, perm)
         @assert size(tree) == length(perm)
         auts = aut(tree)
 
@@ -38,10 +37,10 @@ struct BinaryTreeFlag <: Flag
         return new(tree, perm2)
     end
     BinaryTreeFlag(tree::BinaryTree) = new(tree, 1:size(tree))
-    BinaryTreeFlag(isEmptyTree = true) =
-        new(BinaryTree(isEmptyTree), isEmptyTree ? Int[] : Int[1])
+    function BinaryTreeFlag(isEmptyTree=true)
+        return new(BinaryTree(isEmptyTree), isEmptyTree ? Int[] : Int[1])
+    end
 end
-
 
 # import Base.show
 function Base.show(io::IO, T::BinaryTree)
@@ -65,21 +64,20 @@ function printTree(io::IO, T::BinaryTree, perm::Vector{Int})
         printTree(io, T.left, perm[1:size(T.left)])
         # print(io, ")(")
         print(io, " ")
-        printTree(io, T.right, perm[size(T.left)+1:end])
+        printTree(io, T.right, perm[(size(T.left) + 1):end])
         print(io, ")")
     end
 end
 
 function Base.show(io::IO, T::BinaryTreeFlag)
-    printTree(io, T.tree, T.perm)
+    return printTree(io, T.tree, T.perm)
 end
-
 
 function ==(A::BinaryTree, B::BinaryTree)
-    A.isEmptyTree == B.isEmptyTree && A.left == B.left && A.right == B.right
+    return A.isEmptyTree == B.isEmptyTree && A.left == B.left && A.right == B.right
 end
 function ==(A::BinaryTreeFlag, B::BinaryTreeFlag)
-    A.tree == B.tree && A.perm == B.perm
+    return A.tree == B.tree && A.perm == B.perm
 end
 function hash(A::BinaryTree, h::UInt)
     return hash(
@@ -95,7 +93,6 @@ end
 function permute(F::BinaryTreeFlag, p::AbstractVector{Int})
     return BinaryTreeFlag(F.tree, p[F.perm])
 end
-
 
 Base.one(::Type{BinaryTree}) = BinaryTree()
 Base.one(::Type{BinaryTreeFlag}) = BinaryTreeFlag()
@@ -115,61 +112,51 @@ function size(G::BinaryTreeFlag)::Int
 end
 
 function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
-
     if g1 == BinaryTree() && g2 == BinaryTree()
-        return 1 // 1 * BinaryTreeFlag(g1)
+        return 1//1 * BinaryTreeFlag(g1)
     end
 
     if g1 == BinaryTree() || g2 == BinaryTree()
-
         if g1 == BinaryTree()
-            return 1 // 1 * BinaryTreeFlag(g2)
+            return 1//1 * BinaryTreeFlag(g2)
         else
-            return 1 // 1 * BinaryTreeFlag(g1)
+            return 1//1 * BinaryTreeFlag(g1)
         end
     end
 
-
-
     res = []
 
-    p = vcat(p, 1:minimum(vcat([size(g1) + size(g2)], p))-1)
+    p = vcat(p, 1:(minimum(vcat([size(g1) + size(g2)], p)) - 1))
 
     trees = filter!(
-        x -> size(x) == length(p),
-        generateAll(BinaryTree, length(p), [1]; upToIso = true),
+        x -> size(x) == length(p), generateAll(BinaryTree, length(p), [1]; upToIso=true)
     )
-
 
     resLock = ReentrantLock()
 
     Threads.@threads for c in collect(combinations(1:length(p), size(g1)))
         q = zeros(Int, length(p))
         for q1 in SymmetricGroup(size(g1))
-
             @views q[p[1:size(g1)]] .= c[q1.d]
 
             for t in trees
                 @views if g1 == subFlag(t, c[q1.d])
                     for q2 in SymmetricGroup(length(p) - size(g1))
-
-                        @views q[setdiff(1:length(p), p[1:size(g1)])] .=
-                            setdiff(1:length(p), c)[q2.d]
+                        @views q[setdiff(1:length(p), p[1:size(g1)])] .= setdiff(
+                            1:length(p), c
+                        )[q2.d]
 
                         @views if g2 == subFlag(t, q[1:size(g2)])
-
                             t2 = label(t)
                             lock(resLock) do
                                 push!(res, t2)
                             end
                         end
                     end
-
                 end
             end
         end
     end
-
 
     m = length(res)
 
@@ -178,36 +165,27 @@ function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
     end
 
     return sum(
-        factorial(size(r)) // (aut(r).size * factorial(length(p))) * BinaryTreeFlag(r) for
+        factorial(size(r))//(aut(r).size * factorial(length(p))) * BinaryTreeFlag(r) for
         r in res
     )
 end
 
 # TODO: precompute all products at once 
 
-treeGlueDict::Dict{
-    Tuple{BinaryTree,BinaryTree,AbstractVector{Int}},
-    Union{Nothing,QuantumFlag{BinaryTreeFlag,Rational{Int64}}},
-} = Dict{
+treeGlueDict::Dict{Tuple{BinaryTree,BinaryTree,AbstractVector{Int}},Union{Nothing,QuantumFlag{BinaryTreeFlag,Rational{Int64}}}} = Dict{
     Tuple{BinaryTree,BinaryTree,AbstractVector{Int}},
     Union{Nothing,QuantumFlag{BinaryTreeFlag,Rational{Int64}}},
 }()
 
 function glue(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
-
     get!(treeGlueDict, (g1, g2, p)) do
         glueNoDict(g1, g2, p)
     end
-
 end
 
 function generateAll(
-    ::Type{BinaryTree},
-    maxVertices::Int,
-    maxPredicates::Vector{Int} = [1];
-    upToIso = true,
+    ::Type{BinaryTree}, maxVertices::Int, maxPredicates::Vector{Int}=[1]; upToIso=true
 )
-
     function attachAllWays(t::BinaryTree)
         res = [BinaryTree(t, BinaryTree(false)), BinaryTree(BinaryTree(false), t)]
         if t.left === nothing
@@ -224,8 +202,8 @@ function generateAll(
     end
 
     trees = [[BinaryTree(false)]]
-    for k = 2:maxVertices
-        treesK = vcat(attachAllWays.(trees[k-1])...)
+    for k in 2:maxVertices
+        treesK = vcat(attachAllWays.(trees[k - 1])...)
         if upToIso
             push!(trees, unique(label.(treesK)))
         else
@@ -234,16 +212,12 @@ function generateAll(
     end
 
     return vcat([BinaryTree()], trees...)
-
 end
-
 
 # check if swapping v1 and v2 leaves g invariant
 function isSym(g::BinaryTree, v1::Int, v2::Int)::Bool
-
     vMin = min(v1, v2)
     vMax = max(v1, v2)
-
 
     if size(g) == 2 && vMin == 1 && vMax == 2
         return true
@@ -267,13 +241,11 @@ end
 
 # check if swapping v1 and v2 leaves g invariant
 function isSym(g::BinaryTreeFlag, v1::Int, v2::Int)::Bool
-
     v1p = findfirst(x -> x == v1, g.perm)
     v2p = findfirst(x -> x == v2, g.perm)
 
     return isSym(g.tree, v1p, v2p)
 end
-
 
 function subFlag(F::BinaryTree, vertices::AbstractVector{Int})
     if length(vertices) == 0
@@ -325,12 +297,11 @@ function subFlag(F::BinaryTree, vertices::AbstractVector{Int})
 end
 
 function aut(F::BinaryTree)
-
     if F.left === nothing && F.right === nothing
         if F.isEmptyTree
-            return (gen = Vector{Int}[Int[]], size = 1)
+            return (gen=Vector{Int}[Int[]], size=1)
         else
-            return (gen = Vector{Int}[Int[1]], size = 1)
+            return (gen=Vector{Int}[Int[1]], size=1)
         end
     end
 
@@ -342,8 +313,11 @@ function aut(F::BinaryTree)
 
     if F.left === F.right
         return (
-            gen = vcat([vcat(g, ln+1:2*ln) for g in leftAut.gen], [vcat(ln+1:2*ln, 1:ln)]),
-            size = 2 * (leftAut.size^2),
+            gen=vcat(
+                [vcat(g, (ln + 1):(2 * ln)) for g in leftAut.gen],
+                [vcat((ln + 1):(2 * ln), 1:ln)],
+            ),
+            size=2 * (leftAut.size^2),
         )
     else
         rightAut = aut(F.right)
@@ -351,20 +325,19 @@ function aut(F::BinaryTree)
             empty!(rightAut.gen)
         end
         return (
-            gen = vcat(
-                [vcat(g, ln+1:ln+size(F.right)) for g in leftAut.gen],
+            gen=vcat(
+                [vcat(g, (ln + 1):(ln + size(F.right))) for g in leftAut.gen],
                 [vcat(1:ln, c .+ ln) for c in rightAut.gen],
             ),
-            size = leftAut.size * rightAut.size,
+            size=leftAut.size * rightAut.size,
         )
     end
 end
 
 function aut(F::BinaryTreeFlag)
-
     automs = aut(F.tree)
 
-    return (gen = [F.perm[g] for g in automs.gen], size = automs.size)
+    return (gen=[F.perm[g] for g in automs.gen], size=automs.size)
 end
 
 function label(F::BinaryTree)
@@ -407,7 +380,7 @@ function countEdges(::BinaryTreeFlag)::Vector{Int}
 end
 
 function isolatedVertices(F::BinaryTreeFlag)::BitVector
-    return [false for i = 1:size(F)]
+    return [false for i in 1:size(F)]
 end
 
 function labelCanonically(F::BinaryTree)::BinaryTree
@@ -422,7 +395,7 @@ function joinLevel(T::BinaryTreeFlag, v::Int, w::Int)
     v == w && return 0
 
     leftVerts = T.perm[1:size(T.tree.left)]
-    rightVerts = T.perm[size(T.tree.left)+1:end]
+    rightVerts = T.perm[(size(T.tree.left) + 1):end]
     if (v in leftVerts) && (w in leftVerts)
         return joinLevel(BinaryTreeFlag(T.tree.left, leftVerts), v, w) + 1
     elseif !(v in leftVerts) && !(w in leftVerts)

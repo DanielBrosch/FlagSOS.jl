@@ -22,15 +22,14 @@ addForbiddenFlag(m, triangle)
 addLasserreBlock!(m, 4);
 
 # This results in a semidefinite programming problem with block sizes
-@test modelSize(m).part == Int[5,4,4,2,2,1,1,1] #src
+@test modelSize(m).part == Int[5, 4, 4, 2, 2, 1, 1, 1] #src
 modelSize(m)
 
 # We want to maximize the `edge` density, which we can do by minimizing its negative
-m.objective = -1*edge
+m.objective = -1 * edge
 
 # Finally, we compute the coefficients of the SDP.
 computeSDP!(m)
-
 
 # ## Solving the SDP 
 # We solve the relaxation using [Hypatia](https://github.com/chriscoey/Hypatia.jl).

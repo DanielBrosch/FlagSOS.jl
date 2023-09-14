@@ -10,12 +10,11 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
     n::Int
     function PartiallyLabeledFlag{T}(F::T, n::Int) where {T<:Flag}
         @assert size(F) >= n "More labeled vertices than vertices in the Flag."
-        new(F, n)
+        return new(F, n)
     end
-    PartiallyLabeledFlag{T}(opts::Vararg; n::Int = 0) where {T<:Flag} =
-        new{T}(T(opts...), n)
-    PartiallyLabeledFlag(F::T; n::Int = 0) where {T<:Flag} = new{T}(F, n)
-    PartiallyLabeledFlag{T}(F::T; n::Int = 0) where {T<:Flag} = new{T}(F, n)
+    PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = new{T}(T(opts...), n)
+    PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
+    PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
 end
 
 function numLabels(F::PartiallyLabeledFlag)
@@ -33,29 +32,27 @@ struct LabelPredicate <: Predicate
 end
 
 function permute(
-    F::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int},
+    F::PartiallyLabeledFlag{T}, p::AbstractVector{Int}
 )::PartiallyLabeledFlag{T} where {T<:Flag}
-    F.n > 0 && @assert 1:F.n == p[1:F.n]
+    F.n > 0 && @assert 1:(F.n) == p[1:(F.n)]
 
     return PartiallyLabeledFlag{T}(permute(F.F, p), F.n)
 end
 
 function permute(pred::LabelPredicate, p::AbstractVector{Int})
-    LabelPredicate(p[pred.i])
+    return LabelPredicate(p[pred.i])
 end
 
 function ==(A::PartiallyLabeledFlag{T}, B::PartiallyLabeledFlag{T}) where {T<:Flag}
-    A.F == B.F && A.n == B.n
+    return A.F == B.F && A.n == B.n
 end
 
 function hash(A::PartiallyLabeledFlag{T}, h::UInt) where {T<:Flag}
     return hash(A.F, hash(A.n, hash(:PartiallyLabeledFlag, h)))
 end
 
-
 function Base.one(F::PartiallyLabeledFlag{T})::PartiallyLabeledFlag{T} where {T<:Flag}
-    PartiallyLabeledFlag{T}(one(F.F), 0)
+    return PartiallyLabeledFlag{T}(one(F.F), 0)
 end
 
 Base.size(F::PartiallyLabeledFlag)::Int = size(F.F)
@@ -67,12 +64,11 @@ function Base.:*(F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}) where {
     n = size(F)
     m = size(G)
 
-    glue(F, G, vcat(1:F.n, m+1:m+n-F.n))
+    return glue(F, G, vcat(1:(F.n), (m + 1):(m + n - F.n)))
 end
 
 function subFlag(
-    F::PartiallyLabeledFlag{T},
-    vertices::Vector{Int},
+    F::PartiallyLabeledFlag{T}, vertices::Vector{Int}
 )::PartiallyLabeledFlag{T} where {T<:Flag}
     # sort to make sure labeled vertices are at the front
     if !issorted(vertices)
@@ -81,7 +77,7 @@ function subFlag(
     end
     subF = subFlag(F.F, vertices)
 
-    newLabeledNodes = length(intersect(1:F.n, vertices))
+    newLabeledNodes = length(intersect(1:(F.n), vertices))
 
     return PartiallyLabeledFlag{T}(subF, newLabeledNodes)
 end
@@ -92,13 +88,10 @@ end
 Glues together the two partially labeled Flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. `p` may be a permutation involving more than `size(F)` vertices, but should send the labeled part of `F` to the labeled part of `G`, without permuting indices there.
 """
 function glue(
-    F::PartiallyLabeledFlag{T},
-    G::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int},
+    F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}, p::AbstractVector{Int}
 ) where {T<:Flag}
-
     F.n > 0 &&
-        @assert 1:F.n == p[1:F.n] "Labeled vertices should be glued to labeled vertices without being permuted."
+        @assert 1:(F.n) == p[1:(F.n)] "Labeled vertices should be glued to labeled vertices without being permuted."
 
     FG = glue(F.F, G.F, p)
     FG === nothing && return nothing
@@ -107,7 +100,6 @@ function glue(
         return QuantumFlag(PartiallyLabeledFlag{T}(f) => d for (f, d) in FG.coeff)
     end
     return PartiallyLabeledFlag{T}(FG, max(F.n, G.n))
-
 end
 
 function vertexColor(F::PartiallyLabeledFlag{T}, v::Int) where {T<:Flag}
@@ -129,7 +121,7 @@ Returns the isolated, and un-labeled vertices of `F`.
 """
 function isolatedVertices(F::PartiallyLabeledFlag)::BitVector
     isoV = isolatedVertices(F.F)
-    isoV[1:F.n] .= false
+    isoV[1:(F.n)] .= false
     return isoV
 end
 
@@ -138,20 +130,18 @@ function distinguish(F::PartiallyLabeledFlag{T}, v::Int, W::BitVector) where {T<
 end
 
 function distinguish(P::LabelPredicate, v::Int, W::BitVector)
-    return P.i == v + 2*W[P.i]
+    return P.i == v + 2 * W[P.i]
 end
 
 function one(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
-    PartiallyLabeledFlag{T}(one(T), 0)
+    return PartiallyLabeledFlag{T}(one(T), 0)
 end
 
 function findUnknownPredicates(
-    F::PartiallyLabeledFlag{T},
-    fixed::Vector{U},
+    F::PartiallyLabeledFlag{T}, fixed::Vector{U}
 ) where {T<:Flag,U<:AbstractVector{Int}}
-    unknownLabels = [LabelPredicate(i) for i = 1:size(F) if !(i in vcat(fixed...))]
+    unknownLabels = [LabelPredicate(i) for i in 1:size(F) if !(i in vcat(fixed...))]
     return [unknownLabels, findUnknownPredicates(F.F, fixed)...]
-
 end
 
 function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
@@ -160,19 +150,16 @@ function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
 end
 
 function addPredicates(
-    F::PartiallyLabeledFlag{T},
-    p::Vector{U},
-    preds::Vararg,
+    F::PartiallyLabeledFlag{T}, p::Vector{U}, preds::Vararg
 ) where {T<:Flag,U<:Predicate}
     if U == LabelPredicate
-
         F2 = length(preds) > 0 ? addPredicates(F.F, preds) : F.F
         F2 === nothing && return nothing
-        newLabels = setdiff!([p.i for p in p], 1:F.n)
+        newLabels = setdiff!([p.i for p in p], 1:(F.n))
 
-        pGoal = vcat(1:F.n, newLabels, setdiff(F.n+1:size(F), newLabels))
+        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
         p = zeros(Int, size(F))
-        for i = 1:size(F)
+        for i in 1:size(F)
             p[pGoal[i]] = i
         end
         F3 = permute(F2, p)

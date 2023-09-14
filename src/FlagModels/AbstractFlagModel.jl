@@ -21,7 +21,6 @@ function modelBlockSizes(m::T) where {T<:AbstractFlagModel}
     return missing
 end
 
-
 function computeSDP!(m::T) where {T<:AbstractFlagModel}
     error("computeSDP! not implemented for $T")
     return missing

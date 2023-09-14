@@ -11,17 +11,31 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     sdpData::Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}
     forbiddenFlags::Set{T}
 
-    RazborovModel{T,N,D}() where {T<:Flag,N,D} = new(Dict{T,Vector{PartiallyLabeledFlag{T}}}(), Dict(), Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}(), Set{T}())
+    function RazborovModel{T,N,D}() where {T<:Flag,N,D}
+        return new(
+            Dict{T,Vector{PartiallyLabeledFlag{T}}}(),
+            Dict(),
+            Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}(),
+            Set{T}(),
+        )
+    end
 
-    RazborovModel{T}() where {T<:Flag} = new{T,:limit,Int}(Dict{T,Vector{PartiallyLabeledFlag{T}}}(), Dict(), Dict{T,Dict{T,SparseMatrixCSC{Int,Int}}}(),Set{T}())
+    function RazborovModel{T}() where {T<:Flag}
+        return new{T,:limit,Int}(
+            Dict{T,Vector{PartiallyLabeledFlag{T}}}(),
+            Dict(),
+            Dict{T,Dict{T,SparseMatrixCSC{Int,Int}}}(),
+            Set{T}(),
+        )
+    end
 end
 
-function isAllowed(m::RazborovModel{T, N, D}, F::T) where{T<:Flag, N,D}
-    return isAllowed(F) && !any(f->isSubFlag(f, F), m.forbiddenFlags)
+function isAllowed(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
+    return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
 end
 
-function addForbiddenFlag(m::RazborovModel{T,N,D}, F::T) where {T<:Flag, N,D}
-    push!(m.forbiddenFlags, F)
+function addForbiddenFlag(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
+    return push!(m.forbiddenFlags, F)
 end
 
 function modelSize(m::RazborovModel)
@@ -39,19 +53,21 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
     flags = generateAll(T, n, [99999])
     @info "Splitting $(length(flags)) flags..."
 
-    filter!(f->isAllowed(M, f), flags)
+    filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
         for m in n:-2:size(Ftmp)
-            k = Int((n-m)/2)
+            k = Int((n - m) / 2)
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
-            FBlock = label(F; removeIsolated = false)[1]
-            @assert FBlock == label(FBlock; removeIsolated = false)[1]
-            FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
+            FBlock = label(F; removeIsolated=false)[1]
+            @assert FBlock == label(FBlock; removeIsolated=false)[1]
+            FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
-            
-            FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(PartiallyLabeledFlag{T}(FExtended, m), preds)
+
+            FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(
+                PartiallyLabeledFlag{T}(FExtended, m), preds
+            )
             razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
         end
     end
@@ -68,7 +84,11 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
             gen = zeros(Int, length(B))
             for (i, b) in enumerate(B)
                 @assert length(p) == b.n
-                pb = labelCanonically(PartiallyLabeledFlag{T}(permute(b.F, vcat(p, length(p)+1:size(b))), b.n))
+                pb = labelCanonically(
+                    PartiallyLabeledFlag{T}(
+                        permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
+                    ),
+                )
                 gen[i] = findfirst(x -> x == pb, B)
             end
             push!(newGen, gen)
@@ -76,15 +96,15 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
 
         P = zeros(Int, length(B), length(B))
         i = 1
-        c = [1,1]
+        c = [1, 1]
         while true
-            pos = findnext(x->x==0,P,CartesianIndex{2}(c...))
+            pos = findnext(x -> x == 0, P, CartesianIndex{2}(c...))
             pos === nothing && break
             c[1] = pos[1]
             c[2] = pos[2]
             newPos = [c]
-            P[c[1],c[2]] = i
-            P[c[2],c[1]] = i
+            P[c[1], c[2]] = i
+            P[c[2], c[1]] = i
             while !isempty(newPos)
                 ci = popfirst!(newPos)
                 for p in newGen
@@ -93,7 +113,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
                         push!(newPos, pc)
                         P[pc[1], pc[2]] = i
                         P[pc[2], pc[1]] = i
-                    end   
+                    end
                 end
             end
             i += 1
@@ -104,11 +124,9 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
 
     M.basis = reducedBasis
     return reducedBasis#, blockSizes
-
 end
 
 function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
-
     m.sdpData = Dict()
 
     for (muc, (mu, B)) in enumerate(m.basis)
@@ -118,7 +136,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
 
         P = m.blockSymmetry[mu]
         maxP = maximum(P.pattern)
-        for s = 1:maxP
+        for s in 1:maxP
             print("$s / $maxP      \r")
             c = findfirst(x -> x == s, P.pattern)
             i = c[1]
@@ -132,7 +150,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
 
             newSize = k + (n1 - k) + (n2 - k)
             p = collect(1:newSize)
-            p[k+1:n1] = n2+1:newSize
+            p[(k + 1):n1] = (n2 + 1):newSize
 
             T1 = a.F
             p1 = p[1:size(a.F)]
@@ -141,24 +159,28 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
             T2 = b.F
             p2 = 1:size(b.F)
 
-            p2Inv = [findfirst(x -> x == i, p2) for i = 1:n2]
+            p2Inv = [findfirst(x -> x == i, p2) for i in 1:n2]
             p2Inv = vcat(p2Inv, setdiff(1:newSize, p2Inv))
             p1Fin = p2Inv[p1]
             p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
 
-            @views sort!(p1Fin[n1+1:end])
+            @views sort!(p1Fin[(n1 + 1):end])
 
             p1Fin = Int.(p1Fin)
 
             if !(T <: InducedFlag) # Apply Moebius transform on labels
-
                 t = glueFinite(N, T1, T2, p1Fin; labelFlags=false)
                 overlappingVerts = Int.(intersect(1:size(T2), p1Fin[1:size(T1)]))
                 overlapGraph = subFlag(T2, overlappingVerts)
 
                 missingPreds = findUnknownPredicates(overlapGraph, Vector{Int}[])
                 markers = [permute(p, overlappingVerts) for p in vcat(missingPreds...)]
-                tMarked = labelCanonically(sum(c * EdgeMarkedFlag{T}(F, markers) for (F, c) in t.coeff; init=QuantumFlag{EdgeMarkedFlag{T},Rational{Int}}()))
+                tMarked = labelCanonically(
+                    sum(
+                        c * EdgeMarkedFlag{T}(F, markers) for (F, c) in t.coeff;
+                        init=QuantumFlag{EdgeMarkedFlag{T},Rational{Int}}(),
+                    ),
+                )
 
                 t = moebius(tMarked)
                 t = labelCanonically(t)
@@ -168,10 +190,6 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                 t = labelCanonically(t)
             end
 
-
-
-
-
             for (F, c) in t.coeff
                 if !haskey(m.sdpData, F)
                     m.sdpData[F] = Dict()
@@ -179,7 +197,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                 if !haskey(m.sdpData[F], mu)
                     m.sdpData[F][mu] = zeros(Rational{Int}, length(B), length(B))
                 end
-                m.sdpData[F][mu][P.pattern.==s] .= c
+                m.sdpData[F][mu][P.pattern .== s] .= c
             end
         end
     end
@@ -188,7 +206,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
         # Eliminate linear dependencies 
         @info "Eliminating linear dependencies"
 
-        for (F,B) in m.sdpData
+        for (F, B) in m.sdpData
             if isAllowed(m, F)
                 v = isolatedVertices(F)
                 if !any(v)
@@ -199,15 +217,16 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                 FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
 
                 @assert substitution.coeff[FNoIsolated] == 1
-                
 
-                for (G, c) in substitution.coeff 
+                for (G, c) in substitution.coeff
                     if !haskey(m.sdpData, G)
                         m.sdpData[G] = Dict()
                     end
                     for (mu, b) in m.sdpData[F]
                         if !haskey(m.sdpData[G], mu)
-                            m.sdpData[G][mu] = zeros(Rational{Int}, length(m.basis[mu]), length(m.basis[mu]))
+                            m.sdpData[G][mu] = zeros(
+                                Rational{Int}, length(m.basis[mu]), length(m.basis[mu])
+                            )
                         end
                         m.sdpData[G][mu] += c * b
                     end
@@ -215,27 +234,24 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
             end
             delete!(m.sdpData, F)
         end
-
     end
 
-
-    m.sdpData
+    return m.sdpData
 end
 
 function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model())
     b = modelBlockSizes(m)
     Y = Dict()
 
-
     for (mu, n) in b
         P = m.blockSymmetry[mu].pattern
         name = "y[$mu]"
         t = maximum(P)
         y = @variable(jumpModel, [1:t], base_name = name)
-        AT = typeof(1*y[1])
+        AT = typeof(1 * y[1])
         Y[mu] = zeros(AT, size(P))
-        for s = 1:t
-            Y[mu][P.==s] .+= y[s]
+        for s in 1:t
+            Y[mu][P .== s] .+= y[s]
         end
         if size(P, 1) > 1
             @constraint(jumpModel, Y[mu] in PSDCone())
@@ -251,10 +267,10 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
         eG = AT()
         for mu in keys(b)
             if haskey(m.sdpData[G], mu)
-                for (i,j,c) in Iterators.zip(findnz(m.sdpData[G][mu])...)
-                    i > j && continue 
+                for (i, j, c) in Iterators.zip(findnz(m.sdpData[G][mu])...)
+                    i > j && continue
                     fact = (i == j ? 1 : 2)
-                    add_to_expression!(eG, fact*c,Y[mu][i,j])
+                    add_to_expression!(eG, fact * c, Y[mu][i, j])
                 end
             end
         end

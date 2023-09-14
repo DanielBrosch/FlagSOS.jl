@@ -19,29 +19,27 @@ mutable struct QuadraticModule{T<:Flag,U<:Flag,B,N,D} <:
     baseModel::B
     inequality::QuantumFlag{U}
 
-    QuadraticModule{T,U}(
-        baseModel::B,
-        inequality::QuantumFlag{U},
-    ) where {T<:Flag,U<:Flag,B<:AbstractFlagModel{U,:limit,Int}} =
-        new{T,U,B,:limit,Int}(Dict(), baseModel, inequality)
+    function QuadraticModule{T,U}(
+        baseModel::B, inequality::QuantumFlag{U}
+    ) where {T<:Flag,U<:Flag,B<:AbstractFlagModel{U,:limit,Int}}
+        return new{T,U,B,:limit,Int}(Dict(), baseModel, inequality)
+    end
 
-    QuadraticModule{T}(
-        baseModel::B,
-        inequality::QuantumFlag{T},
-    ) where {T<:Flag,N,D,B<:AbstractFlagModel{T,N,D}} =
-        new{T,T,B,N,D}(Dict(), baseModel, inequality)
+    function QuadraticModule{T}(
+        baseModel::B, inequality::QuantumFlag{T}
+    ) where {T<:Flag,N,D,B<:AbstractFlagModel{T,N,D}}
+        return new{T,T,B,N,D}(Dict(), baseModel, inequality)
+    end
 end
 
 function computeSDP!(
-    m::QuadraticModule{T,U,B,N,D},
+    m::QuadraticModule{T,U,B,N,D}
 ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
-
     @info "computing ineq module"
     computeSDP!(m.baseModel)
 
     m.sdpData = Dict()
     for (G, data) in m.baseModel.sdpData
-
         noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
 
         GH = labelCanonically(noLabel)
@@ -64,7 +62,7 @@ function modelBlockSizes(m::QuadraticModule)
     return modelBlockSizes(m.baseModel)
 end
 
-function buildJuMPModel(m::QuadraticModule, replaceBlocks = Dict(), jumpModel = Model())
+function buildJuMPModel(m::QuadraticModule, replaceBlocks=Dict(), jumpModel=Model())
     b = modelBlockSizes(m)
     Y = Dict()
     for (mu, n) in b
@@ -87,7 +85,7 @@ function buildJuMPModel(m::QuadraticModule, replaceBlocks = Dict(), jumpModel = 
         ) for G in keys(m.sdpData)
     )
 
-    return (model = jumpModel, variables = graphCoefficients, blocks = Y, constraints = [])
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=[])
 end
 
 function modelSize(m::QuadraticModule)
@@ -104,15 +102,15 @@ mutable struct EqualityModule{T<:Flag,U<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     basis::Vector{U}
     equality::QuantumFlag{U}
 
-    EqualityModule{T,U}(equality::QuantumFlag{U}) where {T<:Flag,U<:Flag} =
-        new{T,U,:limit,Int}(Dict(), U[], equality)
-    EqualityModule{T,U,N,D}(equality::QuantumFlag{U}) where {T<:Flag,U<:Flag,N,D} =
-        new{T,U,N,D}(Dict(), U[], equality)
+    function EqualityModule{T,U}(equality::QuantumFlag{U}) where {T<:Flag,U<:Flag}
+        return new{T,U,:limit,Int}(Dict(), U[], equality)
+    end
+    function EqualityModule{T,U,N,D}(equality::QuantumFlag{U}) where {T<:Flag,U<:Flag,N,D}
+        return new{T,U,N,D}(Dict(), U[], equality)
+    end
 end
 
-
 function computeSDP!(m::EqualityModule{T,U,N,D}) where {T<:Flag,U<:Flag,N,D}
-
     m.sdpData = Dict()
     for (i, G) in enumerate(m.basis)
         for (G2, c) in m.equality.coeff
@@ -127,8 +125,6 @@ function computeSDP!(m::EqualityModule{T,U,N,D}) where {T<:Flag,U<:Flag,N,D}
                 @show typeof(GG2)
                 error("Unhandled case")
             end
-            # @show tmpG
-            # @show c
             for (H, c2) in tmpG.coeff
                 if !haskey(m.sdpData, H)
                     m.sdpData[H] = Dict()
@@ -141,12 +137,10 @@ function computeSDP!(m::EqualityModule{T,U,N,D}) where {T<:Flag,U<:Flag,N,D}
 end
 
 function modelBlockSizes(m::EqualityModule)
-    return Dict(i => -1 for i = 1:length(m.basis))
+    return Dict(i => -1 for i in 1:length(m.basis))
 end
 
-
-function buildJuMPModel(m::EqualityModule, replaceBlocks = Dict(), jumpModel = Model())
-
+function buildJuMPModel(m::EqualityModule, replaceBlocks=Dict(), jumpModel=Model())
     @assert length(replaceBlocks) == 0
 
     b = modelBlockSizes(m)
@@ -155,14 +149,12 @@ function buildJuMPModel(m::EqualityModule, replaceBlocks = Dict(), jumpModel = M
         Y[mu] = @variable(jumpModel)
     end
 
-
     graphCoefficients = Dict(
-        G =>
-            sum(Y[mu] * m.sdpData[G][mu] for mu in keys(b) if haskey(m.sdpData[G], mu))
-        for G in keys(m.sdpData)
+        G => sum(Y[mu] * m.sdpData[G][mu] for mu in keys(b) if haskey(m.sdpData[G], mu)) for
+        G in keys(m.sdpData)
     )
 
-    return (model = jumpModel, variables = graphCoefficients, blocks = Y, constraints = [])
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=[])
 end
 
 function modelSize(m::EqualityModule)

@@ -3,7 +3,6 @@ using Test
 using Aqua
 using Documenter
 
-
 """
     _include_sandbox(filename)
 Include the `filename` in a temporary module that acts as a sandbox. (Ensuring
@@ -35,7 +34,7 @@ end
 
 @testset "FlagSOS.jl" begin
     @testset "Code quality (Aqua.jl)" begin
-        Aqua.test_all(FlagSOS; ambiguities = (imported = false))
+        Aqua.test_all(FlagSOS; ambiguities=(imported = false))
     end
 
     @testset "Doctests" begin
@@ -46,4 +45,3 @@ end
         _test_directory.(joinpath(@__DIR__, "..", "docs", "src", "examples"))
     end
 end
-

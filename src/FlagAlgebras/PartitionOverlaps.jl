@@ -5,15 +5,15 @@ using AbstractAlgebra
 R, pN = PolynomialRing(qq, "n")
 
 # Calculates binom(f,a), where f is a polynomial, and k an integer
-function binCoeffPoly(f, k, fact = false)
+function binCoeffPoly(f, k, fact=false)
     if k == 0
-        return 1 // 1
+        return 1//1
     end
     if fact
-        return prod([f + 1 - i for i = 1:k]) .* 1 // factorial(k)
+        return prod([f + 1 - i for i in 1:k]) .* 1//factorial(k)
     else
         tmp = f
-        for i = 2:k
+        for i in 2:k
             tmp *= f + 1 - i
         end
         return tmp
@@ -21,18 +21,17 @@ function binCoeffPoly(f, k, fact = false)
 end
 
 # Calculate the number of ways [n] can be split into partition (n-sum lambda, lambda)
-function numSplits(p, total = pN)
+function numSplits(p, total=pN)
     if length(p) == 0
         return 1
     end
     tmpB = 1
-    for k = 1:length(p)
+    for k in 1:length(p)
         tmpB *= factorial(p[k])
     end
-    tmpA = 1 // tmpB
+    tmpA = 1//tmpB
     shift = 0
-    for k = 1:length(p)
-
+    for k in 1:length(p)
         tmpA *= binCoeffPoly(total - shift, p[k], false)
         shift += p[k]
     end
@@ -40,12 +39,12 @@ function numSplits(p, total = pN)
 end
 
 # Calculates all vectors entrywise at most p with sum k
-function allSmallerPartsOfSizeUpTo(p, k, exact = false)
+function allSmallerPartsOfSizeUpTo(p, k, exact=false)
     res = []
     if length(p) == 0
         return [[]]
     end
-    for i = 0:min(p[1], k)
+    for i in 0:min(p[1], k)
         if i == k || ((!exact) && length(p) == 1)
             push!(res, vcat([i], repeat([0], length(p) - 1)))
         elseif !exact || sum(p[2:end]) >= k - i
@@ -57,7 +56,6 @@ function allSmallerPartsOfSizeUpTo(p, k, exact = false)
     end
     return res
 end
-
 
 """
     overlaps(lambda, mu [, total = pN, limit::Bool = false, fixedN = false])
@@ -77,14 +75,13 @@ Corresponds to the two ways the partitions (1,n-1) and (2,n-2) can overlap. The 
 function overlaps(
     lambda::AbstractVector,
     mu::AbstractVector,
-    total = pN,
-    limit::Bool = false,
-    fixedN::Bool = false,
+    total=pN,
+    limit::Bool=false,
+    fixedN::Bool=false,
 )
-
     res = []
 
-    if fixedN && total < sum(mu; init = 0)
+    if fixedN && total < sum(mu; init=0)
         return res
     end
 
@@ -92,7 +89,7 @@ function overlaps(
 
     options = []
     if limit
-        options = [[0 for i = 1:length(mu)]]
+        options = [[0 for i in 1:length(mu)]]
     else
         options = allSmallerPartsOfSizeUpTo(mu, l1)
     end
@@ -112,10 +109,8 @@ function overlaps(
             end
         else
             push!(
-                res,
-                (multiplicity, hcat(vcat(p, [rest]), vcat(repeat([0], length(p) + 1)))),
+                res, (multiplicity, hcat(vcat(p, [rest]), vcat(repeat([0], length(p) + 1))))
             )
-
         end
     end
     return res

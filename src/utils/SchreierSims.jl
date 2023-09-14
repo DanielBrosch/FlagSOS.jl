@@ -11,10 +11,10 @@ mutable struct Group
     SV::Vector{Int} # Schreier Vector
     O::Vector{Int} # Orbit of b
     order::AbstractVector{Int} # target order of basis elements (usually 1:n, does get modified when point-wise stabilizers are searched for)
-    subGroup::Union{Group, Nothing}
-    Group() = new(-1,Vector{Int}[], -1, Int[], Int[], Int[], nothing)
+    subGroup::Union{Group,Nothing}
+    Group() = new(-1, Vector{Int}[], -1, Int[], Int[], Int[], nothing)
 
-    function Group(gens::Vector{Vector{Int}}, order = 1:length(gens[1]))
+    function Group(gens::Vector{Vector{Int}}, order=1:length(gens[1]))
         G = Group()
         G.order = order
 
@@ -24,14 +24,14 @@ mutable struct Group
             G.n = length(gens[1])
             schreier_sims!(G)
         end
-        G
+        return G
     end
 
-    function Group(gen::Vector{Int}, order = 1:length(gen))
+    function Group(gen::Vector{Int}, order=1:length(gen))
         G = Group()
         G.order = order
         addGen!(G, gen)
-        G
+        return G
     end
 end
 
@@ -73,13 +73,13 @@ function orbitSchreier(G::Group)
     n = G.n
     empty!(G.O)
     push!(G.O, G.b)
-    G.SV = zeros(Int,n)
-    G.SV[G.b] = -1 
+    G.SV = zeros(Int, n)
+    G.SV[G.b] = -1
     i = 1
     while i <= length(G.O)
         @inbounds w = G.O[i]
-        for (k,p) in enumerate(G.gen)
-            j = findfirst(x->x==w, p)
+        for (k, p) in enumerate(G.gen)
+            j = findfirst(x -> x == w, p)
             if !(j in G.O)
                 push!(G.O, j)
                 G.SV[j] = k
@@ -88,16 +88,16 @@ function orbitSchreier(G::Group)
         i += 1
     end
     sort!(G.O)
-    nothing
+    return nothing
 end
 
 function findInvRepr(G::Group, v::Int)
-    g = collect(1:G.n)
+    g = collect(1:(G.n))
 
     while v != G.b
         k = G.SV[v]
-        if k == 0 
-            return nothing 
+        if k == 0
+            return nothing
         end
         p = G.gen[k]
         g .= p[g]
@@ -108,13 +108,13 @@ end
 
 function schreier_sims!(G)
     if length(G.gen) == 0
-        return nothing 
+        return nothing
     end
 
     oldB = G.b
     G.b = -1
 
-    for i = G.order
+    for i in G.order
         # G.gen[1] enough for SGS, but not for point-wise stabilizers
         for g in G.gen
             if g[i] != i
@@ -129,9 +129,9 @@ function schreier_sims!(G)
 
     if oldB != G.b
         G.subGroup = Group()
-        G.subGroup.n = G.n 
+        G.subGroup.n = G.n
         G.subGroup.order = G.order
-    elseif G.subGroup.order != G.order 
+    elseif G.subGroup.order != G.order
         G.subGroup.order = G.order
         schreier_sims!(G.subGroup)
     end
@@ -148,21 +148,20 @@ function schreier_sims!(G)
 
     for i in G.O
         r = findInvRepr(G, i)
-        if r !== nothing 
+        if r !== nothing
             for s in G.gen
                 # rs = inv(r)*s 
                 # rs s[r]
                 rs[r] .= s
-                rsrsbar = sift(G.subGroup,findInvRepr(G, rs[G.b])[rs])
+                rsrsbar = sift(G.subGroup, findInvRepr(G, rs[G.b])[rs])
                 # if !isone(rsrsbar)
-                if rsrsbar != 1:G.n
+                if rsrsbar != 1:(G.n)
                     # @show G.gen
                     # @show G.SGS
                     # @show G.SV
                     # @show (r,s,rsrsbar)
                     addGen!(G.subGroup, rsrsbar)
-                    
-                    
+
                     # @show rsrsbar
                 end
             end
@@ -170,24 +169,22 @@ function schreier_sims!(G)
     end
 end
 
-
 function sift(G::Group, p::Vector{Int})
     if length(G.gen) == 0 || p == 1:length(p)#isone(p)
-        return p 
+        return p
     end
     gInv = findInvRepr(G, p[G.b])
-    
-    if gInv !== nothing 
+
+    if gInv !== nothing
         # p *= gInv
         p .= gInv[p]
     end
-    
-    if G.subGroup !== nothing 
+
+    if G.subGroup !== nothing
         return sift(G.subGroup, p)
     end
-    
+
     return p
-    
 end
 
 sift(::Nothing, p::Vector{Int}) = p
@@ -196,7 +193,7 @@ sift(::Nothing, p::Vector{Int}) = p
 function addGen!(G::Group, p::Vector{Int})
     q = sift(G, p)
     # if !isone(q)
-    if q != 1:G.n
+    if q != 1:(G.n)
         # @info "Adding to group"
         # display(G)
         # display(p)
@@ -204,7 +201,7 @@ function addGen!(G::Group, p::Vector{Int})
         push!(G.gen, q)
         if G.n == -1
             G.n = length(q)
-            G.order = 1:G.n
+            G.order = 1:(G.n)
         end
         schreier_sims!(G)
         return true
@@ -213,17 +210,17 @@ function addGen!(G::Group, p::Vector{Int})
 end
 
 function SGS(G::Group)
-    if G.subGroup === nothing 
+    if G.subGroup === nothing
         return G.gen
     end
-    union(G.gen, SGS(G.subGroup))
+    return union(G.gen, SGS(G.subGroup))
 end
 
 function Basis(G::Group)
     if G.subGroup.b == -1
         return [G.b]
     end
-    vcat([G.b], Basis(G.subGroup))
+    return vcat([G.b], Basis(G.subGroup))
 end
 
 function order(G::Group)
@@ -235,11 +232,11 @@ end
 
 function Base.in(p::Vector{Int}, G::Group)
     # isone(sift(G, p))
-    sift(G, p) == 1:G.n
+    return sift(G, p) == 1:(G.n)
 end
 
 function stabilizer(G::Group, S::Vector{Int})
-    order = vcat(S, setdiff(1:G.n, S))
+    order = vcat(S, setdiff(1:(G.n), S))
     H = G
     while H.b in S
         H = H.subGroup
@@ -252,24 +249,23 @@ function stabilizer(G::Group, S::Vector{Int})
 end
 
 # returns same group as stabilizer(G, S), but modifies stabilizer chain of G in the process
-function stabilizer!(G::Group, S::Vector{Int}, keepOrder = false)
-    
+function stabilizer!(G::Group, S::Vector{Int}, keepOrder=false)
     if keepOrder
-        order = vcat(S, setdiff(1:G.n, S))
+        order = vcat(S, setdiff(1:(G.n), S))
         G.order = order
         schreier_sims!(G)
         while G.b in S
             G = G.subGroup
         end
         return G
-    else 
+    else
         # May change order of elements of S in the stabilizer chain
         covered = Int[]
         while G.b in S
             push!(covered, G.b)
             G = G.subGroup
         end
-        order = vcat(covered, setdiff(S, covered), setdiff(1:G.n, S))
+        order = vcat(covered, setdiff(S, covered), setdiff(1:(G.n), S))
         G.order = order
         schreier_sims!(G)
         while G.b in S
@@ -279,7 +275,6 @@ function stabilizer!(G::Group, S::Vector{Int}, keepOrder = false)
     end
 end
 
-
 function permute!(gr::Group, per::Vector{Int})
     if length(gr.gen) == 0
         return gr
@@ -287,17 +282,17 @@ function permute!(gr::Group, per::Vector{Int})
     # @show gr.gen
     # @show p
     p2 = zero(per)
-    for i = 1:length(per)
+    for i in 1:length(per)
         p2[per[i]] = i
     end
     # p2 = perm(p2)
-    for (i,g) in enumerate(gr.gen)
+    for (i, g) in enumerate(gr.gen)
         # @show p2.d 
         # @show g.d 
         # @show per.d 
         # gr.gen[i] = p2*g*per
         gr.gen[i] .= per[g[p2]]
-    end 
+    end
 
     # G.gen .*= p
     gr.b = per[gr.b]

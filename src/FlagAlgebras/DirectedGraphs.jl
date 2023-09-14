@@ -19,10 +19,9 @@ struct DirectedGraph{allowDigons} <: Flag
     DirectedGraph{false}() = new{false}(BitMatrix(undef, 0, 0))
 end
 
-
 import Base.==
 function ==(A::DirectedGraph, B::DirectedGraph)
-    A.A == B.A
+    return A.A == B.A
 end
 import Base.hash
 function hash(A::DirectedGraph, h::UInt)
@@ -32,8 +31,9 @@ end
 isValid(A::DirectedGraph{true}) = true
 isValid(A::DirectedGraph{false}) = !any(A.A .&& A.A')
 
-Base.one(::Type{DirectedGraph{allowDigons}}) where {allowDigons} =
-    DirectedGraph{allowDigons}()
+function Base.one(::Type{DirectedGraph{allowDigons}}) where {allowDigons}
+    return DirectedGraph{allowDigons}()
+end
 
 Base.one(::Type{DirectedGraph}) = one(DirectedGraph{false})
 
@@ -47,17 +47,15 @@ struct DirectedEdgePredicate <: Predicate
     DirectedEdgePredicate(i, j) = new(i, j)
 end
 
-
 function findUnknownPredicates(
-    F::DirectedGraph{allowDigons},
-    fixed::Vector{U},
+    F::DirectedGraph{allowDigons}, fixed::Vector{U}
 )::Vector{Vector{DirectedEdgePredicate}} where {U<:AbstractVector{Int},allowDigons}
     res = DirectedEdgePredicate[]
     for e in Iterators.product(1:size(F), 1:size(F))
         if e[1] != e[2] &&
-           (!F.A[e...]) &&
-           !any(issubset(e, f) for f in fixed) &&
-           (allowDigons == Val(true) || !F.A[e[2], e[1]])
+            (!F.A[e...]) &&
+            !any(issubset(e, f) for f in fixed) &&
+            (allowDigons == Val(true) || !F.A[e[2], e[1]])
             push!(res, DirectedEdgePredicate(e...))
         end
     end
@@ -65,18 +63,15 @@ function findUnknownPredicates(
 end
 
 function addPredicates(
-    G::DirectedGraph{allowDigons},
-    preds::Vector{DirectedEdgePredicate},
+    G::DirectedGraph{allowDigons}, preds::Vector{DirectedEdgePredicate}
 ) where {allowDigons}
     A = Matrix(copy(G.A))
     for p in preds
         allowDigons == false && A[p.j, p.i] == 1 && return nothing
         A[p.i, p.j] = 1
     end
-    DirectedGraph(A)
+    return DirectedGraph(A)
 end
-
-
 
 # apply p to g1, then glue together
 function glue(g1::DirectedGraph, g2::DirectedGraph, p::AbstractVector{Int})
@@ -142,7 +137,7 @@ function distinguish(F::DirectedEdgePredicate, v::Int, W::BitVector)
 end
 
 function permute(pred::DirectedEdgePredicate, p::AbstractVector{Int})
-    DirectedEdgePredicate(p[pred.i], p[pred.j])
+    return DirectedEdgePredicate(p[pred.i], p[pred.j])
 end
 
 function countEdges(F::DirectedGraph)::Vector{Int}
@@ -150,5 +145,5 @@ function countEdges(F::DirectedGraph)::Vector{Int}
 end
 
 function isolatedVertices(F::DirectedGraph)::BitVector
-    return vec(.!any(F.A, dims = 1)) .&& vec(.!any(F.A, dims = 2))
+    return vec(.!any(F.A; dims=1)) .&& vec(.!any(F.A; dims=2))
 end

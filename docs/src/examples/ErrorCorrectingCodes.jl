@@ -33,7 +33,7 @@ push!(m.subModels, rM);
 #block sizes:
 modelBlockSizes(rM)
 
-@test modelSize(rM).part == [10,4,4,2,1,1,1,1,1,1] #src
+@test modelSize(rM).part == [10, 4, 4, 2, 1, 1, 1, 1, 1, 1] #src
 
 # We still need to compute the coefficients of the actual optimization problem
 computeSDP!(m)

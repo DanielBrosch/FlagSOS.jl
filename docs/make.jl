@@ -32,12 +32,7 @@ function _literate_directory(dir)
         Test.@testset "$(filename)" begin
             _include_sandbox(filename)
         end
-        Literate.markdown(
-            filename,
-            dir;
-            documenter = true,
-            credit = true,
-        )
+        Literate.markdown(filename, dir; documenter=true, credit=true)
     end
     return nothing
 end
@@ -60,12 +55,9 @@ makedocs(;
         "Examples" => [
             "examples/TriangleFreeGraphs.md",
             "examples/CaccettaHaeggkvist.md",
-            "examples/ErrorCorrectingCodes.md"
-        ]
+            "examples/ErrorCorrectingCodes.md",
+        ],
     ],
 )
 
-deploydocs(;
-    repo="github.com/DanielBrosch/FlagSOS.jl",
-    devbranch="main",
-)
+deploydocs(; repo="github.com/DanielBrosch/FlagSOS.jl", devbranch="main")
