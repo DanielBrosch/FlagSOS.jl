@@ -15,8 +15,6 @@ using FlagSOS
 
 using Test #src
 
-
-
 # ## Setting up the model
 # We work with directed graphs without digons.
 const Digraph = DirectedGraph{false}
@@ -36,19 +34,18 @@ addLasserreBlock!(m, 4);
 modelSize(m)
 
 # We want to maximize the `directedEdge` density, which we can do by minimizing its negative
-m.objective = -1*directedEdge
+m.objective = -1 * directedEdge
 
 const lDigraph = PartiallyLabeledFlag{Digraph}
 
-e1 = lDigraph(Bool[0 1; 0 0]; n = 1)
-e2 = lDigraph(Bool[0 0; 1 0]; n = 1)
-eL = lDigraph(Bool[0 1; 0 0]; n = 0)
+e1 = lDigraph(Bool[0 1; 0 0]; n=1)
+e2 = lDigraph(Bool[0 0; 1 0]; n=1)
+eL = lDigraph(Bool[0 1; 0 0]; n=0)
 
 qm2 = FlagSOS.addEquality(m, e1 - eL, 4);
 
 # Finally, we compute the coefficients of the SDP.
 computeSDP!(m)
-
 
 # ## Solving the SDP 
 # We solve the relaxation using [Hypatia](https://github.com/chriscoey/Hypatia.jl).
@@ -60,4 +57,4 @@ termination_status(jm.model)
 #-
 objective_value(jm.model)
 
-@test objective_value(jm.model) ≈ 0.3869 atol=5 #src
+@test objective_value(jm.model) ≈ 0.3869 atol = 5 #src
