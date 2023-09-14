@@ -1,10 +1,11 @@
 export FlagModel,
     addLasserreBlock!,
-    addForbiddenFlag,
-    addInequality,
-    addInequality_Lasserre,
-    addEquality,
-    buildStandardModel
+    addForbiddenFlag!,
+    addInequality!,
+    addInequality_Lasserre!,
+    addEquality!,
+    buildStandardModel,
+    addRazborovBlock!
 
 """
     FlagModel{T <: Flag, N, D} <: AbstractFlagModel{T, N, D}
@@ -32,13 +33,13 @@ mutable struct FlagModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     end
 end
 
-function addForbiddenFlag(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
+function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     #TODO: If non-induced, forbid all graphs that can be obtained by adding edges, as well.
     Fl = labelCanonically(F)
     push!(m.forbiddenFlags, Fl)
-    for ms in m.subModels
-        addForbiddenFlag(ms, Fl)
-    end
+    # for ms in m.subModels
+    #     addForbiddenFlag!(ms, Fl)
+    # end
 end
 
 function computeSDP!(m::FlagModel)
@@ -60,7 +61,7 @@ end
 Adds an empty Lasserre block of internal flag type 'T' to 'm' and returns it. One should then use 'addFlag' to add generators to the block. 
 """
 function addLasserreBlock!(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
-    lM = LasserreModel{T,N,D}()
+    lM = LasserreModel{T,N,D}(m)
     push!(m.subModels, lM)
     return lM
 end
@@ -73,7 +74,7 @@ Adds a symmetry reduced Lasserre block of internal flag type 'T' to 'm' and retu
 function addLasserreBlock!(
     m::FlagModel{T,N,D}, maxEdges; maxVertices=maxEdges * maxPredicateArguments(T)
 ) where {T<:Flag,N,D}
-    lM = LasserreModel{T,N,D}()
+    lM = LasserreModel{T,N,D}(m)
     push!(m.subModels, lM)
 
     Fs = generateAll(T, Int(floor(maxVertices / 2)), Int.(floor.(maxEdges / 2)))
@@ -87,7 +88,22 @@ function addLasserreBlock!(
     return lM
 end
 
-function addInequality(
+"""
+   addLasserreBlock!(m::FlagModel{T,N,D}, maxEdges::Int; maxVertices = maxEdges * maxPredicateArguments(T)) where {T<:Flag,N,D}
+
+Adds a symmetry reduced Lasserre block of internal flag type 'T' to 'm' and returns it. All flags with up to 'floor(maxEdges/2)' edges (resp. true predicates) with optionally at most 'floor(maxVertices/2)' vertices are added as generators of the block. The resulting hierarchy contains flags with at most 'maxEdges' edges and 'maxVertices' vertices.
+"""
+function addRazborovBlock!(
+    m::FlagModel{T,N,D}, lvl
+) where {T<:Flag,N,D}
+    rM = RazborovModel{T,N,D}(m)
+    push!(m.subModels, rM);
+    computeRazborovBasis!(rM, lvl)
+
+    return rM
+end
+
+function addInequality!(
     m::FlagModel{T,N,D}, g::QuantumFlag{U,D}, baseModel::B
 ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
     gl = labelCanonically(g)
@@ -96,7 +112,7 @@ function addInequality(
     return qM
 end
 
-function addInequality_Lasserre(
+function addInequality_Lasserre!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{T,D},
     maxEdges;
@@ -121,7 +137,7 @@ function addInequality_Lasserre(
     return qM
 end
 
-function addInequality_Lasserre(
+function addInequality_Lasserre!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
@@ -150,7 +166,7 @@ function addInequality_Lasserre(
     return qM
 end
 
-function addEquality(
+function addEquality!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
@@ -179,7 +195,7 @@ function addEquality(
     return qM
 end
 
-function addEquality(
+function addEquality!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{T,D},
     maxEdges;

@@ -73,20 +73,23 @@ mutable struct LasserreModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     generators::Vector{FlagSymmetries{T}}
     basis::Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}
     sdpData::Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{D,Int}}}
+    parentModel
 
-    function LasserreModel{T,N,D}() where {T<:Flag,N,D}
+    function LasserreModel{T,N,D}(parent=nothing) where {T<:Flag,N,D}
         return new(
             FlagSymmetries{T}[],
             Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}(),
             Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{D,Int}}}(),
+            parent,
         )
     end
 
-    function LasserreModel{T}() where {T<:Flag}
+    function LasserreModel{T}(parent=nothing) where {T<:Flag}
         return new{T,:limit,Int}(
             FlagSymmetries{T}[],
             Dict{AbstractAlgebra.Generic.Partition,Vector{SpechtFlag{T}}}(),
             Dict{T,Dict{AbstractAlgebra.Generic.Partition,SparseMatrixCSC{Int,Int}}}(),
+            parent,
         )
     end
 end
@@ -404,6 +407,13 @@ function multiplyPolytabsAndSymmetrize(
     end
 
     return symmetrizedGraphs
+end
+
+function isAllowed(m::LasserreModel, F::T) where {T<:Flag}
+    if m.parentModel !== nothing
+        return isAllowed(m.parentModel, F)
+    end
+    return isAllowed(F)
 end
 
 function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitByOverlaps = false)

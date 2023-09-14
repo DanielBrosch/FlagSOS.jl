@@ -9,33 +9,32 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     basis::Dict{T,Vector{PartiallyLabeledFlag{T}}}
     blockSymmetry::Dict
     sdpData::Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}
-    forbiddenFlags::Set{T}
+    parentModel
 
-    function RazborovModel{T,N,D}() where {T<:Flag,N,D}
+    function RazborovModel{T,N,D}(parent=nothing) where {T<:Flag,N,D}
         return new(
             Dict{T,Vector{PartiallyLabeledFlag{T}}}(),
             Dict(),
             Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}(),
-            Set{T}(),
+            parent,
         )
     end
 
-    function RazborovModel{T}() where {T<:Flag}
+    function RazborovModel{T}(parent=nothing) where {T<:Flag}
         return new{T,:limit,Int}(
             Dict{T,Vector{PartiallyLabeledFlag{T}}}(),
             Dict(),
             Dict{T,Dict{T,SparseMatrixCSC{Int,Int}}}(),
-            Set{T}(),
+            parent,
         )
     end
 end
 
 function isAllowed(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
-    return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
-end
-
-function addForbiddenFlag(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
-    return push!(m.forbiddenFlags, F)
+    if m.parentModel !== nothing
+        return isAllowed(m.parentModel, F)
+    end
+    return isAllowed(F)
 end
 
 function modelSize(m::RazborovModel)

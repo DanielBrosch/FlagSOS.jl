@@ -11,7 +11,7 @@ using Test #src
 
 N = 11 # length
 W = 3  # weight 
-D = 4;  # distance
+D = 4; # distance
 
 # The type ConstantWeightCode{W,D} models all codes with constant weight `W` and minimum distance `D`, independent of its length `N`.
 
@@ -25,12 +25,9 @@ e = WDCode(ones(Bool, 1, W))
 m.objective = -1 * e
 
 # ## Initializing the Razborov hierarchy
-# We chose to work with the Razborov hierarchy at level `6`, which is based on densities of subcodes fully contained in `lvl` coordinates of the code. This is the same hierarchy [Flagmatic](http://lidicky.name/flagmatic/) uses. 
+# We chose to work with the Razborov hierarchy at level `6`, which is based on densities of subcodes fully contained in `lvl` vertices of the code. This is the same hierarchy [Flagmatic](http://lidicky.name/flagmatic/) uses. 
 lvl = 6
-rM = RazborovModel{WDCode,N,Rational{Int}}()
-computeRazborovBasis!(rM, lvl)
-push!(m.subModels, rM);
-#block sizes:
+rM = addRazborovBlock!(m, lvl)
 modelBlockSizes(rM)
 
 @test modelSize(rM).part == [10, 4, 4, 2, 1, 1, 1, 1, 1, 1] #src
