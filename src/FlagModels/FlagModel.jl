@@ -36,7 +36,7 @@ end
 function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     #TODO: If non-induced, forbid all graphs that can be obtained by adding edges, as well.
     Fl = labelCanonically(F)
-    push!(m.forbiddenFlags, Fl)
+    return push!(m.forbiddenFlags, Fl)
     # for ms in m.subModels
     #     addForbiddenFlag!(ms, Fl)
     # end
@@ -93,11 +93,9 @@ end
 
 Adds a symmetry reduced Lasserre block of internal flag type 'T' to 'm' and returns it. All flags with up to 'floor(maxEdges/2)' edges (resp. true predicates) with optionally at most 'floor(maxVertices/2)' vertices are added as generators of the block. The resulting hierarchy contains flags with at most 'maxEdges' edges and 'maxVertices' vertices.
 """
-function addRazborovBlock!(
-    m::FlagModel{T,N,D}, lvl
-) where {T<:Flag,N,D}
+function addRazborovBlock!(m::FlagModel{T,N,D}, lvl) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
-    push!(m.subModels, rM);
+    push!(m.subModels, rM)
     computeRazborovBasis!(rM, lvl)
 
     return rM
