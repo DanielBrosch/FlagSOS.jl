@@ -52,6 +52,8 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        # "Flag models" => "FlagModel.md",
+        # "Flag algebras" => "FlagAlgebras.md",
         "Examples" => [
             "examples/TriangleFreeGraphs.md",
             "examples/CaccettaHaeggkvist.md",

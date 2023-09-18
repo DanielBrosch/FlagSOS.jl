@@ -11,6 +11,7 @@ An abstract Flag-SOS model. `T` is the Flag-type used internally, i.e. as variab
 """
 abstract type AbstractFlagModel{T<:Flag,N,D} end
 
+
 function modelSize(m::T) where {T<:AbstractFlagModel}
     error("modelSize not implemented for $T")
     return missing
@@ -27,7 +28,7 @@ function computeSDP!(m::T) where {T<:AbstractFlagModel}
 end
 
 "Returns (Variables, Constraints)"
-function buildJuMPModel(m::T) where {T<:AbstractFlagModel}
+function buildJuMPModel(m::T, replaceBlocks=Dict(), jumpModel=Model()) where {T<:AbstractFlagModel}
     error("buildJuMPModel not implemented for $T")
     return missing
 end
