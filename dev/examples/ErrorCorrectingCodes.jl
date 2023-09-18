@@ -37,7 +37,7 @@ computeSDP!(m)
 
 # ## Solving the SDP
 # Now we can solve it to a high precision
-using Hypatia, JuMP
+using Hypatia, JuMP, GenericLinearAlgebra
 setprecision(256)
 M = buildJuMPModel(m, Dict(), GenericModel{BigFloat}());
 set_optimizer(M.model, Hypatia.Optimizer{BigFloat})
