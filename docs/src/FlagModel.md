@@ -3,7 +3,3 @@
 ```@meta
 CurrentModule = FlagSOS
 ```
-
-```@docs
-AbstractFlagModel
-```
