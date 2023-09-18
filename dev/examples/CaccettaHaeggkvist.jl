@@ -19,8 +19,8 @@ using Test #src
 # We work with directed graphs without digons.
 const Digraph = DirectedGraph{false}
 # We define the relevant graphs using their adjacency matrices.
-directedEdge = Digraph(Bool[0 1; 0 0]);
-directedTriangle = Digraph(Bool[0 1 0; 0 0 1; 1 0 0]);
+directedEdge = Digraph(Bool[0 1; 0 0]) # o -> o
+directedTriangle = Digraph(Bool[0 1 0; 0 0 1; 1 0 0]) # x -> o -> o -> x
 
 # We start with an empty [`FlagModel`](@ref) of type [`DirectedGraph`](@ref), where we forbid the directed triangle:
 m = FlagModel{Digraph}()
@@ -33,14 +33,13 @@ addLasserreBlock!(m, 4);
 # This results in a semidefinite programming problem with block sizes
 modelSize(m)
 
-# We want to maximize the `directedEdge` density, which we can do by minimizing its negative
+# We obtain an equivalent formulation of the conjecture the following way: We remove additional outgoing edges, until every vertex has relative outdegree exactly r. Then r is exactly the edge density of the digraph, i.e. we want to maximize the density of `directedEdge`. This we can do by minimizing its negative
 m.objective = -1 * directedEdge
 
+# We add the constraint that every vertex has relative outdegree identical to the (directed) edge density of the graph.  
 const lDigraph = PartiallyLabeledFlag{Digraph}
-
-e1 = lDigraph(Bool[0 1; 0 0]; n=1)
-e2 = lDigraph(Bool[0 0; 1 0]; n=1)
-eL = lDigraph(Bool[0 1; 0 0]; n=0)
+e1 = lDigraph(Bool[0 1; 0 0]; n=1) # 1 -> o
+eL = lDigraph(Bool[0 1; 0 0]; n=0) # o -> o
 
 qm2 = FlagSOS.addEquality!(m, e1 - eL, 4);
 
