@@ -25,7 +25,7 @@ addLasserreBlock!(m, 4);
 @test modelSize(m).part == Int[5, 4, 4, 2, 2, 1, 1, 1] #src
 modelSize(m)
 
-# We want to maximize the `edge` density, which we can do by minimizing its negative
+# We want to maximize the `edge` density, which we do by minimizing its negative
 m.objective = -1 * edge
 
 # Finally, we compute the coefficients of the SDP.
