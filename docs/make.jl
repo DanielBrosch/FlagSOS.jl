@@ -26,6 +26,7 @@ end
 
 function _literate_directory(dir)
     rm.(_file_list(dir, dir, ".md"))
+    rm.(_file_list(dir, dir, ".ipynb"))
     for filename in _file_list(dir, dir, ".jl")
         # `include` the file to test it before `#src` lines are removed. It is
         # in a testset to isolate local variables between files.
@@ -33,6 +34,7 @@ function _literate_directory(dir)
             _include_sandbox(filename)
         end
         Literate.markdown(filename, dir; documenter=true, credit=true)
+        Literate.notebook(filename, dir; execute=false)
     end
     return nothing
 end
