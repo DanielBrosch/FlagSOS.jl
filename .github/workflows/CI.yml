@@ -39,6 +39,7 @@ jobs:
         with:
           files: lcov.info
   docs:
+    if: ${{ false }} # disable for now as its very slow, replaced with new job below
     name: Documentation
     runs-on: ubuntu-latest
     permissions:
