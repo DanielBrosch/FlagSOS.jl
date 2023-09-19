@@ -234,15 +234,6 @@ function labelCanonically(F::QuantumFlag{T,R})::QuantumFlag{T,R} where {T<:Flag,
     return res
 end
 
-"""
-    labelCanonically(Fs::Vector{T})::Vector{T} where {T <: Flag}
-
-Labels all Flags in `Fs` canonically. If two Flags are isomorphic, this function should return the same Flag.
-"""
-function labelCanonically(Fs::Vector{T})::Vector{T} where {T<:Flag}
-    return labelCanonically.(Fs)
-end
-
 function removeIsolated(F::QuantumFlag{T,D}) where {T<:Flag,D}
     res = QuantumFlag{T,D}()
 

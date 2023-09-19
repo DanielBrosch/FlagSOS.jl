@@ -20,6 +20,7 @@ where $F$, $G_i$, $H_i$ are quantum flags (linear combinations of sub-model dens
 - [Basic example: Mantel's theorem](@ref)
 - [Constrained example: Caccetta Haeggkvist conjecture](@ref)
 - [Finite + high precision example: Error correcting codes](@ref)
+- [Non-binary example: symmetric functions](@ref)
 
 ## Reference
 
