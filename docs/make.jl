@@ -60,6 +60,7 @@ makedocs(;
             "examples/TriangleFreeGraphs.md",
             "examples/CaccettaHaeggkvist.md",
             "examples/ErrorCorrectingCodes.md",
+            "examples/SymmetricFunctions.md",
         ],
     ],
 )

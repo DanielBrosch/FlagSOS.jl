@@ -32,9 +32,6 @@ Base.size(F::InducedFlag)::Int = size(F.F)
 function labelCanonically(F::InducedFlag{T})::InducedFlag{T} where {T<:Flag}
     return InducedFlag{T}(label(F.F; removeIsolated=false)[1])
 end
-function labelCanonically(Fs::Vector{T})::Vector{T} where {T<:InducedFlag}
-    return labelCanonically.(Fs)
-end
 
 function countEdges(F::InducedFlag{T})::Vector{Int} where {T<:Flag}
     return countEdges(F.F)

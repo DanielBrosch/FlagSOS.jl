@@ -1,3 +1,4 @@
+export generateAll
 
 include("SchreierSims.jl")
 
@@ -278,7 +279,8 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}) wh
 
         for f in generatedGraphs[i]
             newF = permute(f, 1:i)
-            uP = findUnknownPredicates(newF, [collect(1:(i - 1))])
+            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
+            uP = findUnknownPredicates(newF, fixed)
             push!(nextGraphs, newF)
             if length(uP) == 1 && length(uP[1]) == 0
                 continue

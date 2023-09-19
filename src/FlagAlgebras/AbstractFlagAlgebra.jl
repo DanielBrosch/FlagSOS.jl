@@ -128,6 +128,15 @@ function labelCanonically(F::T)::T where {T<:Flag}
 end
 
 """
+    labelCanonically(Fs::Vector{T})::Vector{T} where {T <: Flag}
+
+Labels all Flags in `Fs` canonically. If two Flags are isomorphic, this function should return the same Flag.
+"""
+function labelCanonically(Fs::Vector{T})::Vector{T} where {T<:Flag}
+    return labelCanonically.(Fs)
+end
+
+"""
     glue(F::T, G::T, p::Vector{Int})::U where {T<:Flag, U<:Flag}
 
 Glues together the two Flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. `p` may be a permutation involving more than `size(F)` vertices, in which case the result should have at least `maximum(p)` vertices. Optionally specifices a different output Flag type, for cases where the internal Flag type differs and there are performance advantages (such as the case of internal non-induced Graphs and the gluing of two induced Graphs).
@@ -404,6 +413,17 @@ function isAllowed(F::T, e::P) where {T<:Flag,P<:Predicate}
     return true
 end
 
+"""
+    allowMultiEdges(::T) where {T<:Flag}
+
+Can edges be added multiple times? More generally, can we repeatedly add to the same predicate value?
+
+For most combinatoric models this should return `false`.
+"""
+function allowMultiEdges(::Type{T}) where {T<:Flag}
+    return false
+end
+
 include("InducedFlags.jl")
 include("Graphs.jl")
 include("ConstantWeightCodes.jl")
@@ -411,3 +431,4 @@ include("DirectedGraphs.jl")
 include("PartiallyLabeledFlags.jl")
 include("BinaryTrees.jl")
 include("EdgeMarkedFlags.jl")
+include("SymmetricFunctions.jl")
