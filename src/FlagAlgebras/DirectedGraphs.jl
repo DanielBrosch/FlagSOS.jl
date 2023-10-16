@@ -1,7 +1,5 @@
 export DirectedGraph
 
-# TODO: Permuting vertices changes direction of edges!
-
 """ 
     $(TYPEDEF)
 
@@ -28,8 +26,19 @@ function hash(A::DirectedGraph, h::UInt)
     return hash(A.A, hash(:DirectedGraph, h))
 end
 
-isValid(A::DirectedGraph{true}) = true
-isValid(A::DirectedGraph{false}) = !any(A.A .&& A.A')
+isAllowed(A::DirectedGraph{true}) = true
+
+function isAllowed(A::DirectedGraph{false})
+    n = size(A)
+    for i in 1:n
+        for j in (i + 1):n
+            if A.A[i, j] && A.A[j, i]
+                return false
+            end
+        end
+    end
+    return true
+end
 
 function Base.one(::Type{DirectedGraph{allowDigons}}) where {allowDigons}
     return DirectedGraph{allowDigons}()
@@ -45,6 +54,14 @@ struct DirectedEdgePredicate <: Predicate
     i::Int
     j::Int
     DirectedEdgePredicate(i, j) = new(i, j)
+end
+
+function isAllowed(F::DirectedGraph{false}, P::DirectedEdgePredicate)
+    return !F.A[P.j, P.i]
+end
+
+function predicateType(::Type{DirectedGraph{F}}) where {F}
+    return DirectedEdgePredicate
 end
 
 function findUnknownPredicates(
@@ -65,30 +82,35 @@ end
 function addPredicates(
     G::DirectedGraph{allowDigons}, preds::Vector{DirectedEdgePredicate}
 ) where {allowDigons}
-    A = Matrix(copy(G.A))
+    A = deepcopy(G.A)
     for p in preds
+        @assert p.i <= size(A, 1)
+        @assert p.j <= size(A, 2)
         allowDigons == false && A[p.j, p.i] == 1 && return nothing
         A[p.i, p.j] = 1
     end
-    return DirectedGraph(A)
+    return DirectedGraph{allowDigons}(A)
 end
 
 # apply p to g1, then glue together
-function glue(g1::DirectedGraph, g2::DirectedGraph, p::AbstractVector{Int})
+function glue(
+    g1::DirectedGraph{allowDigons}, g2::DirectedGraph{allowDigons}, p::AbstractVector{Int}
+) where {allowDigons}
     n1 = size(g1)
     n2 = size(g2)
     n = max(n2, length(p) > 0 ? maximum(p) : 0)
 
-    res = BitMatrix(zeros(n, n))
-    res[1:n2, 1:n2] = g2.A
-    res[p[1:n1], p[1:n1]] .|= g1.A
+    # res = BitMatrix(zeros(Bool, n, n))
+    res = BitMatrix(undef, n, n)
+    @views res[1:n2, 1:n2] = g2.A
+    @views res[p[1:n1], p[1:n1]] .|= g1.A
 
-    res = DirectedGraph(res)
-    !isValid(res) && return nothing
+    res = DirectedGraph{allowDigons}(res)
+    !isAllowed(res) && return nothing
     return res
 end
 
-function glue(Gs::Vararg{DirectedGraph})
+function glue(Gs::Vararg{DirectedGraph{allowDigons}}) where {allowDigons}
     if length(Gs) == 1
         return Gs[1]
     elseif length(Gs) == 2
@@ -102,8 +124,8 @@ function glue(Gs::Vararg{DirectedGraph})
         res .|= g.A
     end
 
-    res = DirectedGraph(res)
-    !isValid(res) && return nothing
+    res = DirectedGraph{allowDigons}(res)
+    !isAllowed(res) && return nothing
     return res
 end
 
@@ -128,12 +150,21 @@ function maxPredicateArguments(::Type{DirectedGraph{allowDigons}}) where {allowD
     return 2
 end
 
-function distinguish(F::DirectedGraph, v::Int, W::BitVector)
-    return (sum(F.A[W, v]), sum(F.A[v, W]))
+function distinguish(F::DirectedGraph, v::Int, W::BitVector)::UInt
+    eout = 0
+    ein = 0
+    for i in eachindex(W)
+        if W[i]
+            eout += F.A[i, v]
+            ein += F.A[v, i]
+        end
+    end
+    return hash(eout, hash(ein))
+    # return hash((sum(F.A[i, v] for i in findall(W)), sum(F.A[v, i] for i in findall(W))))
 end
 
-function distinguish(F::DirectedEdgePredicate, v::Int, W::BitVector)
-    return 3 * (v == F.i && W[F.j]) + 5 * (v == F.j && W[F.i])
+function distinguish(F::DirectedEdgePredicate, v::Int, W::BitVector)::UInt
+    return hash(UInt(3) * (v == F.i && W[F.j]) + UInt(5) * (v == F.j && W[F.i]))
 end
 
 function permute(pred::DirectedEdgePredicate, p::AbstractVector{Int})

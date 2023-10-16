@@ -31,6 +31,10 @@ struct LabelPredicate <: Predicate
     i::Int
 end
 
+function predicateType(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
+    return Union{LabelPredicate, predicateType(T)}
+end
+
 function permute(
     F::PartiallyLabeledFlag{T}, p::AbstractVector{Int}
 )::PartiallyLabeledFlag{T} where {T<:Flag}
@@ -125,12 +129,12 @@ function isolatedVertices(F::PartiallyLabeledFlag)::BitVector
     return isoV
 end
 
-function distinguish(F::PartiallyLabeledFlag{T}, v::Int, W::BitVector) where {T<:Flag}
+function distinguish(F::PartiallyLabeledFlag{T}, v::Int, W::BitVector)::UInt where {T<:Flag}
     return distinguish(F.F, v, W)
 end
 
-function distinguish(P::LabelPredicate, v::Int, W::BitVector)
-    return P.i == v + 2 * W[P.i]
+function distinguish(P::LabelPredicate, v::Int, W::BitVector)::UInt
+    return hash(P.i == v + 2 * W[P.i])
 end
 
 function one(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
@@ -140,8 +144,13 @@ end
 function findUnknownPredicates(
     F::PartiallyLabeledFlag{T}, fixed::Vector{U}
 ) where {T<:Flag,U<:AbstractVector{Int}}
-    unknownLabels = [LabelPredicate(i) for i in 1:size(F) if !(i in vcat(fixed...))]
-    return [unknownLabels, findUnknownPredicates(F.F, fixed)...]
+    return findUnknownPredicates(F.F, fixed)
+end
+
+function findUnknownGenerationPredicates(
+    F::PartiallyLabeledFlag{T}, fixed::Vector{U}=Vector{Int}[]
+) where {T<:Flag,U<:AbstractVector{Int}}
+    return [LabelPredicate[LabelPredicate(i) for i in F.n+1:size(F) if !(i in vcat(fixed...))]]
 end
 
 function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
@@ -150,30 +159,54 @@ function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
 end
 
 function addPredicates(
-    F::PartiallyLabeledFlag{T}, p::Vector{U}, preds::Vararg
-) where {T<:Flag,U<:Predicate}
-    if U == LabelPredicate
-        F2 = length(preds) > 0 ? addPredicates(F.F, preds) : F.F
-        F2 === nothing && return nothing
-        newLabels = setdiff!([p.i for p in p], 1:(F.n))
+    F::PartiallyLabeledFlag{T}, p::Vector{U}) where {T<:Flag,U<:Predicate}
 
-        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
-        p = zeros(Int, size(F))
-        for i in 1:size(F)
-            p[pGoal[i]] = i
-        end
-        F3 = permute(F2, p)
-        return PartiallyLabeledFlag{T}(F3, F.n + length(newLabels))
-    else
-        if length(preds) > 0
-            F2 = addPredicates(F.F, p, preds)
-        else
-            F2 = addPredicates(F.F, p)
-        end
-        F2 === nothing && return nothing
+    labelPreds = filter(x->x isa LabelPredicate, p)
+    otherPreds = filter(x->!(x isa LabelPredicate), p)
 
+    F2 = length(otherPreds) > 0 ? addPredicates(F.F, otherPreds) : F.F
+    F2 === nothing && return nothing
+
+    if length(labelPreds) == 0
         return PartiallyLabeledFlag{T}(F2, F.n)
     end
+
+    newLabels = setdiff!([p.i for p in p], 1:(F.n))
+
+    pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
+    p = zeros(Int, size(F))
+    for i in 1:size(F)
+        p[pGoal[i]] = i
+    end
+    F3 = permute(F2, p)
+    return PartiallyLabeledFlag{T}(F3, F.n + length(newLabels))
+
+
+    # if U == LabelPredicate
+    #     F2 = length(preds) > 0 ? addPredicates(F.F, preds) : F.F
+    #     F2 === nothing && return nothing
+    #     newLabels = setdiff!([p.i for p in p], 1:(F.n))
+
+    #     pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
+    #     p = zeros(Int, size(F))
+    #     for i in 1:size(F)
+    #         p[pGoal[i]] = i
+    #     end
+    #     F3 = permute(F2, p)
+    #     return PartiallyLabeledFlag{T}(F3, F.n + length(newLabels))
+    # else
+    #     if length(preds) > 0
+    #         F2 = addPredicates(F.F, p, preds)
+    #     else
+    #         # @show U 
+    #         # @show length(p)
+    #         # @show p
+    #         F2 = addPredicates(F.F, p)
+    #     end
+    #     F2 === nothing && return nothing
+
+    #     return PartiallyLabeledFlag{T}(F2, F.n)
+    # end
 end
 
 # function addPredicates(F::PartiallyLabeledFlag{T}, p::Vector{U}, preds::Vararg{Vector{U}}) where {T<:Flag, U<:Predicate}
@@ -196,6 +229,16 @@ function QuantumFlag{T}(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T<:Fla
     for (f, c) in F.coeff
         f2 = f.F
         res.coeff[f2] = get(res.coeff, f2, 0) + c
+    end
+    return res
+end
+
+
+function toInduced(F::Union{PartiallyLabeledFlag{T}, QuantumFlag{PartiallyLabeledFlag{T}}}) where {T<:Flag}
+    tmp = zeta(F)
+    res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T}}, Int}()
+    for (G,c) in tmp.coeff
+        res += c*PartiallyLabeledFlag{InducedFlag{T}}(InducedFlag(G.F), G.n)
     end
     return res
 end

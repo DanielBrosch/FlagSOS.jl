@@ -41,7 +41,6 @@ function orbit(G::Group, v::Int)
     while i <= length(O)
         @inbounds w = O[i]
         for p in G.gen
-            @show p
             j = p[w]
             if !(j in O)
                 push!(O, j)

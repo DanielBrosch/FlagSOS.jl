@@ -1,4 +1,4 @@
-export InducedFlag
+export InducedFlag, toInduced, toNonInduced
 
 """
     InducedFlag{T} <: Flag where {T <: Flag}
@@ -41,6 +41,10 @@ function maxPredicateArguments(::Type{InducedFlag{T}}) where {T<:Flag}
     return maxPredicateArguments(T)
 end
 
+function predicateType(::Type{InducedFlag{T}}) where {T<:Flag}
+    return predicateType(T)
+end
+
 function subFlag(F::InducedFlag{T}, vertices::Vector{Int})::InducedFlag{T} where {T<:Flag}
     return InducedFlag{T}(subFlag(F.F, vertices))
 end
@@ -70,7 +74,7 @@ function glue(
         return QuantumFlag{InducedFlag{T},Rational{Int}}()
     end
 
-    if U == InducedFlag{T}
+    # if U == InducedFlag{T}
 
         # Determine all ways to combine the leaves
         pred = findUnknownPredicates(FG, [collect(1:m), p[1:n]])
@@ -85,29 +89,29 @@ function glue(
         res = sum(c//1 * G for (G, c) in zeta(FGMarked).coeff)
 
         return res
-    elseif U == T
-        # Convert to non-induced
-        predF = [glue(f, FG, p) for f in findUnknownPredicates(F.F, Vector{Int}[])]
-        predG = [
-            glue(FG, g, collect(1:size(FG))) for
-            g in findUnknownPredicates(G.F, Vector{Int}[])
-        ]
-        @views pred = unique(vcat(predF, predG))
+    # elseif U == T
+    #     # Convert to non-induced
+    #     predF = [glue(f, FG, p) for f in findUnknownPredicates(F.F, Vector{Int}[])]
+    #     predG = [
+    #         glue(FG, g, collect(1:size(FG))) for
+    #         g in findUnknownPredicates(G.F, Vector{Int}[])
+    #     ]
+    #     @views pred = unique(vcat(predF, predG))
 
-        res = QuantumFlag{T,Rational{Int}}(
-            glue(Fs...) => (-1)^length(Fs) for Fs in combinations(pred)
-        )
-        res.coeff[FG] = 1
+    #     res = QuantumFlag{T,Rational{Int}}(
+    #         glue(Fs...) => (-1)^length(Fs) for Fs in combinations(pred)
+    #     )
+    #     res.coeff[FG] = 1
 
-        return res
-    else
-        error("Gluing $(InducedFlag{T}) with target type $U not implemented.")
-        return missing
-    end
+    #     return res
+    # else
+    #     error("Gluing $(InducedFlag{T}) with target type $U not implemented.")
+    #     return missing
+    # end
 end
 
-function distinguish(F::InducedFlag{T}, v::Int, W::BitVector) where {T<:Flag}
-    return distinguish(F.F, v, W)
+function distinguish(F::InducedFlag{T}, v::Int, W::BitVector)::UInt where {T<:Flag}
+    return hash(distinguish(F.F, v, W))
 end
 
 function isolatedVertices(F::InducedFlag{T})::BitVector where {T<:Flag}
@@ -115,9 +119,9 @@ function isolatedVertices(F::InducedFlag{T})::BitVector where {T<:Flag}
 end
 
 function addPredicates(
-    F::InducedFlag{T}, p::U, preds::Vararg{U}
+    F::InducedFlag{T}, preds::Vector{U}
 ) where {T<:Flag,U<:Predicate}
-    tmp = addPredicates(F.F, p, preds...)
+    tmp = addPredicates(F.F, preds)
     if tmp === nothing
         return nothing
     end
@@ -168,4 +172,23 @@ function eliminateIsolated(Fs::QuantumFlag{InducedFlag{T},D}) where {T<:Flag,D}
         end
     end
     return res + eliminateIsolated(resIsolated)
+end
+
+# Switching between induced and non-induced
+function toInduced(F::Union{T, QuantumFlag{T}}) where {T<:Flag}
+    tmp = zeta(F)
+    res = QuantumFlag{InducedFlag{T}, Int}()
+    for (G,c) in tmp.coeff
+        res += c*InducedFlag{T}(G)
+    end
+    return res
+end
+
+function toNonInduced(F::Union{InducedFlag{T}, QuantumFlag{InducedFlag{T}}}) where {T<:Flag}
+    tmp = moebius(F)
+    res = QuantumFlag{T, Int}()
+    for (G,c) in tmp.coeff
+        res += c*G.F
+    end
+    return res
 end

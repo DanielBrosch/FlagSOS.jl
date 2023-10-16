@@ -35,17 +35,17 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     curBranch = Int[]
     covered = Vector{Int}[]
 
-    numNode = 1
-
     # To avoid allocations in refine!
     alpha = BitVector(undef, n)
     # newCellSizes = zeros(Int, n)
 
     vertDistinguish = zeros(UInt, n)
 
-    Q = UInt[0 for i in 1:n, j in 1:n]
+    # Q = UInt[0 for i in 1:n, j in 1:n]
+    Q = zeros(UInt, n, n)
     WCellInd = BitVector(undef, n)
     curCell = BitVector(undef, n)
+    newCells = Dict{UInt,Int}()
 
     function refine!(coloring::Vector{Int})
         Q .= 0
@@ -59,10 +59,11 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
                 vertDistinguish .= 0
                 curCell .= coloring .== cell
 
-                newCells = Dict{UInt,Int}()
+                empty!(newCells)
+                # newCells = Dict{UInt,Int}()
 
                 for v in findall(curCell)#findall(x->x==cell, coloring)
-                    @views d = hash(distinguish(F, v, WCellInd))
+                    d = distinguish(F, v, WCellInd)
                     vertDistinguish[v] = d
                     # union!(newCells, [d])
                     newCells[d] = get(newCells, d, 0) + 1
@@ -75,10 +76,19 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
 
                 numNewCells = length(newCells) - 1
 
-                coloring[coloring .> cell] .+= numNewCells
-                alpha[(cell + numNewCells + 1):end] .= alpha[(cell + 1):(end - numNewCells)]
+                for i in eachindex(coloring)
+                    if coloring[i] > cell
+                        coloring[i] += numNewCells
+                    end
+                end
 
-                alpha[(cell + 1):(cell + numNewCells)] .= true
+                # coloring[coloring .> cell] .+= numNewCells
+                for i in length(alpha):-1:(cell+numNewCells+1)
+                    alpha[i] = alpha[i-numNewCells]
+                end
+                # @views alpha[(cell + numNewCells + 1):end] .= alpha[(cell + 1):(end - numNewCells)]
+
+                alpha[(cell+1):(cell+numNewCells)] .= true
 
                 newCellsCol = collect(newCells)
                 sort!(newCellsCol; by=x -> x[1])
@@ -108,7 +118,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
                     end
 
                     # Remove biggest new cell
-                    alpha[maxCellInd + cell - 1] = false
+                    alpha[maxCellInd+cell-1] = false
                 end
 
                 cell += length(newCellsCol)
@@ -120,7 +130,11 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
 
         if maximum(coloring) == n
             # append permuted Flag
-            return [nodeInvariant, hash(permute(F, coloring))]
+            # return UInt[nodeInvariant, hash(permute(F, coloring))]
+            # return nodeInvariant, hash(permute(F, coloring))
+
+            # return [nodeInvariant, hash(permute(F, coloring))]
+            return hash(nodeInvariant, hash(permute(F, coloring)))
         end
         return nodeInvariant
     end
@@ -143,8 +157,6 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     end
 
     function investigateNode(coloring::Vector{Int}, nodeInv=UInt[])
-        numNode += 1
-
         if maximum(coloring) == n
 
             # check for automorphisms
@@ -165,7 +177,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
                     # @info "Added onto stabilizer, new order is $(order(autG))"
                     stabilizer!(autG, curBranch)
                     for i in 1:length(curBranch)
-                        H = stabilizer!(autG, curBranch[1:(i - 1)])
+                        H = stabilizer!(autG, curBranch[1:(i-1)])
 
                         o = covered[i]
                         orbit!(H, o)
@@ -198,23 +210,23 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
         else
             # pruning 
             @assert first ||
-                length(nodeInv) <= length(nInvStar) ||
-                length(nodeInv) <= length(nInv1)
+                    length(nodeInv) <= length(nInvStar) ||
+                    length(nodeInv) <= length(nInv1)
 
             if prune &&
-                (!first) &&
-                (
-                    !(
-                        nodeInv[1:min(length(nodeInv), length(nInv1))] ==
-                        nInv1[1:min(length(nodeInv), length(nInv1))]
-                    )
-                ) &&
-                (
-                    !(
-                        nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
-                        nInvStar[1:min(length(nodeInv), length(nInvStar))]
-                    )
-                )
+               (!first) &&
+               (
+                   !(
+                       nodeInv[1:min(length(nodeInv), length(nInv1))] ==
+                       nInv1[1:min(length(nodeInv), length(nInv1))]
+                   )
+               ) &&
+               (
+                   !(
+                       nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
+                       nInvStar[1:min(length(nodeInv), length(nInvStar))]
+                   )
+               )
                 return 0
             end
             firstBigCell = Int[]
@@ -250,7 +262,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
         return 0
     end
 
-    col = [vertexColor(F, v) for v in 1:n]
+    col = Int[vertexColor(F, v) for v in 1:n]
     alpha[1] = true
     refine!(col)
 
@@ -275,12 +287,16 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}) wh
     for i in 1:maxVertices
         nextGraphs = T[]
 
-        pq = PriorityQueue{EdgeMarkedFlag{T},Vector{Int}}()
+        pq = PriorityQueue{EdgeMarkedFlag{T,predicateType(T)},Vector{Int}}()
 
         for f in generatedGraphs[i]
             newF = permute(f, 1:i)
-            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
+            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i-1))]
             uP = findUnknownPredicates(newF, fixed)
+            uP2 = findUnknownGenerationPredicates(newF, fixed)
+            if uP2 !== nothing
+                uP = vcat(uP, uP2)
+            end
             push!(nextGraphs, newF)
             if length(uP) == 1 && length(uP[1]) == 0
                 continue
@@ -288,7 +304,7 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}) wh
 
             FMarked = EdgeMarkedFlag{T}(newF, uP)
             for (F, _) in allWaysToAddOneMarked(FMarked)
-                cP = countEdges(F)[1:(end - 1)]
+                cP = countEdges(F)[1:(end-1)]
                 if all(cP .<= maxPredicates)
                     pq[F] = cP
                 end
@@ -299,7 +315,7 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}) wh
             FMarked = dequeue!(pq)
             push!(nextGraphs, FMarked.F)
             for (F, _) in allWaysToAddOneMarked(FMarked)
-                cP = countEdges(F)[1:(end - 1)]
+                cP = countEdges(F)[1:(end-1)]
                 if all(cP .<= maxPredicates)
                     pq[F] = cP
                 end

@@ -40,6 +40,10 @@ struct HyperEdgePredicate <: Predicate
     HyperEdgePredicate(e::AbstractVector{Int}) = new(Set(e))
 end
 
+function predicateType(::Type{ConstantWeightCode{W,D}}) where {W,D}
+    return HyperEdgePredicate
+end
+
 function ==(A::HyperEdgePredicate, B::HyperEdgePredicate)
     return A.e == B.e
 end
@@ -150,17 +154,17 @@ function subFlag(
     return ConstantWeightCode{W,D}(newA)
 end
 
-function distinguish(F::ConstantWeightCode, v::Int, W::BitVector)
+function distinguish(F::ConstantWeightCode, v::Int, W::BitVector)::UInt
     @views subA = F.A[F.A[:, v] .== 1, W]
     rowSums = vec(sum(subA; dims=2))
-    return sort!(rowSums)
+    return hash(sort!(rowSums))
 end
 
-function distinguish(F::HyperEdgePredicate, v::Int, W::BitVector)
+function distinguish(F::HyperEdgePredicate, v::Int, W::BitVector)::UInt
     if !(v in F.e)
         return 0
     end
-    return sum(W[i] for i in F.e)
+    return hash(sum(W[i] for i in F.e))
 end
 
 function countEdges(F::ConstantWeightCode)::Vector{Int}

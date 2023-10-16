@@ -35,6 +35,10 @@ struct EdgePredicate <: Predicate
     EdgePredicate(i, j) = new(min(i, j), max(i, j))
 end
 
+function predicateType(::Type{Graph})
+    return EdgePredicate
+end
+
 function hash(P::EdgePredicate, h::UInt)
     return hash(P.i, hash(P.j, hash(:EdgePredicate, h)))
 end
@@ -113,36 +117,36 @@ function isSym(g::Graph, v1::Int, v2::Int)::Bool
     return g.A[v1, setdiff(1:n, [v1, v2])] == g.A[v2, setdiff(1:n, [v1, v2])]
 end
 
-function toNonInduced(G)
-    fact = 1 #Int64(factorial(length(G)) / aut(G).size) # number of ways to embed g 
+# function toNonInduced(G)
+#     fact = 1 #Int64(factorial(length(G)) / aut(G).size) # number of ways to embed g 
 
-    zs = filter!(x -> x[1] < x[2], findall(G.A .== 0))
+#     zs = filter!(x -> x[1] < x[2], findall(G.A .== 0))
 
-    tmp = Dict([labelCanonically(G) => fact])
+#     tmp = Dict([labelCanonically(G) => fact])
 
-    for newEs in combinations(zs)
-        newG = BitMatrix(copy(G.A))
-        for e in newEs
-            newG[e[1], e[2]] = 1
-            newG[e[2], e[1]] = 1
-        end
-        tmp[Graph(newG)] = (-1)^(length(newEs)) * fact
-    end
+#     for newEs in combinations(zs)
+#         newG = BitMatrix(copy(G.A))
+#         for e in newEs
+#             newG[e[1], e[2]] = 1
+#             newG[e[2], e[1]] = 1
+#         end
+#         tmp[Graph(newG)] = (-1)^(length(newEs)) * fact
+#     end
 
-    res = Dict()
-    newGs = collect(keys(tmp))
-    newGsLabelled = labelCanonically(newGs)
+#     res = Dict()
+#     newGs = collect(keys(tmp))
+#     newGsLabelled = labelCanonically(newGs)
 
-    for i in 1:length(newGs)
-        if !haskey(res, newGsLabelled[i])
-            res[newGsLabelled[i]] = tmp[newGs[i]]
-        else
-            res[newGsLabelled[i]] += tmp[newGs[i]]
-        end
-    end
+#     for i in 1:length(newGs)
+#         if !haskey(res, newGsLabelled[i])
+#             res[newGsLabelled[i]] = tmp[newGs[i]]
+#         else
+#             res[newGsLabelled[i]] += tmp[newGs[i]]
+#         end
+#     end
 
-    return res
-end
+#     return res
+# end
 
 function subFlag(F::Graph, vertices::AbstractVector{Int})::Graph
     return Graph(F.A[vertices, vertices])
@@ -181,12 +185,12 @@ function isBipartite(F::Graph)
     return true
 end
 
-function distinguish(F::Graph, v::Int, W::BitVector)
-    @views return sum(F.A[W, v])
+function distinguish(F::Graph, v::Int, W::BitVector)::UInt
+    @views return hash(sum(F.A[W, v]))
 end
 
-function distinguish(F::EdgePredicate, v::Int, W::BitVector)
-    return (v == F.i && W[F.j]) || (v == F.j && W[F.i])
+function distinguish(F::EdgePredicate, v::Int, W::BitVector)::UInt
+    return hash((v == F.i && W[F.j]) || (v == F.j && W[F.i]))
 end
 
 function countEdges(F::Graph)::Vector{Int}

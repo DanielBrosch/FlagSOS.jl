@@ -118,6 +118,7 @@ function addInequality_Lasserre!(
                 floor((maxEdges - countEdges(g)[1]) / 2) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
+
     genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1]) / 2))
     genMaxVertices = Int(floor((maxVertices - size(gl)) / 2))
 

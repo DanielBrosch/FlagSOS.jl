@@ -3,7 +3,7 @@
 using DocStringExtensions
 using Combinatorics
 
-export Flag, labelCanonically, aut, glue
+export Flag, labelCanonically, aut, glue, permute, countEdges
 import Base.zero
 import Base.==
 import Base.one
@@ -47,7 +47,7 @@ end
 
 Creates a copy of `F`, and adds all predicates with the given values to the copy. May change the order of vertices of `F`, if necessary (E.g. in the case of `PartiallyLabeledFlag`). The predicates are given as a Vector of Vectors of Predicate-value pairs, sorted by type in a way that `addPredicates` understands.
 """
-function addPredicates(::T, ::U, ::Vararg{U}) where {T<:Flag,U<:Predicate}
+function addPredicates(::T, ::Vector{U}) where {T<:Flag,U<:Predicate}
     error("addPredicates is not defined for Flag type $T and predicate type $U")
     return missing
 end
@@ -296,6 +296,12 @@ function findUnknownPredicates(
     return missing
 end
 
+function findUnknownGenerationPredicates(
+    F::T, fixed::Vector{U}=Vector{Int}[]
+) where {T<:Flag,U<:AbstractVector{Int}}
+    return nothing
+end
+
 """
     countEdges(F::T)::Vector{Int} where {T<:Flag}
 
@@ -332,11 +338,11 @@ function vertexColor(::T, ::Int) where {T<:Flag}
 end
 
 """
-distinguish(F::T, v::Int, W::BitVector) where {T<:Flag}
+distinguish(F::T, v::Int, W::BitVector)::UInt where {T<:Flag}
 
 Given a Flag `F`, a vertex `v` and a subset of vertices indicated by `W`, distinguish `v` by analyzing it's relationship to the vertices `W`. This may, for example, be the number of edges between `v` and the cell `W`, or the number of triangles with `v` and one/two vertices of `W`. The type of result does not matter, as it does get hashed after.
 """
-function distinguish(F::T, v::Int, W::BitVector) where {T<:Flag}
+function distinguish(F::T, v::Int, W::BitVector)::UInt where {T<:Flag}
     error("distinguish is not defined for Flag type $T")
     return missing
 end
@@ -357,6 +363,11 @@ Maximum number of arguments of a predicate in the theory 'T'. For instance, this
 """
 function maxPredicateArguments(::Type{T}) where {T<:Flag}
     error("maxPredicateArguments is not defined for flag type $T")
+    return missing
+end
+
+function predicateType(::Type{T}) where {T<:Flag}
+    error("predicateType is not defined for flag type $T")
     return missing
 end
 

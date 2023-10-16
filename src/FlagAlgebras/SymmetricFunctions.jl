@@ -64,12 +64,16 @@ function glue(
     return SymmetricFunction(res)
 end
 
-function distinguish(F::SymmetricFunction, v::Int, W::BitVector)
-    return get(F.exponents, v, 0)
+function distinguish(F::SymmetricFunction, v::Int, W::BitVector)::UInt
+    return hash(get(F.exponents, v, 0))
 end
 
 function isolatedVertices(F::SymmetricFunction)::BitVector
     return [i for i in keys(F.exponents) if F.exponents[i] == 0]
+end
+
+function predicateType(::Type{SymmetricFunction})
+    return LabelPredicate
 end
 
 function addPredicates(F::SymmetricFunction, preds::Vector{LabelPredicate})

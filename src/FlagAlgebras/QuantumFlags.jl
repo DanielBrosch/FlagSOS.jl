@@ -8,6 +8,7 @@ A linear combination of Flags of type `F` with coefficients of type `T`.
 mutable struct QuantumFlag{F<:Flag,T<:Real}
     coeff::Dict{F,T}
 
+    QuantumFlag{F,T}(cs::Dict{F,T}) where {F<:Flag,T<:Real} = new(cs)
     QuantumFlag{F,T}(opts...) where {F<:Flag,T<:Real} = new(Dict{F,T}(opts...))
     QuantumFlag{F}(fc::QuantumFlag{F,T}) where {F<:Flag,T<:Real} = new{F,T}(fc.coeff)
 end

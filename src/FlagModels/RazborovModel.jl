@@ -75,7 +75,14 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
 
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
 
+    @info "basis reduced"
     for (mu, B) in reducedBasis
+
+        if length(B) == 1
+            M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]])
+            continue
+        end
+
         muAut = aut(mu)
 
         newGen = []
@@ -120,6 +127,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
 
         M.blockSymmetry[mu] = (pattern=P, gen=newGen)
     end
+    @info "Block symmetries found"
 
     M.basis = reducedBasis
     return reducedBasis#, blockSizes
@@ -168,7 +176,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
             p1Fin = Int.(p1Fin)
 
             if !(T <: InducedFlag) # Apply Moebius transform on labels
-                t = glueFinite(N, T1, T2, p1Fin; labelFlags=false)
+                t = one(D) * glueFinite(N, T1, T2, p1Fin; labelFlags=false)
                 overlappingVerts = Int.(intersect(1:size(T2), p1Fin[1:size(T1)]))
                 overlapGraph = subFlag(T2, overlappingVerts)
 
@@ -177,7 +185,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                 tMarked = labelCanonically(
                     sum(
                         c * EdgeMarkedFlag{T}(F, markers) for (F, c) in t.coeff;
-                        init=QuantumFlag{EdgeMarkedFlag{T},Rational{Int}}(),
+                        init=QuantumFlag{EdgeMarkedFlag{T, predicateType(T)},D}(),
                     ),
                 )
 

@@ -404,6 +404,6 @@ function joinLevel(T::BinaryTreeFlag, v::Int, w::Int)
     return 1
 end
 
-function distinguish(T::BinaryTreeFlag, v::Int, W::BitVector)
-    return sort!([joinLevel(T, v, w) for w in findall(W)])
+function distinguish(T::BinaryTreeFlag, v::Int, W::BitVector)::UInt
+    return hash(sort!([joinLevel(T, v, w) for w in findall(W)]))
 end
