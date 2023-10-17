@@ -85,6 +85,11 @@ function isAllowed(G::ConstantWeightCode{W,D}) where {W,D}
     return maximum(tmp; init=0) <= maxOverlap
 end
 
+function isSym(g::ConstantWeightCode{W,D}, v1::Int, v2::Int)::Bool where {W,D}
+    # n = size(g)
+    return g.A[:, v1] == g.A[:, v2]
+end
+
 function addPredicates(
     G::ConstantWeightCode{W,D}, preds::Vector{HyperEdgePredicate}
 ) where {W,D}
