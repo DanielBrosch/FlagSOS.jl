@@ -7,6 +7,8 @@ using DataStructures
 # Custom implementation of nauty, but still sloooow
 # Allows us to label near-arbitrary combinatoric objects
 function label(F::T; prune=true, removeIsolated=true) where {T}
+    # @show F 
+    # display(F)
     if removeIsolated
         isoV = isolatedVertices(F)
         if any(isoV)
@@ -133,8 +135,8 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
             # return UInt[nodeInvariant, hash(permute(F, coloring))]
             # return nodeInvariant, hash(permute(F, coloring))
 
-            # return [nodeInvariant, hash(permute(F, coloring))]
-            return hash(nodeInvariant, hash(permute(F, coloring)))
+            return [nodeInvariant, hash(permute(F, coloring))]
+            # return hash(nodeInvariant, hash(permute(F, coloring)))
         end
         return nodeInvariant
     end
