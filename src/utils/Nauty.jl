@@ -274,17 +274,17 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     return permute(F, p), permute!(autG, p), p
 end
 
-function generateAll(::Type{F}, maxVertices::Int, maxEdges::Int) where {F}
-    return generateAll(F, maxVertices, [maxEdges])
+function generateAll(::Type{F}, maxVertices::Int, maxEdges::Int; withProperty = (F::F) -> true) where {F}
+    return generateAll(F, maxVertices, [maxEdges]; withProperty = withProperty)
 end
 
 #TODO: Quite a bit slower than nauty/traces, how are they doing it?
 """
-    generateAll(::Type{F}, maxVertices::Int, maxPredicates::Vector{Int}) where {F}
+    generateAll(::Type{F}, maxVertices::Int, maxPredicates::Vector{Int}; withProperty = (F::T) -> true) where {F}
 
-Generates all Flags of type `F` with up to `maxVertices` vertices and up to `maxPredicates` non-zero predicate values. 'maxPredicates' is a vector, for the case that there are multiple predicates.
+Generates all Flags of type `F` with up to `maxVertices` vertices and up to `maxPredicates` non-zero predicate values. 'maxPredicates' is a vector, for the case that there are multiple predicates. If a function `withProperty:F->{true, false}` is given, keeps adding edges to flags as long as the property holds.
 """
-function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}) where {T}
+function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}; withProperty = (F::T) -> true) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     for i in 1:maxVertices
         nextGraphs = T[]
@@ -317,6 +317,9 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}) wh
             FMarked = dequeue!(pq)
             push!(nextGraphs, FMarked.F)
             for (F, _) in allWaysToAddOneMarked(FMarked)
+                if !withProperty(F.F)
+                    continue 
+                end
                 cP = countEdges(F)[1:(end-1)]
                 if all(cP .<= maxPredicates)
                     pq[F] = cP

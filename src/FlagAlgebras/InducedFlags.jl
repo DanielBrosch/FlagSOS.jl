@@ -9,7 +9,7 @@ struct InducedFlag{T} <: Flag where {T<:Flag}
     F::T
     InducedFlag{T}(F::T) where {T<:Flag} = new(F)
     InducedFlag{T}(opts...) where {T<:Flag} = new(T(opts...))
-    InducedFlag{T}(nothing) where {T<:Flag} = nothing
+    InducedFlag{T}(::Nothing) where {T<:Flag} = nothing
 end
 
 function ==(A::InducedFlag{T}, B::InducedFlag{T}) where {T<:Flag}
@@ -111,7 +111,7 @@ function glue(
 end
 
 function distinguish(F::InducedFlag{T}, v::Int, W::BitVector)::UInt where {T<:Flag}
-    return hash(distinguish(F.F, v, W))
+    return distinguish(F.F, v, W)
 end
 
 function isolatedVertices(F::InducedFlag{T})::BitVector where {T<:Flag}
