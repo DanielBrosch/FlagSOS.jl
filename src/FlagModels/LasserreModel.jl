@@ -130,7 +130,7 @@ function addFlag!(
 
     # Decomposing the quotient
     graphSize = size(g)
-    n = 2 * graphSize
+    n = N == :limit ? 2 * graphSize : N
     lambda = nothing
     if graphSize > 0
         lambda = AbstractAlgebra.Partition(
@@ -190,10 +190,13 @@ function multiplyPolytabsAndSymmetrize(
     sp1::SpechtFlag{U},
     sp2::SpechtFlag{U},
     maxVert=-1,
-    limit=true,
+    # limit=true,
     splitByOverlaps=false,
     useGroups=false,
 ) where {T<:Flag,N,D,U<:Flag}
+
+    limit = N == :limit
+
     fixVerts1 = setdiff(1:size(sp1.F.F), sp1.F.consideredVecs)
     fixVerts2 = setdiff(1:size(sp2.F.F), sp2.F.consideredVecs)
 
@@ -215,7 +218,7 @@ function multiplyPolytabsAndSymmetrize(
     # n = limit ? sum(p1.part) : (fixedN > -1 ? fixedN : Polynomial([[1] => 1]))
     # la = vcat([n - sum(p1.part[2:end])], p1.part[2:end])
 
-    n = limit ? sum(sp1.T.part) : (fixedN > -1 ? fixedN : Polynomials.Polynomial([0, 1]))
+    n = limit ? sum(sp1.T.part) : (N > -1 ? N : Polynomials.Polynomial([0, 1]))
     la = vcat([n - sum(sp1.T.part[2:end])], sp1.T.part[2:end])
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
@@ -342,6 +345,7 @@ function multiplyPolytabsAndSymmetrize(
         @assert length(p) == length(unique(p))
 
         combined = glue(sp1.F.F, sp2.F.F, p)
+        # combined = glueFinite(N, sp1.F.F, sp2.F.F, p; labelFlags=false)
 
         combined === nothing && continue
 
@@ -416,7 +420,7 @@ function isAllowed(m::LasserreModel, F::T) where {T<:Flag}
     return isAllowed(F)
 end
 
-function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitByOverlaps = false)
+function computeSDP!(m::LasserreModel{T,N,D}) where {T,N,D}#; maxVert = -1, useGroups = true, splitByOverlaps = false)
     #TODO: Parallelize better
 
     totalNum = Int64(sum(c * (c + 1) / 2 for c in length.(values(m.basis))))
@@ -494,7 +498,7 @@ function computeSDP!(m::LasserreModel)#; maxVert = -1, useGroups = true, splitBy
                     sp1,
                     sp2,
                     -1,#maxVert,
-                    true, # TODO: Limit
+                    # N == :limit, # TODO: Limit
                     false,#splitByOverlaps,
                     false,#useGroups, #TODO: Optimize to be worth
                     # m.graphData[m.basis[mu][i][1]].rowAutomorphisms.fullGroup,
@@ -532,15 +536,18 @@ function buildJuMPModel(
 
     graphCoefficients = Dict()
 
+    AT = typeof(sum(collect(values(Y))[1]))
+    
     for G in keys(m.sdpData)
-        eG = AffExpr()
+        # eG = AffExpr()
         # eG = GenericAffExpr{D, GenericVariableRef{D}}()
+        eG = AT()
         for mu in keys(b)
             if haskey(m.sdpData[G], mu)
                 for (i, j, c) in Iterators.zip(findnz(m.sdpData[G][mu])...)
                     i > j && continue
-                    fact = (i == j ? 1 : 2)
-                    add_to_expression!(eG, fact * c, Y[mu][i, j])
+                    fact = (i == j ? D(1) : D(2))
+                    add_to_expression!(eG, fact * D(c), Y[mu][i, j])
                     # add_to_expression!(eG, m.sdpData[G][mu][c],Y[mu][c])
                 end
             end
