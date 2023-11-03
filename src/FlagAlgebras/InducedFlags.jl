@@ -86,7 +86,7 @@ function glue(
         pred = pred[1]
 
         FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
-        res = sum(c//1 * G for (G, c) in zeta(FGMarked).coeff)
+        res = sum(c//1 * G for (G, c) in zeta(FGMarked; label = true).coeff)
 
         return res
     # elseif U == T
@@ -168,7 +168,7 @@ function eliminateIsolated(Fs::QuantumFlag{InducedFlag{T},D}) where {T<:Flag,D}
             preds = findUnknownPredicates(F, [(1:size(F))[.!v]])
             markedF = EdgeMarkedFlag{InducedFlag{T}}(F, preds)
             resIsolated +=
-                D(c) * (F - zeta(markedF) + labelCanonically(subFlag(F, (1:size(F))[.!v])))
+                D(c) * (F - zeta(markedF; label = true) + labelCanonically(subFlag(F, (1:size(F))[.!v])))
         end
     end
     return res + eliminateIsolated(resIsolated)

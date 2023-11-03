@@ -175,7 +175,11 @@ Glues together the flags `F` and `G`, after applying the permutation `p` to the 
 """
 function glueFinite(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
     if N == :limit
-        return glue(F, G, p)
+        res = glue(F, G, p)
+        if labelFlags
+            return labelCanonically(res)
+        end
+        return res
     end
     if N == :variable
         error("Variable n not implemented right now!")
@@ -200,6 +204,9 @@ function glueFinite(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) wher
         tmp = glue(F, G, p)
         if tmp === nothing
             return QuantumFlag{T,Rational{Int}}()
+        end
+        if labelFlags
+            return 1//1 * labelCanonically(tmp)
         end
         return 1//1 * tmp
     end

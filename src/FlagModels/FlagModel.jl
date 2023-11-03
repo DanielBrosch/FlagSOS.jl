@@ -234,11 +234,12 @@ function buildJuMPModel(
         )
         mergewith!(+, variables, v)
         push!(blocks, b)
-        constraints = vcat(constraints, c)
+        constraints = push!(constraints, c)
         i += 1
     end
 
     if m.objective !== nothing
+        push!(constraints, Dict())
         objL = labelCanonically(m.objective)
         for (G, c) in objL.coeff
             if !iszero(c) && !haskey(variables, G)
@@ -253,7 +254,7 @@ function buildJuMPModel(
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
                 # push!(constraints, c <= (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
-                push!(constraints, @constraint(jumpModel, c == get(objL.coeff, G, 0)))
+                constraints[end][G] = @constraint(jumpModel, c == get(objL.coeff, G, 0))
             end
         end
     end

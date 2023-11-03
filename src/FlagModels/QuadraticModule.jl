@@ -65,14 +65,17 @@ end
 function buildJuMPModel(m::QuadraticModule, replaceBlocks=Dict(), jumpModel=Model())
     b = modelBlockSizes(m)
     Y = Dict()
+    constraints = Dict()
     for (mu, n) in b
         Y[mu] = get(replaceBlocks, mu) do
             name = "Y$mu"
             if n > 1
-                return @variable(jumpModel, [1:n, 1:n], PSD, base_name = name)
+                v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
+                constraints[name] = @constraint(jumpModel, v in PSDCone())
+                return v
             else
                 v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
-                @constraint(jumpModel, v[1, 1] >= 0)
+                constraints[name] = @constraint(jumpModel, v .>= 0)
                 return v
             end
         end
@@ -85,7 +88,7 @@ function buildJuMPModel(m::QuadraticModule, replaceBlocks=Dict(), jumpModel=Mode
         ) for G in keys(m.sdpData)
     )
 
-    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=[])
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
 end
 
 function modelSize(m::QuadraticModule)
@@ -154,7 +157,7 @@ function buildJuMPModel(m::EqualityModule, replaceBlocks=Dict(), jumpModel=Model
         G in keys(m.sdpData)
     )
 
-    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=[])
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=Dict())
 end
 
 function modelSize(m::EqualityModule)

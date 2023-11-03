@@ -20,19 +20,23 @@ using Combinatorics
 #     end
 # end
 
-struct EdgeMarkedFlag{T, P} <: Flag
+struct EdgeMarkedFlag{T,P} <: Flag
     F::T
     marked::Vector{P}
-    EdgeMarkedFlag{T}(F::T) where {T<:Flag} = new{T, predicateType(T)}(F, Vector{predicateType(T)}())
-    EdgeMarkedFlag{T}(F::T, marked::Vector) where {T<:Flag} = new{T, predicateType(T)}(F, marked)
-    function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag, P<:Predicate}
-        return new{T, predicateType(T)}(F, vcat(marked...))
+    function EdgeMarkedFlag{T}(F::T) where {T<:Flag}
+        return new{T,predicateType(T)}(F, Vector{predicateType(T)}())
+    end
+    function EdgeMarkedFlag{T}(F::T, marked::Vector) where {T<:Flag}
+        return new{T,predicateType(T)}(F, marked)
+    end
+    function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag,P<:Predicate}
+        return new{T,predicateType(T)}(F, vcat(marked...))
     end
     function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector}) where {T<:Flag}
-        return new{T, predicateType(T)}(F, vcat(marked...))
+        return new{T,predicateType(T)}(F, vcat(marked...))
     end
     function EdgeMarkedFlag{T}(F::T, marked::Vector{P}) where {T<:Flag,P<:Predicate}
-        return new{T, predicateType(T)}(F, marked)
+        return new{T,predicateType(T)}(F, marked)
     end
 end
 
@@ -43,7 +47,7 @@ function hash(A::EdgeMarkedFlag, h::UInt)
     return hash(Set(A.marked), hash(A.F, hash(:EdgeMarkedFlag, h)))
 end
 
-Base.one(::Type{EdgeMarkedFlag{T,P}}) where {T, P} = EdgeMarkedFlag{T}(one(T), Vector{P}())
+Base.one(::Type{EdgeMarkedFlag{T,P}}) where {T,P} = EdgeMarkedFlag{T}(one(T), Vector{P}())
 
 function size(G::EdgeMarkedFlag)::Int
     return size(G.F)
@@ -67,15 +71,19 @@ function isAllowed(G::EdgeMarkedFlag{T,P}, e::P) where {T,P}
     return isAllowed(G.F, e)
 end
 
-function addPredicates(G::EdgeMarkedFlag{T,P}, preds::Vector{Q}) where {T<:Flag, P, Q<:Predicate}
-    return EdgeMarkedFlag{T, predicateType(T)}(addPredicates(G.F, preds), G.marked)
+function addPredicates(
+    G::EdgeMarkedFlag{T,P}, preds::Vector{Q}
+) where {T<:Flag,P,Q<:Predicate}
+    return EdgeMarkedFlag{T,predicateType(T)}(addPredicates(G.F, preds), G.marked)
 end
 
-function permute(F::EdgeMarkedFlag{T,P}, p::AbstractVector{Int}) where {T<:Flag, P<:Predicate}
+function permute(
+    F::EdgeMarkedFlag{T,P}, p::AbstractVector{Int}
+) where {T<:Flag,P<:Predicate}
     return EdgeMarkedFlag{T}(permute(F.F, p), P[permute(e, p) for e in F.marked])
 end
 
-function maxPredicateArguments(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag, P<:Predicate}
+function maxPredicateArguments(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P<:Predicate}
     return maxPredicateArguments(T)
 end
 
@@ -97,7 +105,7 @@ function isolatedVertices(F::EdgeMarkedFlag)
     return BitVector([false for i in 1:size(F)])
 end
 
-function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}) where {T<:Flag, P<:Predicate}
+function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}) where {T<:Flag,P<:Predicate}
     res = Dict{EdgeMarkedFlag{T,P},Int}()
     for e in F.marked
         added = addPredicates(F.F, [e])
@@ -117,10 +125,10 @@ end
 
 Computes the moebius transform of a flag on the vertices 'verts'
 """
-function moebius(F::T, verts=1:size(F)) where {T<:Flag}
+function moebius(F::T, verts=1:size(F); label=false) where {T<:Flag}
     @assert verts == 1:size(F) "TODO"
     markedF = EdgeMarkedFlag{T}(F, findUnknownPredicates(F))
-    return moebius(markedF)
+    return moebius(markedF; label=label)
 end
 
 """
@@ -128,23 +136,23 @@ end
 
 Computes the zeta transform of a flag on the vertices 'verts'
 """
-function zeta(F::T, verts=1:size(F)) where {T<:Flag}
+function zeta(F::T, verts=1:size(F); label=false) where {T<:Flag}
     @assert verts == 1:size(F) "TODO"
     markedF = EdgeMarkedFlag{T}(F, findUnknownPredicates(F))
-    return zeta(markedF)
+    return zeta(markedF; label=label)
 end
 
-function zeta(F::QuantumFlag{T,D}) where {T<:Flag, D}
-    tmp = sum(c*EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G,c) in F.coeff)
-    return zeta(tmp)
+function zeta(F::QuantumFlag{T,D}; label=false) where {T<:Flag,D}
+    tmp = sum(c * EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G, c) in F.coeff)
+    return zeta(tmp; label=label)
 end
 
-function moebius(F::QuantumFlag{T,D}) where {T<:Flag, D}
-    tmp = sum(c*EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G,c) in F.coeff)
-    return moebius(tmp)
+function moebius(F::QuantumFlag{T,D}; label=false) where {T<:Flag,D}
+    tmp = sum(c * EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G, c) in F.coeff)
+    return moebius(tmp; label=label)
 end
 
-function vertexColor(F::EdgeMarkedFlag{T,P}, v::Int) where {T<:Flag, P<:Predicate}
+function vertexColor(F::EdgeMarkedFlag{T,P}, v::Int) where {T<:Flag,P<:Predicate}
     return vertexColor(F.F, v)
 end
 
@@ -153,7 +161,7 @@ end
 
 Computes the moebius transform of an edge-marked flag on the marked edges. 
 """
-function moebius(F::EdgeMarkedFlag{T, P}) where {T<:Flag, P<:Predicate}
+function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicate}
     res = 0 * F.F
     k = length(F.marked)
     if k == 0
@@ -167,11 +175,21 @@ function moebius(F::EdgeMarkedFlag{T, P}) where {T<:Flag, P<:Predicate}
         for (F2, c2) in tmp
             res += c2 * (-1)^flippedEdges * F2.F
             for (F3, c3) in allWaysToAddOneMarked(F2)
+                # F3L = label ? labelCanonically(F3) : F3
+                # tmp2[F3L] = get(tmp2, F3L, 0) + c2 * c3
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
         map!(x -> Int(x//(flippedEdges + 1)), values(tmp2))
-        tmp = deepcopy(tmp2)
+        if label
+            empty!(tmp)
+            for (F, c) in tmp2
+                FL = labelCanonically(F)
+                tmp[FL] = get(tmp, FL, 0) + c
+            end
+        else
+            tmp = deepcopy(tmp2)
+        end
 
         empty!(tmp2)
     end
@@ -179,19 +197,23 @@ function moebius(F::EdgeMarkedFlag{T, P}) where {T<:Flag, P<:Predicate}
     return res
 end
 
-function zeta(F::QuantumFlag{EdgeMarkedFlag{T, P},D}) where {T<:Flag, D, P<:Predicate}
-    res = moebius(F)
+function zeta(
+    F::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false
+) where {T<:Flag,D,P<:Predicate}
+    res = moebius(F; label=label)
     map!(abs, values(res.coeff))
     return res
 end
 
-function zeta(F::EdgeMarkedFlag{T,P}) where {T<:Flag, P<:Predicate}
-    res = moebius(F)
+function zeta(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicate}
+    res = moebius(F; label=label)
     map!(abs, values(res.coeff))
     return res
 end
 
-function moebius(Fs::QuantumFlag{EdgeMarkedFlag{T, P},D}) where {T<:Flag,D, P<:Predicate}
+function moebius(
+    Fs::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false
+) where {T<:Flag,D,P<:Predicate}
     if length(Fs.coeff) == 0
         return QuantumFlag{T,D}()
     end
@@ -205,15 +227,25 @@ function moebius(Fs::QuantumFlag{EdgeMarkedFlag{T, P},D}) where {T<:Flag,D, P<:P
 
     for flippedEdges in 0:k
         for (F2, c2) in tmp
-            res += c2 * (-1)^flippedEdges * F2.F
+            res += c2 * (-1)^flippedEdges * (label ? labelCanonically(F2.F) : F2.F)
 
             for (F3, c3) in allWaysToAddOneMarked(F2)
+                # F3L = label ? labelCanonically(F3) : F3
+                # tmp2[F3L] = get(tmp2, F3L, 0) + c2 * c3
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
         map!(x -> D(x//(flippedEdges + 1)), values(tmp2))
-        tmp = deepcopy(tmp2)
 
+        if label
+            empty!(tmp)
+            for (F, c) in tmp2
+                FL = labelCanonically(F)
+                tmp[FL] = get(tmp, FL, 0) + c
+            end
+        else
+            tmp = deepcopy(tmp2)
+        end
         empty!(tmp2)
     end
     return res

@@ -189,12 +189,14 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                     ),
                 )
 
-                t = moebius(tMarked)
-                t = labelCanonically(t)
+                t = moebius(tMarked; label = true)
+                # t = labelCanonically(t)
 
             else
-                t = glueFinite(N, T1, T2, p1Fin; labelFlags=false)
-                t = labelCanonically(t)
+                t = glueFinite(N, T1, T2, p1Fin; labelFlags=true)
+                # @show t
+                # t = labelCanonically(t)
+                # @show t
             end
 
             for (F, c) in t.coeff
@@ -220,7 +222,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                     continue
                 end
 
-                substitution = eliminateIsolated(F)
+                substitution = labelCanonically(eliminateIsolated(F))
                 FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
 
                 @assert substitution.coeff[FNoIsolated] == 1
@@ -249,6 +251,7 @@ end
 function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model())
     b = modelBlockSizes(m)
     Y = Dict()
+    constraints = Dict()
 
     for (mu, n) in b
         P = m.blockSymmetry[mu].pattern
@@ -261,9 +264,9 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
             Y[mu][P .== s] .+= y[s]
         end
         if size(P, 1) > 1
-            @constraint(jumpModel, Y[mu] in PSDCone())
+            constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
         else
-            @constraint(jumpModel, Y[mu] .>= 0)
+            constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
         end
     end
 
@@ -284,5 +287,5 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
         graphCoefficients[G] = eG
     end
 
-    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=[])
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
 end
