@@ -51,7 +51,14 @@ function maxPredicateArguments(::Type{SymmetricFunction})
 end
 
 function subFlag(F::SymmetricFunction, vertices::Vector{Int})::SymmetricFunction
-    return SymmetricFunction(filter(x -> x[1] in vertices, F.exponents))
+    # @show vertices
+
+    newExp = Dict{Int, Int}()
+    for (i, v) in enumerate(vertices)
+        newExp[i] = get(F.exponents, v, 0)
+    end
+
+    return SymmetricFunction(newExp)
 end
 
 function glue(
