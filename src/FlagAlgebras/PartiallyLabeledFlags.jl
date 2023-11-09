@@ -106,6 +106,10 @@ function glue(
     return PartiallyLabeledFlag{T}(FG, max(F.n, G.n))
 end
 
+function glueFinite(N, F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}, p::AbstractVector{Int} = vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n)); labelFlags=true) where {T<:Flag}
+    return glueFinite_internal(N, F, G, p; labelFlags = labelFlags)
+end
+
 function vertexColor(F::PartiallyLabeledFlag{T}, v::Int) where {T<:Flag}
     if v <= F.n
         return v
@@ -142,14 +146,17 @@ function one(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::PartiallyLabeledFlag{T}, fixed::Vector{U}
+    F::PartiallyLabeledFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
 ) where {T<:Flag,U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed)
+    return vcat([[]],findUnknownPredicates(F.F, fixed, predLimits[2:end]))
 end
 
 function findUnknownGenerationPredicates(
-    F::PartiallyLabeledFlag{T}, fixed::Vector{U}=Vector{Int}[]
+    F::PartiallyLabeledFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
 ) where {T<:Flag,U<:AbstractVector{Int}}
+    if length(predLimits) > 0 && predLimits[1] <= F.n
+        return LabelPredicate[]
+    end
     return [LabelPredicate[LabelPredicate(i) for i in F.n+1:size(F) if !(i in vcat(fixed...))]]
 end
 
@@ -159,7 +166,7 @@ function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
 end
 
 function addPredicates(
-    F::PartiallyLabeledFlag{T}, p::Vector{U}) where {T<:Flag,U<:Predicate}
+    F::PartiallyLabeledFlag{T}, p::Vector{U}) where {T<:Flag,U}
 
     labelPreds = filter(x->x isa LabelPredicate, p)
     otherPreds = filter(x->!(x isa LabelPredicate), p)
@@ -241,4 +248,12 @@ function toInduced(F::Union{PartiallyLabeledFlag{T}, QuantumFlag{PartiallyLabele
         res += c*PartiallyLabeledFlag{InducedFlag{T}}(InducedFlag(G.F), G.n)
     end
     return res
+end
+
+function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
+    if p isa LabelPredicate
+        return true
+    else
+        return isAllowed(F.F, p)
+    end
 end

@@ -87,9 +87,9 @@ function permute(F::HarmonicFlag{T}, p::HarmonicFlag{Int}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::HarmonicFlag{T}, fixed::Vector{U}
+    F::HarmonicFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
 ) where {T<:Flag,U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed)
+    return findUnknownPredicates(F.F, fixed, predLimits)
 end
 
 function isSym(F::HarmonicFlag, v1::Int, v2::Int)::Bool

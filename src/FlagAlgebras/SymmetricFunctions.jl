@@ -51,7 +51,7 @@ function maxPredicateArguments(::Type{SymmetricFunction})
 end
 
 function subFlag(F::SymmetricFunction, vertices::Vector{Int})::SymmetricFunction
-    return SymmetricFunction(filter(x -> x in vertices, F.exponents))
+    return SymmetricFunction(filter(x -> x[1] in vertices, F.exponents))
 end
 
 function glue(
@@ -61,6 +61,9 @@ function glue(
     for (i, c) in F.exponents
         res[p[i]] = get(res, p[i], 0) + c
     end
+    for i = 1:maximum(p; init = 0)
+        res[i] = get(res, i, 0)
+    end
     return SymmetricFunction(res)
 end
 
@@ -69,7 +72,7 @@ function distinguish(F::SymmetricFunction, v::Int, W::BitVector)::UInt
 end
 
 function isolatedVertices(F::SymmetricFunction)::BitVector
-    return [i for i in keys(F.exponents) if F.exponents[i] == 0]
+    return [get(F.exponents,i,0) == 0 for i=1:size(F)]
 end
 
 function predicateType(::Type{SymmetricFunction})
@@ -86,12 +89,14 @@ end
 
 function permute(F::SymmetricFunction, p::AbstractVector{Int})
     res = SymmetricFunction(p[i] => c for (i, c) in F.exponents)
-    res.exponents[length(p)] = get(res.exponents, length(p), 0)
+    for i = 1:maximum(p)
+        res.exponents[i] = get(res.exponents, i, 0)
+    end
     return res
 end
 
 function findUnknownPredicates(
-    F::SymmetricFunction, fixed::Vector{U}
+    F::SymmetricFunction, fixed::Vector{U}, predLimits::Vector{Int}
 ) where {U<:AbstractVector{Int}}
     return [[LabelPredicate(i) for i in 1:size(F) if !any((i in part) for part in fixed)]]
 end

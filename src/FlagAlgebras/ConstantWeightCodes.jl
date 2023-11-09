@@ -61,7 +61,7 @@ end
 
 #TODO: implement for arbitrary weight (W = 0)
 function findUnknownPredicates(
-    F::ConstantWeightCode{W,D}, fixed::Vector{U}
+    F::ConstantWeightCode{W,D}, fixed::Vector{U}, predLimits::Vector{Int}
 )::Vector{Vector{HyperEdgePredicate}} where {W,D,U<:AbstractVector{Int}}
     res = HyperEdgePredicate[]
 

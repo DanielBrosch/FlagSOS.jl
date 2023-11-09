@@ -133,7 +133,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
     return reducedBasis#, blockSizes
 end
 
-function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
+function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
     m.sdpData = Dict()
 
     for (muc, (mu, B)) in enumerate(m.basis)
@@ -176,7 +176,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
             p1Fin = Int.(p1Fin)
 
             if !(T <: InducedFlag) # Apply Moebius transform on labels
-                t = one(D) * glueFinite(N, T1, T2, p1Fin; labelFlags=false)
+                t = one(D) * glueFinite(N-reservedVerts, T1, T2, p1Fin; labelFlags=false)
                 overlappingVerts = Int.(intersect(1:size(T2), p1Fin[1:size(T1)]))
                 overlapGraph = subFlag(T2, overlappingVerts)
 
@@ -193,7 +193,7 @@ function computeSDP!(m::RazborovModel{T,N,D}) where {T,N,D}
                 # t = labelCanonically(t)
 
             else
-                t = glueFinite(N, T1, T2, p1Fin; labelFlags=true)
+                t = glueFinite(N-reservedVerts, T1, T2, p1Fin; labelFlags=true)
                 # @show t
                 # t = labelCanonically(t)
                 # @show t

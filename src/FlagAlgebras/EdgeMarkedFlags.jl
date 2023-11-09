@@ -26,16 +26,16 @@ struct EdgeMarkedFlag{T,P} <: Flag
     function EdgeMarkedFlag{T}(F::T) where {T<:Flag}
         return new{T,predicateType(T)}(F, Vector{predicateType(T)}())
     end
-    function EdgeMarkedFlag{T}(F::T, marked::Vector) where {T<:Flag}
-        return new{T,predicateType(T)}(F, marked)
-    end
-    function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag,P<:Predicate}
+    # function EdgeMarkedFlag{T}(F::T, marked::Vector) where {T<:Flag}
+    #     return new{T,predicateType(T)}(F, marked)
+    # end
+    function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag,P}
         return new{T,predicateType(T)}(F, vcat(marked...))
     end
     function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector}) where {T<:Flag}
         return new{T,predicateType(T)}(F, vcat(marked...))
     end
-    function EdgeMarkedFlag{T}(F::T, marked::Vector{P}) where {T<:Flag,P<:Predicate}
+    function EdgeMarkedFlag{T}(F::T, marked::Vector{P}) where {T<:Flag,P}
         return new{T,predicateType(T)}(F, marked)
     end
 end
@@ -54,9 +54,9 @@ function size(G::EdgeMarkedFlag)::Int
 end
 
 function findUnknownPredicates(
-    F::EdgeMarkedFlag, fixed::Vector{U}
+    F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector{Int}
 ) where {U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed)
+    return findUnknownPredicates(F.F, fixed, predLimits[1:end-1]), predLimits::Vector{Int}
 end
 
 function predicateType(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P}
@@ -79,7 +79,7 @@ end
 
 function permute(
     F::EdgeMarkedFlag{T,P}, p::AbstractVector{Int}
-) where {T<:Flag,P<:Predicate}
+) where {T<:Flag,P}
     return EdgeMarkedFlag{T}(permute(F.F, p), P[permute(e, p) for e in F.marked])
 end
 
@@ -105,7 +105,7 @@ function isolatedVertices(F::EdgeMarkedFlag)
     return BitVector([false for i in 1:size(F)])
 end
 
-function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}) where {T<:Flag,P<:Predicate}
+function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}) where {T<:Flag,P}
     res = Dict{EdgeMarkedFlag{T,P},Int}()
     for e in F.marked
         added = addPredicates(F.F, [e])
@@ -152,7 +152,7 @@ function moebius(F::QuantumFlag{T,D}; label=false) where {T<:Flag,D}
     return moebius(tmp; label=label)
 end
 
-function vertexColor(F::EdgeMarkedFlag{T,P}, v::Int) where {T<:Flag,P<:Predicate}
+function vertexColor(F::EdgeMarkedFlag, v::Int)
     return vertexColor(F.F, v)
 end
 

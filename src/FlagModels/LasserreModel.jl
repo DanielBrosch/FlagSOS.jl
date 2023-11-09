@@ -117,11 +117,10 @@ function addFlag!(
     m::LasserreModel{T,N,D},
     g::U;
     allowedNumberOfLabels=0:size(g),
-    maxOutVertices=maxPredicateArguments(T) * size(g),
+    maxOutVertices=2 * size(g),
 ) where {T<:Flag,N,D,U<:Flag}
     g = labelCanonically(g)
     gS = FlagSymmetries(g)
-
     if gS in m.generators
         return nothing
     end
@@ -141,7 +140,6 @@ function addFlag!(
     end
 
     info = []
-
     #TODO: Update to use decomposeModule
     for mu in biggerShapes(lambda)
         #TODO: check if congruent % 2 is enough (yes according to Flagmatic paper)
@@ -193,9 +191,13 @@ function multiplyPolytabsAndSymmetrize(
     # limit=true,
     splitByOverlaps=false,
     useGroups=false,
+    reservedVerts = 0
 ) where {T<:Flag,N,D,U<:Flag}
-
+    # @assert sum(length.(sp1.F.shape)) == size(sp1.F.F)
     limit = N == :limit
+    # if !limit 
+    #     N -= reservedVerts
+    # end
 
     fixVerts1 = setdiff(1:size(sp1.F.F), sp1.F.consideredVecs)
     fixVerts2 = setdiff(1:size(sp2.F.F), sp2.F.consideredVecs)
@@ -217,8 +219,13 @@ function multiplyPolytabsAndSymmetrize(
     # IntOrPoly = Union{Int, Polynomial{Int,Int,1}}
     # n = limit ? sum(p1.part) : (fixedN > -1 ? fixedN : Polynomial([[1] => 1]))
     # la = vcat([n - sum(p1.part[2:end])], p1.part[2:end])
+    removedVerts = 0
+    if !limit # same number of labels in partially labeled flag algebra
+        @assert  size(sp1.F.F) - sum(length.(sp1.F.shape)) == size(sp2.F.F) - sum(length.(sp2.F.shape))
+        removedVerts = size(sp1.F.F) - sum(length.(sp1.F.shape))
+    end
 
-    n = limit ? sum(sp1.T.part) : (N > -1 ? N : Polynomials.Polynomial([0, 1]))
+    n = limit ? sum(sp1.T.part) : (N > -1 ? N - reservedVerts - removedVerts : Polynomials.Polynomial([0, 1]) - removedVerts)
     la = vcat([n - sum(sp1.T.part[2:end])], sp1.T.part[2:end])
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
@@ -420,7 +427,7 @@ function isAllowed(m::LasserreModel, F::T) where {T<:Flag}
     return isAllowed(F)
 end
 
-function computeSDP!(m::LasserreModel{T,N,D}) where {T,N,D}#; maxVert = -1, useGroups = true, splitByOverlaps = false)
+function computeSDP!(m::LasserreModel{T,N,D}, reservedVerts::Int) where {T,N,D}#; maxVert = -1, useGroups = true, splitByOverlaps = false)
     #TODO: Parallelize better
 
     totalNum = Int64(sum(c * (c + 1) / 2 for c in length.(values(m.basis))))
@@ -502,7 +509,8 @@ function computeSDP!(m::LasserreModel{T,N,D}) where {T,N,D}#; maxVert = -1, useG
                     false,#splitByOverlaps,
                     false,#useGroups, #TODO: Optimize to be worth
                     # m.graphData[m.basis[mu][i][1]].rowAutomorphisms.fullGroup,
-                    # m.graphData[m.basis[mu][j][1]].rowAutomorphisms.fullGroup
+                    # m.graphData[m.basis[mu][j][1]].rowAutomorphisms.fullGroup,
+                    reservedVerts
                 )
                 put!(collectData, (mu, i, j, blkSize, tmp))
             end

@@ -18,29 +18,33 @@ mutable struct QuadraticModule{T<:Flag,U<:Flag,B,N,D} <:
     sdpData::Any
     baseModel::B
     inequality::QuantumFlag{U}
+    reservedVerts::Int
 
     function QuadraticModule{T,U}(
-        baseModel::B, inequality::QuantumFlag{U}
-    ) where {T<:Flag,U<:Flag,B<:AbstractFlagModel{U,:limit,Int}}
-        return new{T,U,B,:limit,Int}(Dict(), baseModel, inequality)
+        baseModel::B, inequality::QuantumFlag{U}, reservedVerts::Int=0
+    ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
+        return new{T,U,B,N,D}(Dict(), baseModel, inequality, reservedVerts)
     end
 
     function QuadraticModule{T}(
-        baseModel::B, inequality::QuantumFlag{T}
+        baseModel::B, inequality::QuantumFlag{T}, reservedVerts::Int=0
     ) where {T<:Flag,N,D,B<:AbstractFlagModel{T,N,D}}
-        return new{T,T,B,N,D}(Dict(), baseModel, inequality)
+        return new{T,T,B,N,D}(Dict(), baseModel, inequality, reservedVerts)
     end
 end
 
 function computeSDP!(
-    m::QuadraticModule{T,U,B,N,D}
+    m::QuadraticModule{T,U,B,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
     @info "computing ineq module"
-    computeSDP!(m.baseModel)
+    computeSDP!(m.baseModel, reservedVerts + m.reservedVerts)
 
+    # @assert N == :limit "TODO"
     m.sdpData = Dict()
     for (G, data) in m.baseModel.sdpData
-        noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
+        tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality))
+        noLabel = removeIsolated(tmp)
+        # noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
 
         GH = labelCanonically(noLabel)
         for (gh, cgh) in GH.coeff
@@ -104,36 +108,41 @@ mutable struct EqualityModule{T<:Flag,U<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     sdpData::Any
     basis::Vector{U}
     equality::QuantumFlag{U}
+    reservedVerts::Int
 
-    function EqualityModule{T,U}(equality::QuantumFlag{U}) where {T<:Flag,U<:Flag}
-        return new{T,U,:limit,Int}(Dict(), U[], equality)
+    function EqualityModule{T,U}(equality::QuantumFlag{U}, reservedVerts::Int=0) where {T<:Flag,U<:Flag}
+        return new{T,U,:limit,Int}(Dict(), U[], equality, reservedVerts)
     end
-    function EqualityModule{T,U,N,D}(equality::QuantumFlag{U}) where {T<:Flag,U<:Flag,N,D}
-        return new{T,U,N,D}(Dict(), U[], equality)
+    function EqualityModule{T,U,N,D}(equality::QuantumFlag{U}, reservedVerts::Int=0) where {T<:Flag,U<:Flag,N,D}
+        return new{T,U,N,D}(Dict(), U[], equality, reservedVerts)
     end
 end
 
-function computeSDP!(m::EqualityModule{T,U,N,D}) where {T<:Flag,U<:Flag,N,D}
+function computeSDP!(m::EqualityModule{T,U,N,D}, reservedVerts::Int) where {T<:Flag,U<:Flag,N,D}
     m.sdpData = Dict()
+    # @assert N == :limit "TODO"
     for (i, G) in enumerate(m.basis)
         for (G2, c) in m.equality.coeff
-            GG2 = G * G2
-            GG2 === nothing && continue
-            if GG2 isa PartiallyLabeledFlag{T}
-                tmpG = D(1) * label((GG2).F)[1]
-            elseif true#GG2 isa T 
-                tmpG = D(1) * labelCanonically(GG2)#[1]
-            else
-                @show GG2
-                @show typeof(GG2)
-                error("Unhandled case")
-            end
-            for (H, c2) in tmpG.coeff
-                if !haskey(m.sdpData, H)
-                    m.sdpData[H] = Dict()
+            # GG2 = G * G2
+            GG2s = D(1)*glueFinite(N == :limit ? N : N - reservedVerts, G, G2)
+            for (GG2, c2) in GG2s.coeff
+                GG2 === nothing && continue
+                if GG2 isa PartiallyLabeledFlag{T}
+                    tmpG = D(c2) * label((GG2).F)[1]
+                elseif true#GG2 isa T 
+                    tmpG = D(c2) * labelCanonically(GG2)#[1]
+                else
+                    @show GG2
+                    @show typeof(GG2)
+                    error("Unhandled case")
                 end
+                for (H, c2) in tmpG.coeff
+                    if !haskey(m.sdpData, H)
+                        m.sdpData[H] = Dict()
+                    end
 
-                m.sdpData[H][i] = get(m.sdpData[H], i, 0) + c * D(c2)
+                    m.sdpData[H][i] = get(m.sdpData[H], i, 0) + c * D(c2)
+                end
             end
         end
     end

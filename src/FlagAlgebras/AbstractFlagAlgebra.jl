@@ -47,8 +47,8 @@ end
 
 Creates a copy of `F`, and adds all predicates with the given values to the copy. May change the order of vertices of `F`, if necessary (E.g. in the case of `PartiallyLabeledFlag`). The predicates are given as a Vector of Vectors of Predicate-value pairs, sorted by type in a way that `addPredicates` understands.
 """
-function addPredicates(::T, ::Vector{U}) where {T<:Flag,U<:Predicate}
-    error("addPredicates is not defined for Flag type $T and predicate type $U")
+function addPredicates(::T, ::Vector) where {T<:Flag}
+    error("addPredicates is not defined for Flag type $T")
     return missing
 end
 function addPredicates(F::T) where {T<:Flag}
@@ -103,6 +103,7 @@ function Base.:*(F::T, G::T) where {T<:Flag}
     m = size(G)
     return glue(F, G, (m + 1):(m + n))
 end
+
 
 """
     aut(F::T)::NamedTuple{(:gen, :size),Tuple{Vector{Vector{Int64}},Int64}} where {T<:Flag}
@@ -173,7 +174,11 @@ glue() = nothing
 
 Glues together the flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. This variant of `glue` is for optimizing over finite objects, given by `N` which should be one of the options `:limit`, `:variable` or an integer. The operation assumes the k vertices that are sent on top of each other by `p` correspond to labels, and assumes that the other vertices are unlabeled, i.e. get sent to all `N-k` other vertices. 
 """
-function glueFinite(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
+function glueFinite(N, F::T, G::T, p::AbstractVector{Int} = (size(G) + 1):(size(G) + size(F)); labelFlags=true) where {T<:Flag}
+    return glueFinite_internal(N, F, G, p; labelFlags = labelFlags)
+end
+
+function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
     if N == :limit
         res = glue(F, G, p)
         if labelFlags
@@ -245,6 +250,11 @@ function glueFinite(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) wher
     end
 end
 
+function glueFinite(N, F::T, G::QuantumFlag{T, D}) where {T,D}
+    return sum(c*glueFinite(N, F, g) for (g,c) in G.coeff)
+end
+
+
 """
     permute(F::T, p::AbstractVector{Int})::T where {T<:Flag}
 
@@ -297,14 +307,14 @@ The only unclear predicate here is the edge [2,3], i.e. this function should ret
     [[EdgePredicate(2,3)]]
 """
 function findUnknownPredicates(
-    F::T, fixed::Vector{U}=Vector{Int}[]
+    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector{Int} = Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     error("findUnknownPredicates is not defined for Flag type $T")
     return missing
 end
 
 function findUnknownGenerationPredicates(
-    F::T, fixed::Vector{U}=Vector{Int}[]
+    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector{Int} = Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     return nothing
 end
@@ -427,7 +437,7 @@ end
 
 Sometimes one may want to create a flag-algebra with inherently forbidden flags, instead of attaching it to a model. This function should return true iff the predicate P can be set to true (i.e. the edge P can be added).
 """
-function isAllowed(F::T, e::P) where {T<:Flag,P<:Predicate}
+function isAllowed(F::T, e) where {T<:Flag}
     return true
 end
 
@@ -451,3 +461,4 @@ include("BinaryTrees.jl")
 include("EdgeMarkedFlags.jl")
 include("SymmetricFunctions.jl")
 include("HarmonicFlags.jl")
+include("ProductFlag.jl")

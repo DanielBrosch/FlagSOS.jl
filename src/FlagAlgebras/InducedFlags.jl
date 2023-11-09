@@ -133,9 +133,9 @@ function permute(F::InducedFlag{T}, p::AbstractVector{Int}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::InducedFlag{T}, fixed::Vector{U}
+    F::InducedFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
 ) where {T<:Flag,U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed)
+    return findUnknownPredicates(F.F, fixed, predLimits)
 end
 
 function isSym(F::InducedFlag, v1::Int, v2::Int)::Bool

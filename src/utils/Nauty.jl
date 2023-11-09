@@ -9,6 +9,7 @@ using DataStructures
 function label(F::T; prune=true, removeIsolated=true) where {T}
     # @show F 
     # display(F)
+    # @show isolatedVertices(F)
     if removeIsolated
         isoV = isolatedVertices(F)
         if any(isoV)
@@ -274,8 +275,8 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     return permute(F, p), permute!(autG, p), p
 end
 
-function generateAll(::Type{F}, maxVertices::Int, maxEdges::Int; withProperty = (F::F) -> true) where {F}
-    return generateAll(F, maxVertices, [maxEdges]; withProperty = withProperty)
+function generateAll(::Type{F}, maxVertices::Int, maxEdges::Int; withProperty=(F::F) -> true) where {F}
+    return generateAll(F, maxVertices, [maxEdges]; withProperty=withProperty)
 end
 
 #TODO: Quite a bit slower than nauty/traces, how are they doing it?
@@ -284,7 +285,7 @@ end
 
 Generates all Flags of type `F` with up to `maxVertices` vertices and up to `maxPredicates` non-zero predicate values. 'maxPredicates' is a vector, for the case that there are multiple predicates. If a function `withProperty:F->{true, false}` is given, keeps adding edges to flags as long as the property holds.
 """
-function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}; withProperty = (F::T) -> true) where {T}
+function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}; withProperty=(F::T) -> true) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     for i in 1:maxVertices
         nextGraphs = T[]
@@ -293,21 +294,46 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}; wi
 
         for f in generatedGraphs[i]
             newF = permute(f, 1:i)
+
+            # @show newF
+            # @show size(newF)
+            push!(nextGraphs, newF)
+            currentEdges = countEdges(newF)
+
+            if length(maxPredicates) < length(currentEdges) && maxPredicates[end] <= sum(currentEdges[length(maxPredicates):end])
+                continue
+            end
+
+
             fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i-1))]
-            uP = findUnknownPredicates(newF, fixed)
-            uP2 = findUnknownGenerationPredicates(newF, fixed)
+            uP = findUnknownPredicates(newF, fixed, maxPredicates)
+            # @show uP
+            uP2 = findUnknownGenerationPredicates(newF, fixed, maxPredicates)
             if uP2 !== nothing
                 uP = vcat(uP, uP2)
             end
-            push!(nextGraphs, newF)
+
             if length(uP) == 1 && length(uP[1]) == 0
                 continue
             end
 
+            for i = 1:length(maxPredicates)
+                if currentEdges[i] == maxPredicates[i]
+                    empty!(uP[i])
+                end
+            end
+            # @show uP
+            uP = Vector{Vector{Any}}(uP)
             FMarked = EdgeMarkedFlag{T}(newF, uP)
             for (F, _) in allWaysToAddOneMarked(FMarked)
+                if allowMultiEdges(T)
+                    F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
+                end
                 cP = countEdges(F)[1:(end-1)]
-                if all(cP .<= maxPredicates)
+                # @assert length(maxPredicates) == length(cP)
+                if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
+                    pq[F] = cP
+                elseif all(cP[1:length(maxPredicates)-1] .<= maxPredicates[1:end-1]) && sum(cP[length(maxPredicates):end]) <= maxPredicates[end]
                     pq[F] = cP
                 end
             end
@@ -315,16 +341,35 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector{Int}; wi
 
         while !isempty(pq)
             FMarked = dequeue!(pq)
+            # @show (length(pq), sum(countEdges(FMarked.F)))
+            # @show FMarked
             push!(nextGraphs, FMarked.F)
+            cP = countEdges(FMarked.F)
+            if length(maxPredicates) == length(cP) && all(cP .== maxPredicates)
+                continue
+            elseif all(cP[1:length(maxPredicates)-1] .== maxPredicates[1:end-1]) && sum(cP[length(maxPredicates):end]) == maxPredicates[end]
+                continue
+            end
+            # if !all(countEdges(FMarked.F) .== maxPredicates)
             for (F, _) in allWaysToAddOneMarked(FMarked)
+                if allowMultiEdges(T)
+                    F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
+                end
+                @assert sum(countEdges(FMarked.F)) < sum(countEdges(F.F))
                 if !withProperty(F.F)
-                    continue 
+                    continue
                 end
                 cP = countEdges(F)[1:(end-1)]
-                if all(cP .<= maxPredicates)
+                # if all(cP .<= maxPredicates)
+                #     pq[F] = cP
+                # end
+                if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
+                    pq[F] = cP
+                elseif all(cP[1:length(maxPredicates)-1] .<= maxPredicates[1:end-1]) && sum(cP[length(maxPredicates):end]) <= maxPredicates[end]
                     pq[F] = cP
                 end
             end
+            # end
         end
 
         push!(generatedGraphs, unique(labelCanonically.(nextGraphs)))

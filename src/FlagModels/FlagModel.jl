@@ -42,8 +42,8 @@ function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     # end
 end
 
-function computeSDP!(m::FlagModel)
-    return computeSDP!.(m.subModels)
+function computeSDP!(m::FlagModel, reservedVerts::Int)
+    return computeSDP!.(m.subModels, reservedVerts)
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
@@ -78,7 +78,7 @@ function addLasserreBlock!(
     push!(m.subModels, lM)
 
     Fs = generateAll(T, Int(floor(maxVertices / 2)), Int.(floor.(maxEdges / 2)))
-
+    # @show Fs
     for F in Fs
         if isAllowed(m, F)
             addFlag!(lM, F)
@@ -160,7 +160,7 @@ function addInequality_Lasserre!(
         end
     end
 
-    qM = QuadraticModule{T,PartiallyLabeledFlag{T}}(lM, gl)
+    qM = QuadraticModule{T,PartiallyLabeledFlag{T}}(lM, gl, 0)#numLabels(gl))
     push!(m.subModels, qM)
     return qM
 end
@@ -177,7 +177,7 @@ function addEquality!(
     genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])))
     genMaxVertices = Int(floor((maxVertices - size(gl))))
 
-    qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl)
+    qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0)#numLabels(gl))
 
     Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(gl), genMaxEdges])
 
