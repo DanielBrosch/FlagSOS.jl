@@ -19,7 +19,7 @@ m = FlagModel{SymmetricFunction, n, Rational{Int}}()
 addLasserreBlock!(m, 4);
 
 # This results in a semidefinite programming problem with block sizes
-@test modelSize(m).part == Int[2, 1, 1] #src
+@test modelSize(m).part == Int[4, 3, 1] #src
 modelSize(m)
 
 
