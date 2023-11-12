@@ -133,7 +133,7 @@ function permute(F::InducedFlag{T}, p::AbstractVector{Int}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::InducedFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
+    F::InducedFlag{T}, fixed::Vector{U},predLimits::Vector
 ) where {T<:Flag,U<:AbstractVector{Int}}
     return findUnknownPredicates(F.F, fixed, predLimits)
 end

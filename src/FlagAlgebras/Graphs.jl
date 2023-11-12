@@ -51,7 +51,7 @@ function permute(pred::EdgePredicate, p::AbstractVector{Int})
 end
 
 function findUnknownPredicates(
-    F::Graph, fixed::Vector{U}, predLimits::Vector{Int}
+    F::Graph, fixed::Vector{U}, predLimits::Vector
 )::Vector{Vector{EdgePredicate}} where {U<:AbstractVector{Int}}
     @assert length(predLimits) in [0,1]
     res = EdgePredicate[]

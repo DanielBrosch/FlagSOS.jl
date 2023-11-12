@@ -307,14 +307,14 @@ The only unclear predicate here is the edge [2,3], i.e. this function should ret
     [[EdgePredicate(2,3)]]
 """
 function findUnknownPredicates(
-    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector{Int} = Int[]
+    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     error("findUnknownPredicates is not defined for Flag type $T")
     return missing
 end
 
 function findUnknownGenerationPredicates(
-    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector{Int} = Int[]
+    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     return nothing
 end
@@ -462,3 +462,4 @@ include("EdgeMarkedFlags.jl")
 include("SymmetricFunctions.jl")
 include("HarmonicFlags.jl")
 include("ProductFlag.jl")
+include("PartiallyColoredFlags.jl")

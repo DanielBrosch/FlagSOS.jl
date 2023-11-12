@@ -44,7 +44,13 @@ function ==(A::EdgeMarkedFlag, B::EdgeMarkedFlag)
     return A.F == B.F && Set(A.marked) == Set(B.marked)
 end
 function hash(A::EdgeMarkedFlag, h::UInt)
-    return hash(Set(A.marked), hash(A.F, hash(:EdgeMarkedFlag, h)))
+    tmp::UInt = hash(:EdgeMarkedFlag)
+    for m in A.marked
+        tmp ⊻= hash(m)
+    end
+
+    return hash(tmp, hash(A.F, hash(:EdgeMarkedFlag, h)))
+    # return hash(Set(A.marked), hash(A.F, hash(:EdgeMarkedFlag, h)))
 end
 
 Base.one(::Type{EdgeMarkedFlag{T,P}}) where {T,P} = EdgeMarkedFlag{T}(one(T), Vector{P}())
@@ -54,9 +60,9 @@ function size(G::EdgeMarkedFlag)::Int
 end
 
 function findUnknownPredicates(
-    F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector{Int}
+    F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector
 ) where {U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed, predLimits[1:end-1]), predLimits::Vector{Int}
+    return findUnknownPredicates(F.F, fixed, predLimits[1:end-1]), predLimits::Vector
 end
 
 function predicateType(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P}
@@ -97,7 +103,7 @@ function distinguish(F::EdgeMarkedFlag, v::Int, W::BitVector)::UInt
     # return hash(distinguish(F.F, v, W), reduce(⊻, distinguish(m, v, W) for m in F.marked; init = hash(:EdgeMarkedFlag)))
 end
 
-function countEdges(F::EdgeMarkedFlag)::Vector{Int}
+function countEdges(F::EdgeMarkedFlag)
     return vcat(countEdges(F.F), [length(F.marked)])
 end
 

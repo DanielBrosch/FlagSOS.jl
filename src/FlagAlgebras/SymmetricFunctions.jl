@@ -103,7 +103,7 @@ function permute(F::SymmetricFunction, p::AbstractVector{Int})
 end
 
 function findUnknownPredicates(
-    F::SymmetricFunction, fixed::Vector{U}, predLimits::Vector{Int}
+    F::SymmetricFunction, fixed::Vector{U}, predLimits::Vector
 ) where {U<:AbstractVector{Int}}
     return [[LabelPredicate(i) for i in 1:size(F) if !any((i in part) for part in fixed)]]
 end

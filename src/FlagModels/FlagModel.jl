@@ -5,7 +5,8 @@ export FlagModel,
     addInequality_Lasserre!,
     addEquality!,
     buildStandardModel,
-    addRazborovBlock!
+    addRazborovBlock!,
+    addBinomialBlock!
 
 """
     FlagModel{T <: Flag, N, D} <: AbstractFlagModel{T, N, D}
@@ -98,6 +99,12 @@ function addRazborovBlock!(m::FlagModel{T,N,D}, lvl) where {T<:Flag,N,D}
     push!(m.subModels, rM)
     computeRazborovBasis!(rM, lvl)
 
+    return rM
+end
+
+function addBinomialBlock!(m::FlagModel{T,N,D}, lvl) where {T<:Flag,N,D}
+    rM = BinomialSquares{T,N,D}(lvl)
+    push!(m.subModels, rM)
     return rM
 end
 

@@ -65,7 +65,7 @@ function predicateType(::Type{DirectedGraph{F}}) where {F}
 end
 
 function findUnknownPredicates(
-    F::DirectedGraph{allowDigons}, fixed::Vector{U}, predLimits::Vector{Int}
+    F::DirectedGraph{allowDigons}, fixed::Vector{U}, predLimits::Vector
 )::Vector{Vector{DirectedEdgePredicate}} where {U<:AbstractVector{Int},allowDigons}
     res = DirectedEdgePredicate[]
     for e in Iterators.product(1:size(F), 1:size(F))
