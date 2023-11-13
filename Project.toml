@@ -1,7 +1,7 @@
 name = "FlagSOS"
 uuid = "78b365f2-6d95-4275-8db6-8dceb35a712b"
 authors = ["Daniel Brosch <73886037+DanielBrosch@users.noreply.github.com> and contributors"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
