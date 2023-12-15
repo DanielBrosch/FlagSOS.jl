@@ -62,6 +62,7 @@ end
 struct SpechtFlag{T<:Flag}
     F::FlagSymmetries{T}
     T::AbstractAlgebra.Generic.YoungTableau{Int}
+    freePos::Int
 end
 
 """
@@ -119,8 +120,10 @@ function addFlag!(
     allowedNumberOfLabels=0:size(g),
     maxOutVertices=2 * size(g),
 ) where {T<:Flag,N,D,U<:Flag}
+    @show g
     g = labelCanonically(g)
     gS = FlagSymmetries(g)
+    @show gS
     if gS in m.generators
         return nothing
     end
@@ -131,10 +134,18 @@ function addFlag!(
     graphSize = size(g)
     n = N == :limit ? 2 * graphSize : N
     lambda = nothing
+
+    freePos = 1
+
     if graphSize > 0
+        @assert n-graphSize > 0
         lambda = AbstractAlgebra.Partition(
             vcat([n - graphSize], [length(p) for p in gS.shape])
         )
+
+        if n-graphSize < length(gS.shape[1])
+            freePos = findfirst(x->x==n-graphSize,lambda.part)
+        end
     else
         lambda = AbstractAlgebra.Partition([1])
     end
@@ -151,7 +162,15 @@ function addFlag!(
             if gS.rowAut.size > 1
                 generator = []
                 for p in gS.rowAut.gen
-                    push!(generator, (p, semiTabPermMat(K, shiftElement(p))))
+                    @show K 
+                    @show p
+                    @show shiftElement(p)
+                    @show insertElement(p, freePos)
+                    if freePos == 1
+                        @assert shiftElement(p) == insertElement(p, freePos)
+                    end
+                    # push!(generator, (p, semiTabPermMat(K, shiftElement(p))))
+                    push!(generator, (p, semiTabPermMat(K, insertElement(p, freePos))))
                 end
                 fullGroup = generateGroup(generator, gS.rowAut.size, true)
                 for p in fullGroup[1]
@@ -173,8 +192,8 @@ function addFlag!(
                     m.basis[muInd] = []
                 end
                 for t in K[2][colSet]
-                    push!(m.basis[muInd], SpechtFlag{U}(gS, t))
-                    push!(info[end].basis, SpechtFlag{U}(gS, t))
+                    push!(m.basis[muInd], SpechtFlag{U}(gS, t, freePos))
+                    push!(info[end].basis, SpechtFlag{U}(gS, t, freePos))
                 end
             end
         end
@@ -227,30 +246,52 @@ function multiplyPolytabsAndSymmetrize(
 
     n = limit ? sum(sp1.T.part) : (N > -1 ? N - reservedVerts - removedVerts : Polynomials.Polynomial([0, 1]) - removedVerts)
     la = vcat([n - sum(sp1.T.part[2:end])], sp1.T.part[2:end])
+    # la = deepcopy(sp1.T.part.part)
+    # la[sp1.freePos] += n - sum(sp1.T.part)
+    # @show sp1 
+    # @show sp1.freePos
+    # @show sp1.T
+    # @show sp1.T.part
+    # @show n 
+    
+    # la = vcat(sp1.T.part[1:sp1.freePos-1], n - sum(sp1.T.part) + sp1.T.part[sp1.freePos], sp1.T.part[sp1.freePos+1:end])
+    # @show la 
+
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
 
     combinedOverlaps = Dict([])
     for (a, b) in newVariant
-        cord = [2:size(a, 1)..., 1]
-        shiftedMat = a[cord, cord]
-        shiftedMat[end, end] = 0
+        # cord = [2:size(a, 1)..., 1]
+        # shiftedMat = a[cord, cord]
+        # shiftedMat[end, end] = 0
+        # if sp1.freePos != sp2.freePos
+        #     @show sp1.freePos
+        #     @show sp2.freePos
+        # end
+        coord1 = [setdiff(1:size(a,1), [sp1.freePos])..., sp1.freePos]
+        coord2 = [setdiff(1:size(a,1), [sp2.freePos])..., sp2.freePos]
+        # cord = [2:size(a, 1)..., 1]
+        shiftedMat = a[coord1, coord2]
+        # shiftedMat = a[coord2, coord1]
+        shiftedMat[end,end] = 0
 
         # naive
         # if maxVert == -1 || sum(shiftedMat) <= maxVert
 
         # Flagmatic style
-        if maxVert == -1 ||
-            sum(shiftedMat[1:(end - 1), 1:(end - 1)]) +
-           2 * max(sum(shiftedMat[:, end]), sum(shiftedMat[end, :])) <= maxVert
-            combinedOverlaps[Int64.(shiftedMat)'] = b//fact
-        end
+        # if maxVert == -1 ||
+        #     sum(shiftedMat[1:(end - 1), 1:(end - 1)]) +
+        #    2 * max(sum(shiftedMat[:, end]), sum(shiftedMat[end, :])) <= maxVert
+        #     combinedOverlaps[Int64.(shiftedMat)'] = b//fact
+        # end
+        combinedOverlaps[Int64.(shiftedMat)'] = b//fact
     end
 
     # reduce using automorphisms
     combinedOverlapsReduced = Dict{Any,D}([])
     if useGroups
-
+        @assert limit "TODO: Fix finite case with group speedup"
         #TODO Current solution does reduce it somewhat, but not fully?
         for B in keys(combinedOverlaps)
 

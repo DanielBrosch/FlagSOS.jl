@@ -102,8 +102,8 @@ function addRazborovBlock!(m::FlagModel{T,N,D}, lvl) where {T<:Flag,N,D}
     return rM
 end
 
-function addBinomialBlock!(m::FlagModel{T,N,D}, lvl) where {T<:Flag,N,D}
-    rM = BinomialSquares{T,N,D}(lvl)
+function addBinomialBlock!(m::FlagModel{T,N,D}, maxVerts, maxEdges) where {T<:Flag,N,D}
+    rM = BinomialSquares{T,N,D}(maxVerts, maxEdges)
     push!(m.subModels, rM)
     return rM
 end
@@ -266,10 +266,12 @@ function buildJuMPModel(
         end
     end
 
-    if !(one(T) in keys(m.objective.coeff))
-        @objective(jumpModel, Min, variables[one(T)])
-    else
-        @objective(jumpModel, Min, 0)
+    if m.objective !== nothing
+        if !(one(T) in keys(m.objective.coeff))
+            @objective(jumpModel, Min, variables[one(T)])
+        else
+            @objective(jumpModel, Min, 0)
+        end
     end
 
     return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)

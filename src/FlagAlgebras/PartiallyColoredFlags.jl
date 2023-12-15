@@ -99,9 +99,9 @@ function glue(
     # F.n > 0 &&
     # @assert 1:(F.n) == p[1:(F.n)] "Labeled vertices should be glued to labeled vertices without being permuted."
 
-    @show F
-    @show G
-    @show p
+    # @show F
+    # @show G
+    # @show p
 
     # @assert F.c[p[1:length(F.c)]] == G.c
     @assert F.c == G.c

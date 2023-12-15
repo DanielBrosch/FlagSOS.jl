@@ -2,22 +2,22 @@ export BinomialSquares
 
 mutable struct BinomialSquares{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     sdpData::Any
-    generators::Dict{Int,Vector{PartiallyLabeledFlag{T}}}
+    # generators::Dict{Int,Vector{PartiallyLabeledFlag{T}}}
     basis::Vector{ProductFlag{NTuple{2,PartiallyColoredFlag{T}}}}
 
-    function BinomialSquares{T,N,D}(lvl=0) where {T,N,D}
+    function BinomialSquares{T,N,D}(maxVerts=0, maxEdges =0) where {T,N,D}
         res = new{T,N,D}(
             Dict(),
-            Dict{Int,Vector{PartiallyLabeledFlag{T}}}(),
+            # Dict{Int,Vector{PartiallyLabeledFlag{T}}}(),
             # Vector{Tuple{PartiallyLabeledFlag{T},PartiallyLabeledFlag{T}}}(),
-            Vector{ProductFlag{NTuple{2,PartiallyColoredFlag{T}}}}()
+            Vector{ProductFlag{NTuple{2,PartiallyColoredFlag{T}}}}(),
         )
-        addGenerators!(res, lvl)
+        addGenerators!(res, maxVerts, maxEdges)
         return res
     end
 end
 
-function addGenerators!(m::BinomialSquares{T,N,D}, lvl) where {T,N,D}
+function addGenerators!(m::BinomialSquares{T,N,D}, maxVerts, maxEdges) where {T,N,D}
     # PT = PartiallyLabeledFlag{T}
 
     # for i = 1:lvl 
@@ -34,21 +34,44 @@ function addGenerators!(m::BinomialSquares{T,N,D}, lvl) where {T,N,D}
 
     #TODO: Too many graphs! Use partially colored flags instead of partially labeled, and label the direct product flag (F,G)
 
+    @warn "For truncation assumes edges are glued distinctly."
+
     coloredPairs = ProductFlag{NTuple{2,PartiallyColoredFlag{Graph}}}
 
     sameColors(x) = x.Fs[1].c == x.Fs[2].c
 
-    for i = 1:lvl 
+    for i in 1:maxVerts
         pairs = generateAll(
-            coloredPairs, floor(Int, (lvl - i)/2) + i, [[[i], 99], [[i], 99]]; withProperty=sameColors
+            coloredPairs,
+            floor(Int, (maxVerts - i) / 2) + i,
+            [[[i], floor(maxEdges/2)], [[i], floor(maxEdges/2)]];
+            withProperty=sameColors,
         )
-        filter!(x->length(x.Fs[1].c) == i, pairs)
-        filter!(x->hash(x.Fs[1]) <= hash(x.Fs[2]), pairs)
+        filter!(x -> length(x.Fs[1].c) == i, pairs)
+        filter!(x -> hash(x.Fs[1]) <= hash(x.Fs[2]), pairs)
         m.basis = vcat(m.basis, pairs)
     end
 end
 
 function computeSDP!(m::BinomialSquares{T,N,D}, reservedVerts::Int) where {T<:Flag,N,D}
+    @assert N == :limit "TODO: Finite binomial squares (and reserved verts)"
+    for F in m.basis
+        F2 = labelCanonically((F.Fs[1] * F.Fs[1]).F)
+        G2 = labelCanonically((F.Fs[2] * F.Fs[2]).F)
+        FG = labelCanonically((F.Fs[1] * F.Fs[2]).F)
+
+        e = D(1) * F2 - D(2) * FG + D(1) * G2
+
+        for (G, c) in e.coeff
+            if !haskey(m.sdpData, G)
+                m.sdpData[G] = Dict()
+            end
+            if !haskey(m.sdpData[G], F)
+                m.sdpData[G][F] = 0
+            end
+            m.sdpData[G][F] += c
+        end
+    end
 end
 
 function modelBlockSizes(m::BinomialSquares)
@@ -58,25 +81,20 @@ end
 function buildJuMPModel(
     m::BinomialSquares{T,N,D}, replaceBlocks=Dict(), jumpModel=Model()
 ) where {T,N,D}
+    @assert length(replaceBlocks) == 0
+
     b = modelBlockSizes(m)
     Y = Dict()
-    constraints = Dict()
-    for (mu, n) in b
-        Y[mu] = get(replaceBlocks, mu) do
-            name = "Y$mu"
-            if n > 1
-                v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
-                constraints[name] = @constraint(jumpModel, v in PSDCone())
-                return v
-            else
-                v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
-                constraints[name] = @constraint(jumpModel, v .>= 0)
-                return v
-            end
-        end
+    for (mu, _) in b
+        Y[mu] = @variable(jumpModel)
     end
 
-    AT = typeof(sum(collect(values(Y))[1]))
+    # graphCoefficients = Dict(
+    #     G => sum(Y[mu] * m.sdpData[G][mu] for mu in keys(b) if haskey(m.sdpData[G], mu)) for
+    #     G in keys(m.sdpData)
+    # )
+
+    AT = typeof(sum(D(1) * collect(values(Y))[1]))
     graphCoefficients = Dict()
 
     for G in keys(m.sdpData)
@@ -85,24 +103,18 @@ function buildJuMPModel(
         eG = AT()
         for mu in keys(b)
             if haskey(m.sdpData[G], mu)
-                for (i, j, c) in Iterators.zip(findnz(m.sdpData[G][mu])...)
-                    i > j && continue
-                    fact = (i == j ? D(1) : D(2))
-                    add_to_expression!(eG, fact * D(c), Y[mu][i, j])
-                    # add_to_expression!(eG, m.sdpData[G][mu][c],Y[mu][c])
-                end
+                # for (i, j, c) in Iterators.zip(findnz(m.sdpData[G][mu])...)
+                #     i > j && continue
+                #     fact = (i == j ? D(1) : D(2))
+                #     add_to_expression!(eG, fact * D(c), Y[mu][i, j])
+                #     # add_to_expression!(eG, m.sdpData[G][mu][c],Y[mu][c])
+                # end
+                add_to_expression!(eG, m.sdpData[G][mu], Y[mu])
             end
         end
         graphCoefficients[G] = eG
     end
-    # graphCoefficients = Dict(
-    #     G => sum(
-    #         dot(Y[mu], Symmetric(m.sdpData[G][mu])) for
-    #         mu in keys(b) if haskey(m.sdpData[G], mu)
-    #     ) for G in keys(m.sdpData)
-    # )
-
-    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
+    return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=Dict())
 end
 
 function modelSize(m::BinomialSquares)
