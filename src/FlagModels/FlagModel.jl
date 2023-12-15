@@ -259,12 +259,13 @@ function buildJuMPModel(
         end
     end
 
-    if !(one(T) in keys(m.objective.coeff))
-        @objective(jumpModel, Min, variables[one(T)])
-    else
-        @objective(jumpModel, Min, 0)
+    if m.objective !== nothing
+        if !(one(T) in keys(m.objective.coeff))
+            @objective(jumpModel, Min, variables[one(T)])
+        else
+            @objective(jumpModel, Min, 0)
+        end
     end
-
     return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)
 end
 
