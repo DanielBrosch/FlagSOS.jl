@@ -1,5 +1,9 @@
 export RazborovModel, computeRazborovBasis!
 
+using SparseArrays
+
+include("../utils/RegularRepresentation.jl")
+
 """
     RazborovModel{T<:Flag, N, D} <: AbstractFlagModel{T, N, D}
 
@@ -38,7 +42,8 @@ function isAllowed(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
 end
 
 function modelSize(m::RazborovModel)
-    return Partition([length(b) for b in values(m.basis)])
+    return Partition([b.n for b in values(m.blockSymmetry)])
+    # return Partition([length(b) for b in values(m.basis)])
 end
 
 function modelBlockSizes(m::RazborovModel)
@@ -79,7 +84,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
     for (mu, B) in reducedBasis
 
         if length(B) == 1
-            M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]])
+            M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n = 1)
             continue
         end
 
@@ -110,7 +115,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
             c[2] = pos[2]
             newPos = [c]
             P[c[1], c[2]] = i
-            P[c[2], c[1]] = i
+            # P[c[2], c[1]] = i
             while !isempty(newPos)
                 ci = popfirst!(newPos)
                 for p in newGen
@@ -118,16 +123,61 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
                     if P[pc[1], pc[2]] == 0
                         push!(newPos, pc)
                         P[pc[1], pc[2]] = i
-                        P[pc[2], pc[1]] = i
+                        # P[pc[2], pc[1]] = i
                     end
                 end
             end
             i += 1
         end
 
-        M.blockSymmetry[mu] = (pattern=P, gen=newGen)
+        if maximum(P) > size(P,1) # regular representation makes things worse
+            symmetrize = Dict()
+            ind = 1
+            for i = 1:maximum(P)
+                if !haskey(symmetrize, i)
+                    symmetrize[i] = ind 
+                    c = findfirst(x -> x == i, P)
+                    j = P[c[2], c[1]]
+                    symmetrize[j] = ind 
+                    ind += 1
+                end
+            end
+            P2 = [symmetrize[i] for i in P]
+            M.blockSymmetry[mu] = (pattern=P2, gen=newGen, n = size(P,1))
+        else # regular representation makes things better
+            reg, factors = regularRepresentation(P)
+            @show factors
+            symmetrizedReg = Dict()
+            for (i, B) in reg 
+                @show i 
+                display(B)
+            end
+            for i = 1:maximum(P)
+                c = findfirst(x -> x == i, P)
+                j = P[c[2], c[1]]
+                
+                ind = min(i,j)
+                
+                if !haskey(symmetrizedReg, ind)
+                    symmetrizedReg[ind] = (1/factors[i])*reg[i]
+                else 
+                    symmetrizedReg[ind] += (1/factors[i])*reg[i]
+                end
+            end
+            for (i, B) in symmetrizedReg 
+                @show i 
+                display(B)
+            end
+
+            M.blockSymmetry[mu] = (pattern=P, gen=newGen, reg=symmetrizedReg, n = maximum(P))
+        end
+        # M.blockSymmetry[mu] = (pattern=P, gen=newGen)
     end
     @info "Block symmetries found"
+
+    # @info "Computing regular representation, if advantageous"
+    
+
 
     M.basis = reducedBasis
     return reducedBasis#, blockSizes
@@ -144,8 +194,12 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         P = m.blockSymmetry[mu]
         maxP = maximum(P.pattern)
         for s in 1:maxP
+
             print("$s / $maxP      \r")
             c = findfirst(x -> x == s, P.pattern)
+            if P.pattern[c[2], c[1]] < s
+                continue 
+            end
             i = c[1]
             j = c[2]
             a = B[i]
@@ -199,14 +253,29 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                 # @show t
             end
 
-            for (F, c) in t.coeff
+            for (F, d) in t.coeff
                 if !haskey(m.sdpData, F)
                     m.sdpData[F] = Dict()
                 end
                 if !haskey(m.sdpData[F], mu)
-                    m.sdpData[F][mu] = zeros(Rational{Int}, length(B), length(B))
+                    if haskey(P, :reg)
+                        m.sdpData[F][mu] = zeros(Float64, P.n, P.n)
+                    else
+                        m.sdpData[F][mu] = zeros(Rational{Int}, length(B), length(B))
+                    end
                 end
-                m.sdpData[F][mu][P.pattern .== s] .= c
+                if haskey(P, :reg)
+                    # factor = P.pattern[c[2], c[1]] == s ? 1 : 2
+                    # t = P.pattern[c[2], c[1]]
+                    # A = Int.(P.pattern .== s)
+                    # if t != s 
+                    #     A += Int.(P.pattern .== t)
+                    # end
+                    # m.sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
+                    m.sdpData[F][mu] .+= d*P.reg[s]#*factor
+                else
+                    m.sdpData[F][mu][P.pattern .== s] .= d
+                end
             end
         end
     end
@@ -256,12 +325,27 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
     for (mu, n) in b
         P = m.blockSymmetry[mu].pattern
         name = "y[$mu]"
-        t = maximum(P)
-        y = @variable(jumpModel, [1:t], base_name = name)
-        AT = typeof(1 * y[1])
-        Y[mu] = zeros(AT, size(P))
-        for s in 1:t
-            Y[mu][P .== s] .+= y[s]
+        # t = maximum(P)
+        t = m.blockSymmetry[mu].n
+        if haskey(m.blockSymmetry[mu], :reg)
+            reg = m.blockSymmetry[mu].reg
+            y = @variable(jumpModel, [keys(reg)], base_name = name)
+            AT = typeof(1 * y[1])
+    
+            Y[mu] = zeros(AT, t, t)
+            for s in keys(reg)
+                Y[mu] .+= reg[s]*y[s]
+            end
+        else
+            numVars = maximum(P)
+            y = @variable(jumpModel, [1:numVars], base_name = name)
+            AT = typeof(1 * y[1])
+    
+            Y[mu] = zeros(AT, t, t)
+            # Y[mu] = zeros(AT, size(P))
+            for s in 1:numVars
+                Y[mu][P .== s] .+= y[s]
+            end
         end
         if size(P, 1) > 1
             constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
