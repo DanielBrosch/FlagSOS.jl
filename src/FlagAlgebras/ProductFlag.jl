@@ -27,7 +27,7 @@ function isAllowed(A::ProductFlag)
         return false
     end
 
-    return all(i -> unique([vertexColor(f, i) for f in A.fs]) == 1 for i = 1:size(A))
+    return all(length(unique([vertexColor(f, i) for f in A.Fs])) == 1 for i = 1:size(A))
 end
 
 
@@ -57,7 +57,13 @@ function findUnknownPredicates(
         #     push!(res, tmp)
         #     continue
         # end
-        FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[i])
+
+        if length(predLimits) == length(fieldtypes(FT))
+            FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[i])
+        else 
+            FIP = findUnknownPredicates(F.Fs[i], fixed, [predLimits[1]])
+        end
+
         # @assert length(FIP) == 1
         for fips in FIP
             for p in fips
@@ -79,7 +85,12 @@ function findUnknownGenerationPredicates(
         #     push!(res, tmp)
         #     continue
         # end
-        FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
+        if length(predLimits) == length(fieldtypes(FT))
+            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
+        else 
+            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, [predLimits[1]])
+        end
+        # FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
         # @assert length(FIP) == 1
         for fips in FIP
             for p in fips

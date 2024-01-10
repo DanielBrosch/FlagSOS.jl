@@ -143,7 +143,8 @@ function addFlag!(
             vcat([n - graphSize], [length(p) for p in gS.shape])
         )
 
-        if n-graphSize < length(gS.shape[1])
+        if n-graphSize < lambda.part[1]
+        # if n-graphSize < length(gS.shape[1])
             freePos = findfirst(x->x==n-graphSize,lambda.part)
         end
     else
@@ -154,21 +155,22 @@ function addFlag!(
     #TODO: Update to use decomposeModule
     for mu in biggerShapes(lambda)
         #TODO: check if congruent % 2 is enough (yes according to Flagmatic paper)
-        if sum(mu.part[2:end]) in allowedNumberOfLabels &&
-            sum(mu.part[2:end]) + 2 * (size(g) - sum(mu.part[2:end])) <= maxOutVertices #&& sum(mu.part[2:end]) + (length(mu.part) > 1 ? mu.part[2] : 0) + 2*(m.flagType.nV(g) - sum(mu.part[2:end])) <= maxOutVertices # maxLabelled #&& sum(mu.part[2:end]) % 2 == maxLabelled % 2
+        if freePos != 1 || (sum(mu.part[2:end]) in allowedNumberOfLabels &&
+            sum(mu.part[2:end]) + 2 * (size(g) - sum(mu.part[2:end])) <= maxOutVertices) #&& sum(mu.part[2:end]) + (length(mu.part) > 1 ? mu.part[2] : 0) + 2*(m.flagType.nV(g) - sum(mu.part[2:end])) <= maxOutVertices # maxLabelled #&& sum(mu.part[2:end]) % 2 == maxLabelled % 2
             K = Kostka(mu, lambda)
 
             reynolds = zeros(Int64, K[1], K[1])
             if gS.rowAut.size > 1
                 generator = []
                 for p in gS.rowAut.gen
-                    @show K 
-                    @show p
-                    @show shiftElement(p)
-                    @show insertElement(p, freePos)
-                    if freePos == 1
-                        @assert shiftElement(p) == insertElement(p, freePos)
-                    end
+                    # @show K 
+                    # @show p
+                    # @show shiftElement(p)
+                    # @show insertElement(p, freePos)
+                    # @assert insertElement(p, freePos)[freePos] == freePos
+                    # if freePos == 1
+                    #     @assert shiftElement(p) == insertElement(p, freePos)
+                    # end
                     # push!(generator, (p, semiTabPermMat(K, shiftElement(p))))
                     push!(generator, (p, semiTabPermMat(K, insertElement(p, freePos))))
                 end
@@ -253,9 +255,17 @@ function multiplyPolytabsAndSymmetrize(
     # @show sp1.T
     # @show sp1.T.part
     # @show n 
+
+    if sp1.freePos !== 1
+        @assert sum(sp1.T.part) == n 
+    end
+    if sp2.freePos !== 1
+        @assert sum(sp2.T.part) == n 
+    end
     
     # la = vcat(sp1.T.part[1:sp1.freePos-1], n - sum(sp1.T.part) + sp1.T.part[sp1.freePos], sp1.T.part[sp1.freePos+1:end])
     # @show la 
+
 
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
@@ -269,11 +279,13 @@ function multiplyPolytabsAndSymmetrize(
         #     @show sp1.freePos
         #     @show sp2.freePos
         # end
-        coord1 = [setdiff(1:size(a,1), [sp1.freePos])..., sp1.freePos]
+        coord1 = [setdiff(1:size(a,2), [sp1.freePos])..., sp1.freePos]
         coord2 = [setdiff(1:size(a,1), [sp2.freePos])..., sp2.freePos]
         # cord = [2:size(a, 1)..., 1]
-        shiftedMat = a[coord1, coord2]
-        # shiftedMat = a[coord2, coord1]
+        
+        # shiftedMat = a[coord1, coord2]
+        shiftedMat = a[coord2, coord1]
+
         shiftedMat[end,end] = 0
 
         # naive

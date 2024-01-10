@@ -334,7 +334,7 @@ function symPolytabloidProduct(
     m = max(maximum(t1), maximum(t2))
     lambda = vcat(lambda, [zero(lambda[1]) for i in (length(lambda) + 1):(m + 1)])
 
-    @show lambda
+    # @show lambda
     # @assert issorted(lambda, rev = true)
     @assert issorted(lambda, lt = (x,y)->x>y)
 

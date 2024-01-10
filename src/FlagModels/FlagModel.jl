@@ -73,7 +73,7 @@ end
 Adds a symmetry reduced Lasserre block of internal flag type 'T' to 'm' and returns it. All flags with up to 'floor(maxEdges/2)' edges (resp. true predicates) with optionally at most 'floor(maxVertices/2)' vertices are added as generators of the block. The resulting hierarchy contains flags with at most 'maxEdges' edges and 'maxVertices' vertices.
 """
 function addLasserreBlock!(
-    m::FlagModel{T,N,D}, maxEdges; maxVertices=maxEdges * maxPredicateArguments(T)
+    m::FlagModel{T,N,D}, maxEdges; maxVertices=min(N, maxEdges * maxPredicateArguments(T))
 ) where {T<:Flag,N,D}
     lM = LasserreModel{T,N,D}(m)
     push!(m.subModels, lM)

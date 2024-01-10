@@ -299,8 +299,13 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector; withPro
             # @show size(newF)
             push!(nextGraphs, newF)
             currentEdges = countEdges(newF)
+            # @show currentEdges
+            # @show length(currentEdges)
+            # @show currentEdges[length(maxPredicates):end]
+            # @show sum(currentEdges[length(maxPredicates):end])
+            # @show maxPredicates
 
-            if length(maxPredicates) < length(currentEdges) && (maxPredicates[end] isa Int && maxPredicates[end] <= sum(currentEdges[length(maxPredicates):end]))
+            if length(maxPredicates) < length(currentEdges) && (maxPredicates[end] isa Int && maxPredicates[end] <= sum(sum.(currentEdges[length(maxPredicates):end])))
                 continue
             end
 
@@ -333,7 +338,7 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector; withPro
                 # @assert length(maxPredicates) == length(cP)
                 if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
                     pq[F] = cP
-                elseif all(cP[1:length(maxPredicates)-1] .<= maxPredicates[1:end-1]) && maxPredicates[end] isa Int && sum(cP[length(maxPredicates):end]) <= maxPredicates[end]
+                elseif all(cP[1:length(maxPredicates)-1] .<= maxPredicates[1:end-1]) && maxPredicates[end] isa Int && sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
                     pq[F] = cP
                 end
             end
@@ -368,7 +373,7 @@ function generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector; withPro
                 # end
                 if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
                     pq[F] = cP
-                elseif all(cP[1:length(maxPredicates)-1] .<= maxPredicates[1:end-1]) && sum(cP[length(maxPredicates):end]) <= maxPredicates[end]
+                elseif all(cP[1:length(maxPredicates)-1] .<= maxPredicates[1:end-1]) && sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
                     pq[F] = cP
                 end
             end

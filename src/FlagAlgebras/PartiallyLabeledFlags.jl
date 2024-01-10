@@ -160,7 +160,7 @@ function findUnknownGenerationPredicates(
     return [LabelPredicate[LabelPredicate(i) for i in F.n+1:size(F) if !(i in vcat(fixed...))]]
 end
 
-function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
+function countEdges(F::PartiallyLabeledFlag{T})::Vector where {T<:Flag}
     cP = countEdges(F.F)
     return [F.n, cP...]
 end
