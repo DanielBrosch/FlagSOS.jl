@@ -87,7 +87,7 @@ function permute(F::HarmonicFlag{T}, p::HarmonicFlag{Int}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::HarmonicFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
+    F::HarmonicFlag{T}, fixed::Vector{U},predLimits::Vector
 ) where {T<:Flag,U<:AbstractVector{Int}}
     return findUnknownPredicates(F.F, fixed, predLimits)
 end

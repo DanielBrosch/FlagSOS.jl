@@ -117,6 +117,12 @@ end
 function shiftElement(p, by=1)
     return vcat(collect(1:by), p .+ by)
 end
+
+function insertElement(p, at=1)
+    # return vcat(collect(1:by), p .+ by)
+    return vcat(p[1:at-1], [at], p[at:end] .+ 1)
+end
+
 function shiftGroup(F)
     return [Perm(vcat([1], p.d .+ 1)) for p in F]
 end
@@ -327,6 +333,10 @@ function symPolytabloidProduct(
 ) where {T}
     m = max(maximum(t1), maximum(t2))
     lambda = vcat(lambda, [zero(lambda[1]) for i in (length(lambda) + 1):(m + 1)])
+
+    # @show lambda
+    # @assert issorted(lambda, rev = true)
+    @assert issorted(lambda, lt = (x,y)->x>y)
 
     function move(A::Matrix{T}, i::Int, j::Int, k::Int, l::Int)
         res = copy(A)

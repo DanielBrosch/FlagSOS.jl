@@ -101,7 +101,7 @@ function glue(
     FG === nothing && return nothing
 
     if FG isa QuantumFlag
-        return QuantumFlag(PartiallyLabeledFlag{T}(f) => d for (f, d) in FG.coeff)
+        return QuantumFlag(PartiallyLabeledFlag{T}(f, max(F.n, G.n)) => d for (f, d) in FG.coeff)
     end
     return PartiallyLabeledFlag{T}(FG, max(F.n, G.n))
 end
@@ -146,13 +146,13 @@ function one(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::PartiallyLabeledFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
+    F::PartiallyLabeledFlag{T}, fixed::Vector{U},predLimits::Vector
 ) where {T<:Flag,U<:AbstractVector{Int}}
     return vcat([[]],findUnknownPredicates(F.F, fixed, predLimits[2:end]))
 end
 
 function findUnknownGenerationPredicates(
-    F::PartiallyLabeledFlag{T}, fixed::Vector{U},predLimits::Vector{Int}
+    F::PartiallyLabeledFlag{T}, fixed::Vector{U},predLimits::Vector
 ) where {T<:Flag,U<:AbstractVector{Int}}
     if length(predLimits) > 0 && predLimits[1] <= F.n
         return LabelPredicate[]
@@ -160,7 +160,7 @@ function findUnknownGenerationPredicates(
     return [LabelPredicate[LabelPredicate(i) for i in F.n+1:size(F) if !(i in vcat(fixed...))]]
 end
 
-function countEdges(F::PartiallyLabeledFlag{T})::Vector{Int} where {T<:Flag}
+function countEdges(F::PartiallyLabeledFlag{T})::Vector where {T<:Flag}
     cP = countEdges(F.F)
     return [F.n, cP...]
 end
