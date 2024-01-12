@@ -50,17 +50,17 @@ function modelBlockSizes(m::RazborovModel)
     return Dict(F => length(b) for (F, b) in m.basis)
 end
 
-function computeRazborovBasis!(M::RazborovModel{T,N,D}, n) where {T<:Flag,N,D}
+function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels = n) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
     @info "Generating flags up to isomorphism..."
-    flags = generateAll(T, n, [99999])
+    flags = generateAll(T, maxLabels, [99999])
     @info "Splitting $(length(flags)) flags..."
 
     filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
-        for m in n:-2:size(Ftmp)
+        for m in maxLabels:-2:size(Ftmp)
             k = Int((n - m) / 2)
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
             FBlock = label(F; removeIsolated=false)[1]
@@ -284,7 +284,12 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         # Eliminate linear dependencies 
         @info "Eliminating linear dependencies"
 
+        total = length(m.sdpData)
+        i = 1
         for (F, B) in m.sdpData
+            @show i, total 
+            @show F 
+            i += 1
             if isAllowed(m, F)
                 v = isolatedVertices(F)
                 if !any(v)
@@ -313,6 +318,8 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             delete!(m.sdpData, F)
         end
     end
+
+    @info "Razborov computation done"
 
     return m.sdpData
 end

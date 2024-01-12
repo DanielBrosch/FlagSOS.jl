@@ -413,15 +413,18 @@ function multiplyPolytabsAndSymmetrize(
             combined = QuantumFlag{T,Int}(combined => 1)
         end
 
+        # fact = limit ? 1 : factorial(sp1.T.part[sp1.freePos]) * factorial(sp2.T.part[sp2.freePos])
+        fact = 1
+
         for (comb, c) in combined.coeff
             if splitByOverlaps
                 comb = (comb, sp1.F.F, sp2.F.F, B)
             end
 
             if !haskey(resUnsorted, comb)
-                resUnsorted[comb] = c * combinedOverlapsReduced[B]
+                resUnsorted[comb] = c * combinedOverlapsReduced[B] // fact
             else
-                resUnsorted[comb] += c * combinedOverlapsReduced[B]
+                resUnsorted[comb] += c * combinedOverlapsReduced[B] // fact
                 if resUnsorted[comb] == 0
                     delete!(resUnsorted, comb)
                 end

@@ -94,10 +94,10 @@ end
 
 Adds a symmetry reduced Lasserre block of internal flag type 'T' to 'm' and returns it. All flags with up to 'floor(maxEdges/2)' edges (resp. true predicates) with optionally at most 'floor(maxVertices/2)' vertices are added as generators of the block. The resulting hierarchy contains flags with at most 'maxEdges' edges and 'maxVertices' vertices.
 """
-function addRazborovBlock!(m::FlagModel{T,N,D}, lvl) where {T<:Flag,N,D}
+function addRazborovBlock!(m::FlagModel{T,N,D}, lvl, maxLabels = lvl) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
-    computeRazborovBasis!(rM, lvl)
+    computeRazborovBasis!(rM, lvl, maxLabels)
 
     return rM
 end
