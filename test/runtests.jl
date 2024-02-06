@@ -34,7 +34,7 @@ end
 
 @testset "FlagSOS.jl" begin
     @testset "Code quality (Aqua.jl)" begin
-        Aqua.test_all(FlagSOS; ambiguities=(imported = false))
+        Aqua.test_all(FlagSOS; ambiguities=(imported = false), deps_compat=(check_extras=false))#ignore=[Test, Aqua]))
     end
 
     @testset "Doctests" begin
@@ -43,5 +43,9 @@ end
 
     @testset "Examples" begin
         _test_directory.(joinpath(@__DIR__, "..", "docs", "src", "examples"))
+    end
+
+    @testset "Harmonic Flags" begin 
+        _include_sandbox("src/HarmonicFlags.jl")
     end
 end
