@@ -258,10 +258,12 @@ function buildJuMPModel(
         end
         for (G, c) in variables
             if isAllowed(m, G) && (G != T() || T() in keys(objL.coeff))
+                @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
                 # push!(constraints, c <= (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
                 constraints[end][G] = @constraint(jumpModel, c == get(objL.coeff, G, 0))
+                # constraints[end][G] = @constraint(jumpModel, c <= get(objL.coeff, G, 0))
             end
         end
     end

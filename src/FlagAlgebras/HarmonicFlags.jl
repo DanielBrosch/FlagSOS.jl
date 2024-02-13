@@ -34,7 +34,7 @@ end
 Base.size(F::HarmonicFlag)::Int = size(F.F)
 
 function labelCanonically(F::HarmonicFlag{T})::HarmonicFlag{T} where {T<:Flag}
-    return HarmonicFlag{T}(label(F.F; removeIsolated=false)[1])
+    return HarmonicFlag{T}(label(F.F; removeIsolated=true)[1])
 end
 
 function countEdges(F::HarmonicFlag{T})::Vector{Int} where {T<:Flag}

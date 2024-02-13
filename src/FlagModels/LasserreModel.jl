@@ -246,6 +246,10 @@ function multiplyPolytabsAndSymmetrize(
         removedVerts = size(sp1.F.F) - sum(length.(sp1.F.shape))
     end
 
+
+    # @show reservedVerts
+    # @show removedVerts
+
     n = limit ? sum(sp1.T.part) : (N > -1 ? N - reservedVerts - removedVerts : Polynomials.Polynomial([0, 1]) - removedVerts)
     la = vcat([n - sum(sp1.T.part[2:end])], sp1.T.part[2:end])
     # la = deepcopy(sp1.T.part.part)
@@ -279,12 +283,15 @@ function multiplyPolytabsAndSymmetrize(
         #     @show sp1.freePos
         #     @show sp2.freePos
         # end
+        # cord = [2:size(a, 1)..., 1]
+
         coord1 = [setdiff(1:size(a,2), [sp1.freePos])..., sp1.freePos]
         coord2 = [setdiff(1:size(a,1), [sp2.freePos])..., sp2.freePos]
-        # cord = [2:size(a, 1)..., 1]
-        
-        # shiftedMat = a[coord1, coord2]
         shiftedMat = a[coord2, coord1]
+        
+        # coord1 = [setdiff(1:size(a,1), [sp1.freePos])..., sp1.freePos]
+        # coord2 = [setdiff(1:size(a,2), [sp2.freePos])..., sp2.freePos]
+        # shiftedMat = a[coord1, coord2]
 
         shiftedMat[end,end] = 0
 
@@ -413,6 +420,10 @@ function multiplyPolytabsAndSymmetrize(
             combined = QuantumFlag{T,Int}(combined => 1)
         end
 
+        # @show sp1.T 
+        # @show sp1.freePos
+        # @show sp1.F.shape
+        # @show sp2
         # fact = limit ? 1 : factorial(sp1.T.part[sp1.freePos]) * factorial(sp2.T.part[sp2.freePos])
         fact = 1
 

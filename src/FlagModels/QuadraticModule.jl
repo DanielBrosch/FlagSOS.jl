@@ -145,7 +145,7 @@ function computeSDP!(
     m::EqualityModule{T,U,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D}
     m.sdpData = Dict()
-    @assert !(T isa InducedFlag) "TODO:"
+    @assert !(T <: InducedFlag) "TODO:"
     # @assert N == :limit "TODO"
     for (i, G) in enumerate(m.basis)
         for (G2, c) in m.equality.coeff

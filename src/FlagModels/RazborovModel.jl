@@ -339,25 +339,34 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
             y = @variable(jumpModel, [keys(reg)], base_name = name)
             AT = typeof(1 * y[1])
     
-            Y[mu] = zeros(AT, t, t)
-            for s in keys(reg)
-                Y[mu] .+= reg[s]*y[s]
+            # Y[mu] = zeros(AT, t, t)
+            # for s in keys(reg)
+            #     Y[mu] .+= reg[s]*y[s]
+            # end
+            Y[mu] = sum(reg[s]*y[s] for s in keys(reg))
+            if size(P, 1) > 1
+                constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+            else
+                constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
             end
         else
             numVars = maximum(P)
             y = @variable(jumpModel, [1:numVars], base_name = name)
             AT = typeof(1 * y[1])
     
-            Y[mu] = zeros(AT, t, t)
-            # Y[mu] = zeros(AT, size(P))
-            for s in 1:numVars
-                Y[mu][P .== s] .+= y[s]
+            # Y[mu] = zeros(AT, t, t)
+            # # Y[mu] = zeros(AT, size(P))
+            # for s in 1:numVars
+            #     Y[mu][P .== s] .+= y[s]
+            # end
+
+            Y[mu] = sum((P .== s)*y[s] for s in 1:numVars)
+            # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
+            if size(P, 1) > 1
+                constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+            else
+                constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
             end
-        end
-        if size(P, 1) > 1
-            constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
-        else
-            constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
         end
     end
 
