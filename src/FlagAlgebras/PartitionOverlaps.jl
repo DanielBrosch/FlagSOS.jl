@@ -2,7 +2,7 @@
 
 using AbstractAlgebra
 
-R, pN = PolynomialRing(qq, "n")
+R, pN = polynomial_ring(qq, "n")
 
 # Calculates binom(f,a), where f is a polynomial, and k an integer
 function binCoeffPoly(f, k, fact=false)
