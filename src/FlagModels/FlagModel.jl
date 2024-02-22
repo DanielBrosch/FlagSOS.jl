@@ -148,16 +148,19 @@ function addInequality_Lasserre!(
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
     maxVertices=size(g) +
-                floor((maxEdges - countEdges(g)[1]) / 2) * maxPredicateArguments(T),
+                floor((maxEdges - countEdges(g)[2]) / 2) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
-    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1]) / 2))
+    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[2]) / 2))
     genMaxVertices = Int(floor((maxVertices - size(gl)) / 2))
 
     lM = LasserreModel{PartiallyLabeledFlag{T},N,D}()
 
-    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(gl), genMaxEdges])
+    @show genMaxEdges
+    @show genMaxVertices
+
+    Fs = generateAll(PartiallyLabeledFlag{T}, numLabels(gl) + genMaxVertices, [numLabels(gl), genMaxEdges])
 
     filter!(x -> x.n == numLabels(gl), Fs)
 
@@ -177,16 +180,16 @@ function addEquality!(
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
     maxVertices=size(g) +
-                floor((maxEdges - countEdges(g)[1]) / 2) * maxPredicateArguments(T),
+                floor((maxEdges - countEdges(g)[2]) / 2) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
-    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])))
+    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[2])))
     genMaxVertices = Int(floor((maxVertices - size(gl))))
 
     qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0)#numLabels(gl))
 
-    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices, [numLabels(gl), genMaxEdges])
+    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices+numLabels(gl), [numLabels(gl), genMaxEdges])
 
     filter!(x -> x.n == numLabels(gl), Fs)
 

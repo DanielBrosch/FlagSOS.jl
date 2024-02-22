@@ -42,7 +42,11 @@ function computeSDP!(
     # @assert N == :limit "TODO"
     m.sdpData = Dict()
     for (G, data) in m.baseModel.sdpData
-        tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality))
+        if N == :limit
+            tmp = QuantumFlag{T}(glueFinite(N, G, m.inequality))
+        else
+            tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality))
+        end
         noLabel = removeIsolated(tmp)
         # noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
 
@@ -66,7 +70,7 @@ function modelBlockSizes(m::QuadraticModule)
     return modelBlockSizes(m.baseModel)
 end
 
-function buildJuMPModel(m::QuadraticModule{T,U,B,N,D}, replaceBlocks=Dict(), jumpModel=Model()) where {T, U, B, N, D}
+function buildJuMPModel(m::QuadraticModule{T,U,B,N,D}, replaceBlocks=Dict(), jumpModel=Model()) where {T,U,B,N,D}
     b = modelBlockSizes(m)
     Y = Dict()
     constraints = Dict()
@@ -192,7 +196,7 @@ function buildJuMPModel(m::EqualityModule{T,U,N,D}, replaceBlocks=Dict(), jumpMo
     #     G in keys(m.sdpData)
     # )
 
-    AT = typeof(sum(D(1)*collect(values(Y))[1]))
+    AT = typeof(sum(D(1) * collect(values(Y))[1]))
     graphCoefficients = Dict()
 
     for G in keys(m.sdpData)
