@@ -7,3 +7,4 @@
 /docs/build/
 /docs/src/examples/*.md
 /docs/src/examples/*.ipynb
+.VSCodeCounter

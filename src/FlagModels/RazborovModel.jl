@@ -50,7 +50,7 @@ function modelBlockSizes(m::RazborovModel)
     return Dict(F => length(b) for (F, b) in m.basis)
 end
 
-function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels = n) where {T<:Flag,N,D}
+function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
     @info "Generating flags up to isomorphism..."
@@ -65,7 +65,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels = n) where 
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
             FBlock = label(F; removeIsolated=false)[1]
             @assert FBlock == label(FBlock; removeIsolated=false)[1]
-            FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
+            FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
 
@@ -84,7 +84,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels = n) where 
     for (mu, B) in reducedBasis
 
         if length(B) == 1
-            M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n = 1)
+            M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n=1)
             continue
         end
 
@@ -97,7 +97,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels = n) where 
                 @assert length(p) == b.n
                 pb = labelCanonically(
                     PartiallyLabeledFlag{T}(
-                        permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
+                        permute(b.F, vcat(p, (length(p)+1):size(b))), b.n
                     ),
                 )
                 gen[i] = findfirst(x -> x == pb, B)
@@ -130,53 +130,57 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels = n) where 
             i += 1
         end
 
-        if maximum(P) > size(P,1) # regular representation makes things worse
+        if maximum(P) > size(P, 1) # regular representation makes things worse
             symmetrize = Dict()
             ind = 1
             for i = 1:maximum(P)
                 if !haskey(symmetrize, i)
-                    symmetrize[i] = ind 
+                    symmetrize[i] = ind
                     c = findfirst(x -> x == i, P)
                     j = P[c[2], c[1]]
-                    symmetrize[j] = ind 
+                    symmetrize[j] = ind
                     ind += 1
                 end
             end
             P2 = [symmetrize[i] for i in P]
-            M.blockSymmetry[mu] = (pattern=P2, gen=newGen, n = size(P,1))
+            M.blockSymmetry[mu] = (pattern=P2, gen=newGen, n=size(P, 1), fullPattern = P)
+            # @info "Cannot reduce $mu from $(size(P,1)) (squared $(size(P,1)^2))to $(maximum(P)) " 
         else # regular representation makes things better
-            reg, factors = regularRepresentation(P)
-            @show factors
+            # reg, factors = regularRepresentation(P)
+            reg = regularRepresentation(P)
+            # @show factors
             symmetrizedReg = Dict()
-            for (i, B) in reg 
-                @show i 
+            for (i, B) in reg
+                @show i
                 display(B)
             end
             for i = 1:maximum(P)
                 c = findfirst(x -> x == i, P)
                 j = P[c[2], c[1]]
-                
-                ind = min(i,j)
-                
+
+                ind = min(i, j)
+
                 if !haskey(symmetrizedReg, ind)
-                    symmetrizedReg[ind] = (1/factors[i])*reg[i]
-                else 
-                    symmetrizedReg[ind] += (1/factors[i])*reg[i]
+                    # symmetrizedReg[ind] = (1 / factors[i]) * reg[i]
+                    symmetrizedReg[ind] = reg[i]
+                else
+                    # symmetrizedReg[ind] += (1 / factors[i]) * reg[i]
+                    symmetrizedReg[ind] += reg[i]
                 end
             end
-            for (i, B) in symmetrizedReg 
-                @show i 
+            for (i, B) in symmetrizedReg
+                @show i
                 display(B)
             end
 
-            M.blockSymmetry[mu] = (pattern=P, gen=newGen, reg=symmetrizedReg, n = maximum(P))
+            M.blockSymmetry[mu] = (pattern=P, gen=newGen, reg=symmetrizedReg, n=maximum(P), fullPattern = P)
         end
         # M.blockSymmetry[mu] = (pattern=P, gen=newGen)
     end
     @info "Block symmetries found"
 
     # @info "Computing regular representation, if advantageous"
-    
+
 
 
     M.basis = reducedBasis
@@ -198,7 +202,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             print("$s / $maxP      \r")
             c = findfirst(x -> x == s, P.pattern)
             if P.pattern[c[2], c[1]] < s
-                continue 
+                continue
             end
             i = c[1]
             j = c[2]
@@ -211,7 +215,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
             newSize = k + (n1 - k) + (n2 - k)
             p = collect(1:newSize)
-            p[(k + 1):n1] = (n2 + 1):newSize
+            p[(k+1):n1] = (n2+1):newSize
 
             T1 = a.F
             p1 = p[1:size(a.F)]
@@ -225,12 +229,16 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             p1Fin = p2Inv[p1]
             p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
 
-            @views sort!(p1Fin[(n1 + 1):end])
+            @views sort!(p1Fin[(n1+1):end])
 
             p1Fin = Int.(p1Fin)
 
             if !(T <: InducedFlag) # Apply Moebius transform on labels
-                t = one(D) * glueFinite(N-reservedVerts, T1, T2, p1Fin; labelFlags=false)
+                if N == :limit
+                    t = one(D) * glueFinite(N, T1, T2, p1Fin; labelFlags=false)
+                else
+                    t = one(D) * glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=false)
+                end
                 overlappingVerts = Int.(intersect(1:size(T2), p1Fin[1:size(T1)]))
                 overlapGraph = subFlag(T2, overlappingVerts)
 
@@ -239,15 +247,15 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                 tMarked = labelCanonically(
                     sum(
                         c * EdgeMarkedFlag{T}(F, markers) for (F, c) in t.coeff;
-                        init=QuantumFlag{EdgeMarkedFlag{T, predicateType(T)},D}(),
+                        init=QuantumFlag{EdgeMarkedFlag{T,predicateType(T)},D}(),
                     ),
                 )
 
-                t = moebius(tMarked; label = true)
+                t = moebius(tMarked; label=true)
                 # t = labelCanonically(t)
 
             else
-                t = glueFinite(N-reservedVerts, T1, T2, p1Fin; labelFlags=true)
+                t = glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=true)
                 # @show t
                 # t = labelCanonically(t)
                 # @show t
@@ -272,9 +280,9 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     #     A += Int.(P.pattern .== t)
                     # end
                     # m.sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
-                    m.sdpData[F][mu] .+= d*P.reg[s]#*factor
+                    m.sdpData[F][mu] .+= d * P.reg[s]#*factor
                 else
-                    m.sdpData[F][mu][P.pattern .== s] .= d
+                    m.sdpData[F][mu][P.pattern.==s] .= d
                 end
             end
         end
@@ -287,8 +295,8 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         total = length(m.sdpData)
         i = 1
         for (F, B) in m.sdpData
-            @show i, total 
-            @show F 
+            @show i, total
+            @show F
             i += 1
             if isAllowed(m, F)
                 v = isolatedVertices(F)
@@ -338,34 +346,48 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
             reg = m.blockSymmetry[mu].reg
             y = @variable(jumpModel, [keys(reg)], base_name = name)
             AT = typeof(1 * y[1])
-    
+
             # Y[mu] = zeros(AT, t, t)
             # for s in keys(reg)
             #     Y[mu] .+= reg[s]*y[s]
             # end
-            Y[mu] = sum(reg[s]*y[s] for s in keys(reg))
+            Y[mu] = sum(reg[s] * y[s] for s in keys(reg))
             if size(P, 1) > 1
                 constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
             else
                 constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
             end
         else
-            numVars = maximum(P)
-            y = @variable(jumpModel, [1:numVars], base_name = name)
-            AT = typeof(1 * y[1])
-    
+            # numVars = maximum(P)
+            # y = @variable(jumpModel, [1:numVars], base_name = name)
+            # AT = typeof(1 * y[1])
+
             # Y[mu] = zeros(AT, t, t)
             # # Y[mu] = zeros(AT, size(P))
             # for s in 1:numVars
             #     Y[mu][P .== s] .+= y[s]
             # end
 
-            Y[mu] = sum((P .== s)*y[s] for s in 1:numVars)
-            # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
-            if size(P, 1) > 1
-                constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
-            else
-                constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+            # Y[mu] = sum((P .== s) * y[s] for s in 1:numVars)
+            # # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
+            # if size(P, 1) > 1
+            #     constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+            # else
+            #     constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+            # end
+
+
+            Y[mu] = get(replaceBlocks, mu) do
+                name = "Y$mu"
+                if n > 1
+                    v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
+                    constraints[name] = @constraint(jumpModel, v in PSDCone())
+                    return v
+                else
+                    v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
+                    constraints[name] = @constraint(jumpModel, v .>= 0)
+                    return v
+                end
             end
         end
     end

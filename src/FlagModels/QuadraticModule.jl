@@ -89,7 +89,11 @@ function buildJuMPModel(m::QuadraticModule{T,U,B,N,D}, replaceBlocks=Dict(), jum
         end
     end
 
-    AT = typeof(sum(collect(values(Y))[1]))
+    if length(Y) > 0
+        AT = typeof(sum(collect(values(Y))[1]))
+    end
+    # AT = GenericAffExpr{D, GenericVariableRef{D}}
+    # AT = GenericAffExpr{D, GenericVariableRef{D}}
     graphCoefficients = Dict()
 
     for G in keys(m.sdpData)
@@ -101,7 +105,15 @@ function buildJuMPModel(m::QuadraticModule{T,U,B,N,D}, replaceBlocks=Dict(), jum
                 for (i, j, c) in Iterators.zip(findnz(m.sdpData[G][mu])...)
                     i > j && continue
                     fact = (i == j ? D(1) : D(2))
-                    add_to_expression!(eG, fact * D(c), Y[mu][i, j])
+                    # @show typeof(eG)
+                    # @show typeof(fact*D(c))
+                    # @show typeof(Y[mu][i,j])
+                    # @show AT
+                    # @show typeof(sum(collect(values(Y))[1]))
+                    # @show c
+                    # @show Y[mu]
+                    add_to_expression!(eG, fact * D(c), D(1) * Y[mu][i, j])
+                    # eG += fact*D(c)*Y[mu][i,j]
                     # add_to_expression!(eG, m.sdpData[G][mu][c],Y[mu][c])
                 end
             end
@@ -196,7 +208,10 @@ function buildJuMPModel(m::EqualityModule{T,U,N,D}, replaceBlocks=Dict(), jumpMo
     #     G in keys(m.sdpData)
     # )
 
-    AT = typeof(sum(D(1) * collect(values(Y))[1]))
+    if length(Y) > 0
+        AT = typeof(sum(D(1) * collect(values(Y))[1]))
+    end
+    # AT = GenericAffExpr{D,GenericVariableRef{D}}
     graphCoefficients = Dict()
 
     for G in keys(m.sdpData)

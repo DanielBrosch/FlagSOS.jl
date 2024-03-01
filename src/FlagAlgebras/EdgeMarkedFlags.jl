@@ -206,8 +206,9 @@ end
 function zeta(
     F::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false
 ) where {T<:Flag,D,P<:Predicate}
-    res = moebius(F; label=label)
-    map!(abs, values(res.coeff))
+    # res = moebius(F; label=label)
+    # map!(abs, values(res.coeff))
+    res = sum(c*zeta(f) for (f,c) in F.coeff)
     return res
 end
 

@@ -21,7 +21,7 @@ struct FlagSymmetries{T<:Flag}
             for i in cV
                 if !(i in covered)
                     part = [i]
-                    for j in setdiff((i + 1):nV, covered)
+                    for j in setdiff((i+1):nV, covered)
                         if isSym(g, i, j)
                             push!(part, j)
                             push!(covered, j)
@@ -138,14 +138,14 @@ function addFlag!(
     freePos = 1
 
     if graphSize > 0
-        @assert n-graphSize > 0
+        @assert n - graphSize > 0
         lambda = AbstractAlgebra.Partition(
             vcat([n - graphSize], [length(p) for p in gS.shape])
         )
 
-        if n-graphSize < lambda.part[1]
-        # if n-graphSize < length(gS.shape[1])
-            freePos = findfirst(x->x==n-graphSize,lambda.part)
+        if n - graphSize < lambda.part[1]
+            # if n-graphSize < length(gS.shape[1])
+            freePos = findfirst(x -> x == n - graphSize, lambda.part)
         end
     else
         lambda = AbstractAlgebra.Partition([1])
@@ -156,7 +156,7 @@ function addFlag!(
     for mu in biggerShapes(lambda)
         #TODO: check if congruent % 2 is enough (yes according to Flagmatic paper)
         if freePos != 1 || (sum(mu.part[2:end]) in allowedNumberOfLabels &&
-            sum(mu.part[2:end]) + 2 * (size(g) - sum(mu.part[2:end])) <= maxOutVertices) #&& sum(mu.part[2:end]) + (length(mu.part) > 1 ? mu.part[2] : 0) + 2*(m.flagType.nV(g) - sum(mu.part[2:end])) <= maxOutVertices # maxLabelled #&& sum(mu.part[2:end]) % 2 == maxLabelled % 2
+                            sum(mu.part[2:end]) + 2 * (size(g) - sum(mu.part[2:end])) <= maxOutVertices) #&& sum(mu.part[2:end]) + (length(mu.part) > 1 ? mu.part[2] : 0) + 2*(m.flagType.nV(g) - sum(mu.part[2:end])) <= maxOutVertices # maxLabelled #&& sum(mu.part[2:end]) % 2 == maxLabelled % 2
             K = Kostka(mu, lambda)
 
             reynolds = zeros(Int64, K[1], K[1])
@@ -212,7 +212,7 @@ function multiplyPolytabsAndSymmetrize(
     # limit=true,
     splitByOverlaps=false,
     useGroups=false,
-    reservedVerts = 0
+    reservedVerts=0
 ) where {T<:Flag,N,D,U<:Flag}
     # @assert sum(length.(sp1.F.shape)) == size(sp1.F.F)
     limit = N == :limit
@@ -242,7 +242,7 @@ function multiplyPolytabsAndSymmetrize(
     # la = vcat([n - sum(p1.part[2:end])], p1.part[2:end])
     removedVerts = 0
     if !limit # same number of labels in partially labeled flag algebra
-        @assert  size(sp1.F.F) - sum(length.(sp1.F.shape)) == size(sp2.F.F) - sum(length.(sp2.F.shape))
+        @assert size(sp1.F.F) - sum(length.(sp1.F.shape)) == size(sp2.F.F) - sum(length.(sp2.F.shape))
         removedVerts = size(sp1.F.F) - sum(length.(sp1.F.shape))
     end
 
@@ -261,12 +261,12 @@ function multiplyPolytabsAndSymmetrize(
     # @show n 
 
     if sp1.freePos !== 1
-        @assert sum(sp1.T.part) == n 
+        @assert sum(sp1.T.part) == n
     end
     if sp2.freePos !== 1
-        @assert sum(sp2.T.part) == n 
+        @assert sum(sp2.T.part) == n
     end
-    
+
     # la = vcat(sp1.T.part[1:sp1.freePos-1], n - sum(sp1.T.part) + sp1.T.part[sp1.freePos], sp1.T.part[sp1.freePos+1:end])
     # @show la 
 
@@ -285,15 +285,15 @@ function multiplyPolytabsAndSymmetrize(
         # end
         # cord = [2:size(a, 1)..., 1]
 
-        coord1 = [setdiff(1:size(a,2), [sp1.freePos])..., sp1.freePos]
-        coord2 = [setdiff(1:size(a,1), [sp2.freePos])..., sp2.freePos]
+        coord1 = [setdiff(1:size(a, 2), [sp1.freePos])..., sp1.freePos]
+        coord2 = [setdiff(1:size(a, 1), [sp2.freePos])..., sp2.freePos]
         shiftedMat = a[coord2, coord1]
-        
+
         # coord1 = [setdiff(1:size(a,1), [sp1.freePos])..., sp1.freePos]
         # coord2 = [setdiff(1:size(a,2), [sp2.freePos])..., sp2.freePos]
         # shiftedMat = a[coord1, coord2]
 
-        shiftedMat[end,end] = 0
+        shiftedMat[end, end] = 0
 
         # naive
         # if maxVert == -1 || sum(shiftedMat) <= maxVert
@@ -304,7 +304,7 @@ function multiplyPolytabsAndSymmetrize(
         #    2 * max(sum(shiftedMat[:, end]), sum(shiftedMat[end, :])) <= maxVert
         #     combinedOverlaps[Int64.(shiftedMat)'] = b//fact
         # end
-        combinedOverlaps[Int64.(shiftedMat)'] = b//fact
+        combinedOverlaps[Int64.(shiftedMat)'] = b // fact
     end
 
     # reduce using automorphisms
@@ -350,8 +350,8 @@ function multiplyPolytabsAndSymmetrize(
                 minimum([
                     vec(
                         B[
-                            vcat(q.d, (length(q.d) + 1):size(B, 1)),
-                            vcat(p.d, (length(p.d) + 1):size(B, 2)),
+                            vcat(q.d, (length(q.d)+1):size(B, 1)),
+                            vcat(p.d, (length(p.d)+1):size(B, 2)),
                         ],
                     ) for p in vcat(grp1, [(d=collect(1:size(B, 2)),)]) for
                     q in vcat(grp2, [(d=collect(1:size(B, 1)),)])
@@ -393,7 +393,7 @@ function multiplyPolytabsAndSymmetrize(
         for i in 1:size(B, 1)
             for j in 1:size(B, 2)
                 if B[i, j] > 0
-                    correspondingEntries[i, j] = vecShape2[cur:(cur + B[i, j] - 1)]
+                    correspondingEntries[i, j] = vecShape2[cur:(cur+B[i, j]-1)]
                     cur += B[i, j]
                 end
             end
@@ -403,7 +403,7 @@ function multiplyPolytabsAndSymmetrize(
         for j in 1:size(B, 2)
             for i in 1:size(B, 1)
                 if B[i, j] > 0
-                    p[vecShape1[cur:(cur + B[i, j] - 1)]] = correspondingEntries[i, j]
+                    p[vecShape1[cur:(cur+B[i, j]-1)]] = correspondingEntries[i, j]
                     cur += B[i, j]
                 end
             end
@@ -497,7 +497,7 @@ end
 function computeSDP!(m::LasserreModel{T,N,D}, reservedVerts::Int) where {T,N,D}#; maxVert = -1, useGroups = true, splitByOverlaps = false)
     #TODO: Parallelize better
 
-    totalNum = Int64(sum(c * (c + 1) / 2 for c in length.(values(m.basis))))
+    totalNum = Int64(sum(c * (c + 1) / 2 for c in length.(values(m.basis)); init = 0))
 
     t = 1
 
@@ -616,7 +616,7 @@ function buildJuMPModel(
     graphCoefficients = Dict()
 
     AT = typeof(sum(collect(values(Y))[1]))
-    
+
     for G in keys(m.sdpData)
         # eG = AffExpr()
         # eG = GenericAffExpr{D, GenericVariableRef{D}}()
@@ -633,6 +633,14 @@ function buildJuMPModel(
         end
         graphCoefficients[G] = eG
     end
+
+    # graphCoefficients = Dict(
+    #     G => sum(
+    #         dot(Y[mu], Symmetric(m.sdpData[G][mu])) for
+    #         mu in keys(b) if haskey(m.sdpData[G], mu)
+    #     ) for G in keys(m.sdpData)
+    # )
+
 
     return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
 end
