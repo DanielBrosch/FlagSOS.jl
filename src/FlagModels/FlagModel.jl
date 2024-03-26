@@ -256,7 +256,7 @@ function buildJuMPModel(
             end
         end
         for (G, c) in variables
-            if isAllowed(m, G) && (G != T() || T() in keys(objL.coeff))
+            if isAllowed(m, G) && (G != T())# || T() in keys(objL.coeff))
                 @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
@@ -271,7 +271,8 @@ function buildJuMPModel(
         if !(one(T) in keys(m.objective.coeff))
             @objective(jumpModel, Min, variables[one(T)])
         else
-            @objective(jumpModel, Min, 0)
+            # @objective(jumpModel, Min, 0)
+            @objective(jumpModel, Min, variables[one(T)] - m.objective.coeff[one(T)])
         end
     end
     return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)

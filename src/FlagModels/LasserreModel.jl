@@ -48,10 +48,13 @@ struct FlagSymmetries{T<:Flag}
             end
             return setdiff(unique!(res), [collect(1:length(shape))])
         end
-
+        @show F 
         shape = determineShape(F)
+        @show shape
         automs = aut(F)
+        @show automs
         ge = reduceAutomorphismsToRows(automs.gen, shape)
+        @show ge
         s = Integer(automs.size / prod([factorial(length(s)) for s in shape]))
         rowAut = (gen=ge, size=s, fullGroup=generateGroup(perm.(ge), s))
 
@@ -586,6 +589,9 @@ function computeSDP!(m::LasserreModel{T,N,D}, reservedVerts::Int) where {T,N,D}#
     end
     close(collectData)
     # @info "Waiting for collection"
+
+    @assert !isInducedFlag(T) "TODO: Reduction for induced flags for Lasserre hierarchy"
+
     return wait(doneCollecting)
     # @info "Notified"
 end

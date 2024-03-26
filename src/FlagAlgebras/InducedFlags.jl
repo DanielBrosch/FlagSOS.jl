@@ -76,19 +76,19 @@ function glue(
 
     # if U == InducedFlag{T}
 
-        # Determine all ways to combine the leaves
-        pred = findUnknownPredicates(FG, [collect(1:m), p[1:n]])
+    # Determine all ways to combine the leaves
+    pred = findUnknownPredicates(FG, [collect(1:m), p[1:n]])
 
-        if length(pred) > 1
-            @error "TODO: Multiple predicate types"
-        end
+    if length(pred) > 1
+        @error "TODO: Multiple predicate types"
+    end
 
-        pred = pred[1]
+    pred = pred[1]
 
-        FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
-        res = sum(c//1 * G for (G, c) in zeta(FGMarked; label = true).coeff)
+    FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
+    res = sum(c//1 * G for (G, c) in zeta(FGMarked; label=true).coeff)
 
-        return res
+    return res
     # elseif U == T
     #     # Convert to non-induced
     #     predF = [glue(f, FG, p) for f in findUnknownPredicates(F.F, Vector{Int}[])]
@@ -118,9 +118,7 @@ function isolatedVertices(F::InducedFlag{T})::BitVector where {T<:Flag}
     return isolatedVertices(F.F)
 end
 
-function addPredicates(
-    F::InducedFlag{T}, preds::Vector{U}
-) where {T<:Flag,U<:Predicate}
+function addPredicates(F::InducedFlag{T}, preds::Vector{U}) where {T<:Flag,U<:Predicate}
     tmp = addPredicates(F.F, preds)
     if tmp === nothing
         return nothing
@@ -133,7 +131,7 @@ function permute(F::InducedFlag{T}, p::AbstractVector{Int}) where {T<:Flag}
 end
 
 function findUnknownPredicates(
-    F::InducedFlag{T}, fixed::Vector{U},predLimits::Vector
+    F::InducedFlag{T}, fixed::Vector{U}, predLimits::Vector
 ) where {T<:Flag,U<:AbstractVector{Int}}
     return findUnknownPredicates(F.F, fixed, predLimits)
 end
@@ -168,27 +166,84 @@ function eliminateIsolated(Fs::QuantumFlag{InducedFlag{T},D}) where {T<:Flag,D}
             preds = findUnknownPredicates(F, [(1:size(F))[.!v]])
             markedF = EdgeMarkedFlag{InducedFlag{T}}(F, preds)
             resIsolated +=
-                D(c) * (F - zeta(markedF; label = true) + labelCanonically(subFlag(F, (1:size(F))[.!v])))
+                D(c) * (
+                    F - zeta(markedF; label=true) +
+                    labelCanonically(subFlag(F, (1:size(F))[.!v]))
+                )
         end
     end
     return res + eliminateIsolated(resIsolated)
 end
 
 # Switching between induced and non-induced
-function toInduced(F::Union{T, QuantumFlag{T}}) where {T<:Flag}
+function toInduced(F::Union{T,QuantumFlag{T}}) where {T<:Flag}
     tmp = zeta(F)
-    res = QuantumFlag{InducedFlag{T}, Int}()
-    for (G,c) in tmp.coeff
-        res += c*InducedFlag{T}(G)
+    res = QuantumFlag{InducedFlag{T},Int}()
+    for (G, c) in tmp.coeff
+        res += c * InducedFlag{T}(G)
     end
     return res
 end
 
-function toNonInduced(F::Union{InducedFlag{T}, QuantumFlag{InducedFlag{T}}}) where {T<:Flag}
+function toNonInduced(F::Union{InducedFlag{T},QuantumFlag{InducedFlag{T}}}) where {T<:Flag}
     tmp = moebius(F)
-    res = QuantumFlag{T, Int}()
-    for (G,c) in tmp.coeff
-        res += c*G.F
+    res = QuantumFlag{T,Int}()
+    for (G, c) in tmp.coeff
+        res += c * G.F
     end
     return res
+end
+
+function isInducedFlag(T)
+    return T <: InducedFlag
+end
+
+# For quotienting out linear dependencies
+# E.g. adding isolated vertices results in a quantum flag equivalent to the original flag
+function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
+    oneVert = permute(T(), [1])
+    @show oneVert
+
+    @show Fs
+
+    n = maximum(size.(Fs))
+
+    res = Dict()
+    for f in Fs
+        size(f) == n && continue
+        tmp = oneVert * f
+        if any(tmp.coeff) do (G, _)
+            isAllowed(G) && !in(G, Fs)
+        end
+            @info "Missing some flags to eliminate product of $f"
+            continue
+        end
+        res[f] = tmp
+    end
+    res
+    n = length(Fs)
+    m = length(res)
+    A = zeros(Rational{Int}, m,n)
+    display(res)
+    for (f, g) in res 
+        i = findfirst(x->x==f, Fs)
+        A[i, findfirst(x->x==f, Fs)] = 1
+        @show f
+        @show g.coeff
+        for (h, c) in g.coeff
+            A[i, findfirst(x->x==h, Fs)] = -c 
+        end
+    end
+    display(A)
+
+    for i = m:-1:1
+        j = findlast(x->!iszero(x), A[i, :])
+        A[i, :] .//= A[i, j]
+        @show (i,j)
+        for k = m:-1:1
+            k == i && continue
+            A[k, :] -= A[k, j] * A[i, :]
+        end
+    end
+    A
 end

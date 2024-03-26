@@ -14,6 +14,7 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     blockSymmetry::Dict
     sdpData::Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}
     parentModel
+    substitution
 
     function RazborovModel{T,N,D}(parent=nothing) where {T<:Flag,N,D}
         return new(
@@ -21,6 +22,7 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
             Dict(),
             Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}(),
             parent,
+            Dict()
         )
     end
 
@@ -30,6 +32,7 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
             Dict(),
             Dict{T,Dict{T,SparseMatrixCSC{Int,Int}}}(),
             parent,
+            Dict()
         )
     end
 end
@@ -50,7 +53,9 @@ function modelBlockSizes(m::RazborovModel)
     return Dict(F => length(b) for (F, b) in m.basis)
 end
 
-function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T<:Flag,N,D}
+function computeUnreducedRazborovBasis(
+    M::RazborovModel{T,N,D}, n, maxLabels=n
+) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
     @info "Generating flags up to isomorphism..."
@@ -65,7 +70,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
             FBlock = label(F; removeIsolated=false)[1]
             @assert FBlock == label(FBlock; removeIsolated=false)[1]
-            FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
+            FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
 
@@ -75,6 +80,12 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
             razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
         end
     end
+    return razborovBasis
+end
+
+function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T<:Flag,N,D}
+    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
+    display(razborovBasis)
 
     @info "determining symmetries"
 
@@ -82,7 +93,6 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
 
     @info "basis reduced"
     for (mu, B) in reducedBasis
-
         if length(B) == 1
             M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n=1)
             continue
@@ -97,7 +107,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
                 @assert length(p) == b.n
                 pb = labelCanonically(
                     PartiallyLabeledFlag{T}(
-                        permute(b.F, vcat(p, (length(p)+1):size(b))), b.n
+                        permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
                     ),
                 )
                 gen[i] = findfirst(x -> x == pb, B)
@@ -133,7 +143,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
         if maximum(P) > size(P, 1) # regular representation makes things worse
             symmetrize = Dict()
             ind = 1
-            for i = 1:maximum(P)
+            for i in 1:maximum(P)
                 if !haskey(symmetrize, i)
                     symmetrize[i] = ind
                     c = findfirst(x -> x == i, P)
@@ -143,7 +153,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
                 end
             end
             P2 = [symmetrize[i] for i in P]
-            M.blockSymmetry[mu] = (pattern=P2, gen=newGen, n=size(P, 1), fullPattern = P)
+            M.blockSymmetry[mu] = (pattern=P2, gen=newGen, n=size(P, 1), fullPattern=P)
             # @info "Cannot reduce $mu from $(size(P,1)) (squared $(size(P,1)^2))to $(maximum(P)) " 
         else # regular representation makes things better
             # reg, factors = regularRepresentation(P)
@@ -154,7 +164,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
                 @show i
                 display(B)
             end
-            for i = 1:maximum(P)
+            for i in 1:maximum(P)
                 c = findfirst(x -> x == i, P)
                 j = P[c[2], c[1]]
 
@@ -173,15 +183,15 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
                 display(B)
             end
 
-            M.blockSymmetry[mu] = (pattern=P, gen=newGen, reg=symmetrizedReg, n=maximum(P), fullPattern = P)
+            M.blockSymmetry[mu] = (
+                pattern=P, gen=newGen, reg=symmetrizedReg, n=maximum(P), fullPattern=P
+            )
         end
         # M.blockSymmetry[mu] = (pattern=P, gen=newGen)
     end
     @info "Block symmetries found"
 
     # @info "Computing regular representation, if advantageous"
-
-
 
     M.basis = reducedBasis
     return reducedBasis#, blockSizes
@@ -198,7 +208,6 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         P = m.blockSymmetry[mu]
         maxP = maximum(P.pattern)
         for s in 1:maxP
-
             print("$s / $maxP      \r")
             c = findfirst(x -> x == s, P.pattern)
             if P.pattern[c[2], c[1]] < s
@@ -215,7 +224,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
             newSize = k + (n1 - k) + (n2 - k)
             p = collect(1:newSize)
-            p[(k+1):n1] = (n2+1):newSize
+            p[(k + 1):n1] = (n2 + 1):newSize
 
             T1 = a.F
             p1 = p[1:size(a.F)]
@@ -229,15 +238,17 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             p1Fin = p2Inv[p1]
             p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
 
-            @views sort!(p1Fin[(n1+1):end])
+            @views sort!(p1Fin[(n1 + 1):end])
 
             p1Fin = Int.(p1Fin)
 
-            if !(T <: InducedFlag) # Apply Moebius transform on labels
+            if !isInducedFlag(T) # Apply Moebius transform on labels
                 if N == :limit
                     t = one(D) * glueFinite(N, T1, T2, p1Fin; labelFlags=false)
                 else
-                    t = one(D) * glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=false)
+                    t =
+                        one(D) *
+                        glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=false)
                 end
                 overlappingVerts = Int.(intersect(1:size(T2), p1Fin[1:size(T1)]))
                 overlapGraph = subFlag(T2, overlappingVerts)
@@ -255,7 +266,18 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                 # t = labelCanonically(t)
 
             else
-                t = glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=true)
+                if N == :limit
+                    # @show a
+                    # @show b
+                    # @show mu
+                    # @show T1
+                    # @show T2
+                    # @show p1Fin
+                    t = glueFinite(N, T1, T2, p1Fin; labelFlags=true)
+                    # @show t
+                else
+                    t = glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=true)
+                end
                 # @show t
                 # t = labelCanonically(t)
                 # @show t
@@ -282,49 +304,84 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # m.sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
                     m.sdpData[F][mu] .+= d * P.reg[s]#*factor
                 else
-                    m.sdpData[F][mu][P.pattern.==s] .= d
+                    m.sdpData[F][mu][P.pattern .== s] .= d
                 end
             end
         end
     end
 
-    if T <: InducedFlag
+    if isInducedFlag(T)# <: InducedFlag
         # Eliminate linear dependencies 
         @info "Eliminating linear dependencies"
 
-        total = length(m.sdpData)
-        i = 1
-        for (F, B) in m.sdpData
-            @show i, total
-            @show F
-            i += 1
-            if isAllowed(m, F)
-                v = isolatedVertices(F)
-                if !any(v)
-                    continue
+        Fs = sort(collect(keys(m.sdpData)), by = size)
+        reduction = quotient(Fs, x -> isAllowed(m.parentModel, x))
+
+        display(reduction)
+
+        for i in size(reduction, 1):-1:1
+            j = findlast(x -> !iszero(x), reduction[i, :])
+            @assert reduction[i, j] == 1
+            F = Fs[j]
+            substitution = sum(-reduction[i, k] * Fs[k] for k in 1:(j - 1) if reduction[i,k] != 0)
+            m.substitution[F] = substitution
+            @show F 
+            @show substitution
+            # substitution = labelCanonically(eliminateIsolated(F))
+            # FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
+
+            # @assert substitution.coeff[FNoIsolated] == 1
+
+            for (G, c) in substitution.coeff
+                if !haskey(m.sdpData, G)
+                    m.sdpData[G] = Dict()
                 end
-
-                substitution = labelCanonically(eliminateIsolated(F))
-                FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
-
-                @assert substitution.coeff[FNoIsolated] == 1
-
-                for (G, c) in substitution.coeff
-                    if !haskey(m.sdpData, G)
-                        m.sdpData[G] = Dict()
+                for (mu, b) in m.sdpData[F]
+                    if !haskey(m.sdpData[G], mu)
+                        m.sdpData[G][mu] = zeros(
+                            Rational{Int}, length(m.basis[mu]), length(m.basis[mu])
+                        )
                     end
-                    for (mu, b) in m.sdpData[F]
-                        if !haskey(m.sdpData[G], mu)
-                            m.sdpData[G][mu] = zeros(
-                                Rational{Int}, length(m.basis[mu]), length(m.basis[mu])
-                            )
-                        end
-                        m.sdpData[G][mu] += c * b
-                    end
+                    m.sdpData[G][mu] += c * b
                 end
             end
+            @info "deleting $F"
             delete!(m.sdpData, F)
         end
+
+        # total = length(m.sdpData)
+        # i = 1
+        # for (F, B) in m.sdpData
+        #     @show i, total
+        #     @show F
+        #     i += 1
+        #     if isAllowed(m, F)
+        #         v = isolatedVertices(F)
+        #         if !any(v)
+        #             continue
+        #         end
+
+        #         substitution = labelCanonically(eliminateIsolated(F))
+        #         FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
+
+        #         @assert substitution.coeff[FNoIsolated] == 1
+
+        #         for (G, c) in substitution.coeff
+        #             if !haskey(m.sdpData, G)
+        #                 m.sdpData[G] = Dict()
+        #             end
+        #             for (mu, b) in m.sdpData[F]
+        #                 if !haskey(m.sdpData[G], mu)
+        #                     m.sdpData[G][mu] = zeros(
+        #                         Rational{Int}, length(m.basis[mu]), length(m.basis[mu])
+        #                     )
+        #                 end
+        #                 m.sdpData[G][mu] += c * b
+        #             end
+        #         end
+        #     end
+        #     delete!(m.sdpData, F)
+        # end
     end
 
     @info "Razborov computation done"
@@ -376,7 +433,6 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
             #     constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
             # end
 
-
             Y[mu] = get(replaceBlocks, mu) do
                 name = "Y$mu"
                 if n > 1
@@ -410,4 +466,115 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
     end
 
     return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
+end
+
+function computeUnreducedRazborovBasis(
+    M::RazborovModel{BinaryTreeFlag,N,D}, n, maxLabels=n
+) where {N,D}
+    razborovBasis = Dict()
+
+    # @info "Generating flags up to isomorphism..."
+    # flags = generateAll(BinaryTreeFlag, maxLabels, [99999])
+    # @info "Splitting $(length(flags)) flags..."
+
+    # filter!(f -> isAllowed(M, f), flags)
+
+    # for Ftmp in flags
+    #     for m in maxLabels:-2:size(Ftmp)
+    #         k = Int((n - m) / 2)
+    #         F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
+    #         FBlock = label(F; removeIsolated=false)[1]
+    #         @assert FBlock == label(FBlock; removeIsolated=false)[1]
+    #         FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
+
+    #         preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
+
+    #         FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(
+    #             PartiallyLabeledFlag{T}(FExtended, m), preds
+    #         )
+    #         razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
+    #     end
+    # end
+    # razborovBasis
+
+    razborovBasis = Dict()
+    trees = generateAll(BinaryTree, n, [1]; upToIso=true)
+    for T in trees
+        m = size(T) # = n + (n-k)/2
+        # @show k = 3*n-2*m
+
+        # k + 2(m-k) <= n
+        # 2m - k <= n 
+        # 2m - n <= k
+        # @show T 
+        # @show max((2*m-n),0):m
+        # @show n
+        for k in m:-2:max((2 * m - n), 0)
+            # @show k
+            for c in combinations(1:m, k)
+                # @show c
+                tLabeled = subFlag(T, c)
+
+                tCanLabeled, tCanLabelPerm = labelPerm(tLabeled)
+                tCanLabeled = BinaryTreeFlag(tCanLabeled)
+
+                auts = aut(tCanLabeled)
+                fullGroup = generateGroup(perm.(auts.gen), auts.size)
+
+                if auts.size == 1
+                    fullGroup = [AbstractAlgebra.perm(1:k)]
+                end
+
+                if true#k == 0
+                    # @show auts
+                    # @show fullGroup
+                end
+
+                for p in fullGroup
+                    # if !haskey(razborovBasis, (tCanLabeled, k))
+                    #     razborovBasis[(tCanLabeled, k)] = Set([])
+                    # end
+                    if !haskey(razborovBasis, tCanLabeled)
+                        razborovBasis[tCanLabeled] = Set([])
+                    end
+
+                    # @show tCanLabelPerm
+                    tCanLabelPermInv = [
+                        findfirst(x -> x == i, tCanLabelPerm) for
+                        i in 1:length(tCanLabelPerm)
+                    ]
+
+                    q = collect(1:m)
+                    q[c] .= 1:k
+                    q[setdiff(1:m, c)] .= (k + 1):m
+                    # @show k
+                    q[c] .= p.d[tCanLabelPermInv[1:k]]
+
+                    # @error "DO NOT INVERT? ADD CHECK"
+
+                    # @show subFlag(T, c)
+                    # @show tCanLabeled
+                    # @assert subFlag(T, q[c]) == tCanLabeled
+
+                    push!(
+                        razborovBasis[tCanLabeled],
+                        # razborovBasis[(tCanLabeled, k)],
+                        PartiallyLabeledFlag{BinaryTreeFlag}(BinaryTreeFlag(T, q), k),
+                    )
+
+                    # @assert PartiallyLabeledFlag{BinaryTreeFlag}(BinaryTreeFlag(T, q), k) == labelCanonically(PartiallyLabeledFlag{BinaryTreeFlag}(BinaryTreeFlag(T, q), k)) "A = $(PartiallyLabeledFlag{BinaryTreeFlag}(BinaryTreeFlag(T, q), k)), B = $(labelCanonically(PartiallyLabeledFlag{BinaryTreeFlag}(BinaryTreeFlag(T, q), k)) )"
+
+                    # if (tCanLabeled, k) == Test 
+                    #     @show  T 
+                    #     @show k 
+                    #     @show c 
+                    #     @show tCanLabeled
+                    #     @show p
+                    #     @show PartiallyLabeledFlag{BinaryTreeFlag}( BinaryTreeFlag(T, q), k)
+                    # end
+                end
+            end
+        end
+    end
+    return razborovBasis
 end

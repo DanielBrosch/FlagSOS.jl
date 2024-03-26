@@ -101,7 +101,7 @@ The gluing operation of type `T`. Should, for example, glue unlabeled vertices t
 function Base.:*(F::T, G::T) where {T<:Flag}
     n = size(F)
     m = size(G)
-    return glue(F, G, (m + 1):(m + n))
+    return glue(F, G, vcat((m + 1):(m + n), 1:m))
 end
 
 

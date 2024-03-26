@@ -1,5 +1,10 @@
 using LinearAlgebra
 using Combinatorics
+using ProgressMeter
+
+export BinaryTree, BinaryTreeFlag
+
+
 
 # vertices = leaves. All other notes have degree 2. Inducibility density
 # In "drawable" leaf order (not nice for flag algebras) 
@@ -12,6 +17,9 @@ struct BinaryTree
     BinaryTree(isEmptyTree=true) = new(isEmptyTree, nothing, nothing)
 end
 
+function treeFactor(T)
+    return factorial(size(T)) // aut(T).size
+end
 # In any leaf order
 struct BinaryTreeFlag <: Flag
     tree::BinaryTree
@@ -64,7 +72,7 @@ function printTree(io::IO, T::BinaryTree, perm::Vector{Int})
         printTree(io, T.left, perm[1:size(T.left)])
         # print(io, ")(")
         print(io, " ")
-        printTree(io, T.right, perm[(size(T.left) + 1):end])
+        printTree(io, T.right, perm[(size(T.left)+1):end])
         print(io, ")")
     end
 end
@@ -91,6 +99,10 @@ function hash(A::BinaryTreeFlag, h::UInt)
 end
 
 function permute(F::BinaryTreeFlag, p::AbstractVector{Int})
+    if size(F) == 0 && length(p) > 0 && p[1] == 1
+        return BinaryTreeFlag(BinaryTree(false))
+    end
+
     return BinaryTreeFlag(F.tree, p[F.perm])
 end
 
@@ -113,20 +125,20 @@ end
 
 function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
     if g1 == BinaryTree() && g2 == BinaryTree()
-        return 1//1 * BinaryTreeFlag(g1)
+        return 1 // 1 * BinaryTreeFlag(g1)
     end
 
     if g1 == BinaryTree() || g2 == BinaryTree()
         if g1 == BinaryTree()
-            return 1//1 * BinaryTreeFlag(g2)
+            return 1 // 1 * BinaryTreeFlag(g2)
         else
-            return 1//1 * BinaryTreeFlag(g1)
+            return 1 // 1 * BinaryTreeFlag(g1)
         end
     end
 
     res = []
 
-    p = vcat(p, 1:(minimum(vcat([size(g1) + size(g2)], p)) - 1))
+    p = vcat(p, 1:(minimum(vcat([size(g1) + size(g2)], p))-1))
 
     trees = filter!(
         x -> size(x) == length(p), generateAll(BinaryTree, length(p), [1]; upToIso=true)
@@ -165,9 +177,30 @@ function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
     end
 
     return sum(
-        factorial(size(r))//(aut(r).size * factorial(length(p))) * BinaryTreeFlag(r) for
+        factorial(size(r)) // (aut(r).size * factorial(length(p))) * BinaryTreeFlag(r) for
         r in res
     )
+end
+
+function glue(g1::BinaryTreeFlag, g2::BinaryTreeFlag, p::AbstractVector{Int})
+    if size(g1) == 0 && size(g2) == 0 && length(p) > 0 && p[1] == 1
+        return BinaryTreeFlag(BinaryTree(false))
+    end
+
+    # p2 = p[g1.perm]
+    # @show g1 
+    # @show g2 
+    # @show p
+    tmp = p[g1.perm]
+    p2 = vcat(tmp, setdiff(p, tmp))
+    p3 = Int[(i in g2.perm ? findfirst(x -> x == i, g2.perm) : i) for i in p2]
+    # p2 = [i in  for i in p]
+    @assert !issorted(g1.perm) || !issorted(g2.perm) || p3 == p
+    @views sort!(p3[p3.>size(g2)])
+    @views sort!(p3[size(g1)+1:end])
+    @assert issorted(p3[p3.>size(g2)]) "$(g1.tree) $(g2.tree) $p3"
+    return glue(g1.tree, g2.tree, p3)
+    # return glueNoDict(g1.tree, g2.tree, p3)
 end
 
 # TODO: precompute all products at once 
@@ -177,14 +210,414 @@ treeGlueDict::Dict{Tuple{BinaryTree,BinaryTree,AbstractVector{Int}},Union{Nothin
     Union{Nothing,QuantumFlag{BinaryTreeFlag,Rational{Int64}}},
 }()
 
-function glue(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
-    get!(treeGlueDict, (g1, g2, p)) do
-        glueNoDict(g1, g2, p)
+function computeGlueDictC(n)
+    trees = generateAll(BinaryTree, n, [1]; upToIso=true)
+    # filter!(x -> size(x) == n, trees)
+    @show trees
+
+    # testDict = Dict{Tuple{BinaryTree,BinaryTree,Vector{Int64}},QuantumFlag{BinaryTreeFlag}}()
+
+    treeDicts = Dict(
+        T => Dict{Tuple{BinaryTree,BinaryTree,Vector{Int64}},Rational{Int}}() for T in trees
+    )
+    # threadDicts = Dict(i => Dict(T => [] for T in trees) for i = 1:Threads.nthreads())
+
+    # @showprogress for T in trees[end-1:end-1]
+    # @time Threads.@threads for T in trees
+
+    numTrees = length(trees)
+
+    p = Progress(numTrees; desc="Trees computed", barglyphs=BarGlyphs("[=> ]"))
+
+    pTrees = [
+        Progress(
+            sum(binomial(size(T), i) for i in 0:size(T));
+            desc="Tree $j",
+            barglyphs=BarGlyphs("[=> ]"),
+            enabled=false,
+            offset=j,
+        ) for (j, T) in enumerate(trees)
+    ]
+
+    progressChannel = Channel{Int}(Inf)
+    dataChannel = Channel{Any}(Inf)
+
+    makeDict = Threads.@spawn :interactive while true
+        data = take!(dataChannel)
+        if data === nothing
+            @assert dataChannel.n_avail_items == 0
+            break
+        end
+
+        mergewith!(mergewith!(+), treeDicts, data)
     end
+
+    maxOffset = 20
+    sem = Base.Semaphore(5)
+
+    progressTask = Threads.@spawn :interactive while true
+        if !isready(progressChannel)
+            wait(progressChannel)
+        end
+
+        changed = false
+
+        # !isready(progressChannel) && sleep(0.001)
+
+        if isready(progressChannel)
+            # while isready(progressChannel)
+            # inds = collect(progressChannel)
+            # println(length(inds))
+            inds = Dict{Int,Int}()
+            tStart = time()
+            while isready(progressChannel)
+                i = take!(progressChannel)
+                inds[i] = get(inds, i, 0) + 1
+                if time() - tStart > 1
+                    break
+                end
+            end
+
+            # display(length(inds))
+            for (i, iCount) in inds
+                # iCount = count(x->x==i, inds)
+                # i = take!(progressChannel)
+                # @show progressChannel.n_avail_items
+                if i < 0
+                    # @info "finished progress"
+                    print(stdout, "\n")
+                    return nothing
+                    # break
+                end
+                if i == 0
+                    next!(p; step=iCount)
+                else
+                    # changed = false
+                    if !pTrees[i].enabled && pTrees[i].offset >= 0
+                        pTrees[i].enabled = true
+                        changed = true
+                    else
+                        # next!(pTrees[i])
+                        pTrees[i].counter += iCount
+                        if pTrees[i].n <= pTrees[i].counter
+                            # ProgressMeter.lock_if_threading(pTrees[i]) do
+                            # counter_changed = p.counter != counter
+                            # p.counter = counter
+                            # p.color = color
+
+                            # @info "Really done with tree $i"
+
+                            ProgressMeter.updateProgress!(pTrees[i]; ignore_predictor=true)
+                            # end
+                            pTrees[i].enabled = false
+                            pTrees[i].offset = 1
+                            pTrees[i].color = :red
+                            changed = true
+                            # ProgressMeter.updateProgress!(pTrees[i]; ignore_predictor=false)
+                        end
+                    end
+                end
+            end
+        end
+
+        # println("changed = $changed")
+        treeOrder = []
+        if changed
+            c = 1
+            for (i, pI) in enumerate(pTrees)
+                if pI.enabled || pI.offset < 0
+                    if c <= maxOffset
+                        push!(treeOrder, i)
+                        pI.offset = c
+                        pI.enabled = true
+                    else
+                        pI.offset = -1
+                        pI.enabled = false
+                    end
+                    c += 1
+                    # ProgressMeter.lock_if_threading(pI) do
+                    # counter_changed = p.counter != counter
+                    # p.counter = counter
+                    # p.color = color
+                    ProgressMeter.updateProgress!(pI; ignore_predictor=true)
+                    # end
+                    # update!(pI)
+                end
+            end
+            cMax = min(c, maxOffset)
+            print(stdout, ("\n"^cMax) * "\r\u1b[K\u1b[A" * ("\r\u1b[A"^(cMax - 1)))
+            if c > maxOffset
+                print(
+                    stdout,
+                    ("\n"^(maxOffset + 1)) *
+                    "And $(c-maxOffset) additional trees..." *
+                    ("\r\u1b[A"^(maxOffset + 1)),
+                )
+            end
+        end
+    end
+
+    bind(progressChannel, progressTask)
+
+    Threads.@threads for (i, T) in collect(enumerate(trees))
+        # Base.acquire(sem)
+        # @show sem
+        # @show sem.curr_cnt
+        # @show sem.sem_size
+
+        put!(progressChannel, i)
+        m = size(T)
+        k = factorial(size(T))
+
+        # @show (i, T)
+
+        Threads.@threads for c1 in
+                             collect(Iterators.flatten(combinations(1:m, i) for i in 0:m))
+            missingElements = setdiff(1:m, c1)
+
+            treeDictsInner = Dict(
+                T => Dict{Tuple{BinaryTree,BinaryTree,Vector{Int64}},Rational{Int}}() for
+                T in trees
+            )
+            # @show c1
+            tPerm = zeros(Int, m)
+            pRes = zeros(Int, m)
+            pResCopy = zeros(Int, m)
+
+            overlapMin = max(2 * length(c1) - n, 0)
+            # overlapMin = 0
+            overlapMax = min(n + 2 * length(c1) - 2 * m, n)
+            overlapMax = min(overlapMin, overlapMax)
+
+            # @show T, c1, overlapMin, overlapMax
+
+            # overlapMin = 0
+            # overlapMax = length(c1)
+
+            # if overlapMin > overlapMax
+            #     put!(progressChannel, i)
+            #     continue
+            # end
+
+            # aLways allow overlap zero for quadratic modules
+            ovRange = if overlapMin <= 0
+                (overlapMin:max(0, overlapMax))
+            else
+                Iterators.flatten((0:0, overlapMin:overlapMax))
+            end
+            # ovRange = (overlapMin:overlapMax)
+
+            # for overlap in Iterators.flatten(combinations(c1, i) for i = union([0],overlapMin:overlapMax))
+            for overlap in Iterators.flatten(combinations(c1, i) for i in ovRange)
+                c2 = sort!(union(overlap, missingElements))
+
+                t1 = subFlag(T, c1)
+                t2 = subFlag(T, c2)
+
+                # @show (t1,t2)
+                # gen1 = aut(t1)
+                # gen2 = aut(t2)
+                # automs1 = [p.d for p in generateGroup(perm.(gen1.gen), gen1.size)]
+                # automs2 = [p.d for p in generateGroup(perm.(gen2.gen), gen2.size)]
+                # automs1c = [c1[p] for p in automs1]
+                # automs2c = [c2[p] for p in automs2]
+
+                # joint1 = [p for p in automs1c if any([findfirst(x->x==i, p) for i in overlap] == [findfirst(x->x==i, q) for i in overlap] for q in automs2c)]
+                # joint2 = [p for p in automs2c if any([findfirst(x->x==i, p) for i in overlap] == [findfirst(x->x==i, q) for i in overlap] for q in automs1c)]
+
+                # # print(joint1) 
+                # # print(joint2)
+                # println((gen1.size, length(joint1), gen2.size, length(joint2)))
+
+                t1l, t1p = labelPerm(t1)
+                t2l, t2p = labelPerm(t2)
+
+                # t1lFactor = treeFactor(t1l)
+                # t2lFactor = treeFactor(t2l)
+                t1lFactor = 1 // 1
+                t2lFactor = 1 // 1
+                # global t1test = t1
+
+                @assert t2l == subFlag(t2, t2p)
+
+                # Generating all automorphisms of t1, t2
+                genAutost1, genAutost2 = aut(t1l), aut(t2l)
+                fullGroupt1 = generateGroup(perm.(genAutost1.gen), genAutost1.size)
+                fullGroupt2 = generateGroup(perm.(genAutost2.gen), genAutost2.size)
+                # fullGroupt2 = [AbstractAlgebra.perm(1:size(t2l))]
+                # fullGroupt1 = [AbstractAlgebra.perm(1:size(t1l))]
+
+                t1InTPerm = zeros(Int, length(c1))
+                t1pInit = deepcopy(t1p)
+                t2pInit = deepcopy(t2p)
+
+                # @info "before"
+                # overlapCoordc1 = [findfirst(x->x==i, c1) for i in overlap]
+                # @show fullGroupt1
+                # testA = length(fullGroupt1)
+                # filter!(x->Set(x.d[overlapCoordc1]) != Set(overlapCoordc1) || x.d == 1:length(x.d),fullGroupt1)
+                # testB = length(fullGroupt1)
+                # @show testA, testB
+                # overlapCoordc2 = [findfirst(x->x==i, c2) for i in overlap]
+                # filter!(x->Set(x.d[overlapCoordc2]) != Set(overlapCoordc2) || x.d == 1:length(x.d),fullGroupt2)
+
+                # tmp = []
+
+                # jointAutoms = [(a1, a2) for a1 in fullGroupt1 for a2 in fullGroupt2 if ]
+
+                # fullGroupt2Shifted = 
+
+                # TODO: idea:
+                # first swap positions in final permutation according to aut1
+                # then numbers in final permutation according to aut2
+
+                for autot1 in fullGroupt1
+                    for autot2 in fullGroupt2
+
+                        # tPerm .= 0
+
+                        @views t1p .= t1pInit[autot1.d]
+                        @views t2p .= t2pInit[autot2.d]
+                        # t2p = t2pInit
+                        # t2p = minimum(fullGroupt2) do p
+                        # t2pInit[p.d]
+                        # end
+
+                        @views tPerm[1:size(t2)] .= c2[t2p] #1:size(t2)
+                        @views tPerm[(size(t2)+1):m] .= setdiff(1:m, c2)
+
+                        # t1InTPermB = [findfirst(x -> x == i, tPerm) for i in c1]
+
+                        for (j, k) in enumerate(c1)
+                            t1InTPerm[j] = findfirst(x -> x == k, tPerm)
+                        end
+
+                        # t1pInitInTPerm = minimum(fullGroupt1) do p
+                        #     t1InTPerm[t1pInit[p.d]]
+                        # end
+
+                        # @assert t1InTPerm == t1InTPermB
+
+                        # @show t1InTPerm
+                        # @show tPerm
+
+                        # Does t1p need to be inverted? (Probably no?!?!?)
+                        # t1p = [findfirst(x->x==i, t1p) for i =1:length(t1p)]
+
+                        # pResB = t1InTPerm[t1p]
+                        # @show t1InTPerm, t1p, pResB
+                        # pResB = Int.(vcat(pResB, setdiff(1:m, pResB)))
+
+                        # pRes[1:length(t1p)] .= t1pInitInTPerm#t1InTPerm[t1p]
+                        @views pRes[1:length(t1p)] .= t1InTPerm[t1p]
+                        # pRes[length(t1p)+1:end] .= setdiff(1:m, t1pInitInTPerm)#t1InTPerm[t1p])
+                        @views pRes[(length(t1p)+1):end] .= setdiff(1:m, t1InTPerm[t1p])
+
+                        # @show pRes
+                        # @show pResB
+                        # @assert pRes == pResB "$pRes, $pResB"
+
+                        t2n = length(c2)
+                        rMin = deepcopy(pRes)
+                        @views sort!(rMin[pRes.>t2n])
+                        # for q in SymmetricGroup(length(setdiff(c1, c2)))
+                        #     pResCopy .= pRes
+
+                        #     if t2n < m && m > 0 && length(q.d) > 0
+                        #         # @show q.d
+                        #         @views pResCopy[pRes.>t2n] .= pRes[pRes.>t2n][q.d]
+                        #     end
+
+                        #     if pResCopy < rMin 
+                        #         rMin .= pResCopy
+                        #     end
+                        # end
+                        # rMin = minimum(SymmetricGroup(length(setdiff(c1, c2)))) do q
+                        #     pResCopy = deepcopy(pRes)
+
+                        #     if t2n < m && m > 0 && length(q.d) > 0
+                        #         # @show q.d
+                        #         pResCopy[pRes.>t2n] .= pRes[pRes.>t2n][q.d]
+                        #     end
+                        #     pResCopy
+                        # end
+                        # # @show rMin
+                        treeDictsInner[T][(t1l, t2l, rMin)] =
+                            get(treeDictsInner[T], (t1l, t2l, rMin), 0 // 1) +
+                            t1lFactor * t2lFactor // k
+                    end
+                end
+            end
+            put!(progressChannel, i)
+            put!(dataChannel, treeDictsInner)
+
+            # yield()
+        end
+        # @info "done with tree $i"
+        put!(progressChannel, 0)
+        # Base.release(sem)
+    end
+    put!(progressChannel, -1)
+    close(progressChannel)
+    put!(dataChannel, nothing)
+
+    # @info "Waiting for channel"
+    wait(makeDict)
+
+
+    treeGlueDictTmp::Dict{Tuple{BinaryTree,BinaryTree,AbstractVector{Int}},Union{Nothing,QuantumFlag{BinaryTreeFlag,Rational{Int64}}}} = Dict{
+        Tuple{BinaryTree,BinaryTree,AbstractVector{Int}},
+        Union{Nothing,QuantumFlag{BinaryTreeFlag,Rational{Int64}}},
+    }()
+
+    @showprogress 0.1 "turning results into flag combinations" for (T, tDict) in treeDicts
+        for (p, c) in collect(tDict)
+            treeGlueDictTmp[p] = get!(treeGlueDictTmp, p, 0 // 1 * BinaryTreeFlag()) + treeFactor(T) * c * BinaryTreeFlag(T)
+        end
+    end
+
+    for (p, c) in treeGlueDictTmp
+        if haskey(treeGlueDict, p)
+            @error "Computing $p double at $n"
+        end
+        treeGlueDict[p] = c
+    end
+
+    # @info "waiting for merging"
+    # wait(makeDict)
+
+    return treeGlueDict
+end
+
+function glue(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
+    if !haskey(treeGlueDict, (g1, g2, p))
+        @show g1
+        @show g2
+        @show p
+        @show n = 2 * max(size(g1), size(g2)) - length(intersect(p[1:size(g1)], 1:size(g2)))
+
+        if n > maximum(p; init=0)
+            return glueNoDict(g1, g2, p)
+        end
+
+
+        computeGlueDictC(maximum(p; init=0))
+        # computeGlueDictC(n)
+    end
+
+    return treeGlueDict[(g1, g2, p)]
+
+    # get!(treeGlueDict, (g1, g2, p)) do
+    #     glueNoDict(g1, g2, p)
+    # end
 end
 
 function generateAll(
-    ::Type{BinaryTree}, maxVertices::Int, maxPredicates::Vector{Int}=[1]; upToIso=true
+    ::Type{BinaryTree},
+    maxVertices::Int,
+    maxPredicates::Vector{Int}=[1];
+    upToIso=true,
+    withProperty=(F::BinaryTreeFlag) -> true,
 )
     function attachAllWays(t::BinaryTree)
         res = [BinaryTree(t, BinaryTree(false)), BinaryTree(BinaryTree(false), t)]
@@ -203,7 +636,7 @@ function generateAll(
 
     trees = [[BinaryTree(false)]]
     for k in 2:maxVertices
-        treesK = vcat(attachAllWays.(trees[k - 1])...)
+        treesK = vcat(attachAllWays.(trees[k-1])...)
         if upToIso
             push!(trees, unique(label.(treesK)))
         else
@@ -212,6 +645,17 @@ function generateAll(
     end
 
     return vcat([BinaryTree()], trees...)
+end
+
+function generateAll(
+    ::Type{BinaryTreeFlag},
+    maxVertices::Int,
+    maxPredicates::Vector{Int}=[1];
+    upToIso=true,
+    withProperty=(F::BinaryTreeFlag) -> true,
+)
+    trees = generateAll(BinaryTree, maxVertices, maxPredicates; upToIso=upToIso)
+    return [BinaryTreeFlag(T) for T in trees]
 end
 
 # check if swapping v1 and v2 leaves g invariant
@@ -314,8 +758,8 @@ function aut(F::BinaryTree)
     if F.left === F.right
         return (
             gen=vcat(
-                [vcat(g, (ln + 1):(2 * ln)) for g in leftAut.gen],
-                [vcat((ln + 1):(2 * ln), 1:ln)],
+                [vcat(g, (ln+1):(2*ln)) for g in leftAut.gen],
+                [vcat((ln+1):(2*ln), 1:ln)],
             ),
             size=2 * (leftAut.size^2),
         )
@@ -326,7 +770,7 @@ function aut(F::BinaryTree)
         end
         return (
             gen=vcat(
-                [vcat(g, (ln + 1):(ln + size(F.right))) for g in leftAut.gen],
+                [vcat(g, (ln+1):(ln+size(F.right))) for g in leftAut.gen],
                 [vcat(1:ln, c .+ ln) for c in rightAut.gen],
             ),
             size=leftAut.size * rightAut.size,
@@ -335,9 +779,22 @@ function aut(F::BinaryTree)
 end
 
 function aut(F::BinaryTreeFlag)
+    # @show F 
+    # @show F.tree
+    # @show F.perm
     automs = aut(F.tree)
+    # @show automs 
 
-    return (gen=[F.perm[g] for g in automs.gen], size=automs.size)
+    permGen = []
+    for g in automs.gen
+        tmp = [F.perm[g[findfirst(x -> x == i, F.perm)]] for i in 1:size(F.perm, 1)]
+        push!(permGen, tmp)
+    end
+
+    return (gen=permGen, size=automs.size)
+    # return (gen=[F.perm[g] for g in automs.gen], size=automs.size)
+    # return (gen=[g[F.perm] for g in automs.gen], size=automs.size)
+    # return (gen=[F.perm[[findfirst(x->x==i, g) for i in 1:size(F.perm,1)]] for g in automs.gen], size=automs.size)
 end
 
 function label(F::BinaryTree)
@@ -387,6 +844,10 @@ function labelCanonically(F::BinaryTree)::BinaryTree
     return label(F)
 end
 
+function labelCanonically(F::BinaryTreeFlag)::BinaryTreeFlag
+    return BinaryTreeFlag(label(F.tree), 1:size(F.tree))
+end
+
 function maxPredicateArguments(::Type{BinaryTreeFlag})
     return 2
 end
@@ -395,7 +856,7 @@ function joinLevel(T::BinaryTreeFlag, v::Int, w::Int)
     v == w && return 0
 
     leftVerts = T.perm[1:size(T.tree.left)]
-    rightVerts = T.perm[(size(T.tree.left) + 1):end]
+    rightVerts = T.perm[(size(T.tree.left)+1):end]
     if (v in leftVerts) && (w in leftVerts)
         return joinLevel(BinaryTreeFlag(T.tree.left, leftVerts), v, w) + 1
     elseif !(v in leftVerts) && !(w in leftVerts)
@@ -406,4 +867,8 @@ end
 
 function distinguish(T::BinaryTreeFlag, v::Int, W::BitVector)::UInt
     return hash(sort!([joinLevel(T, v, w) for w in findall(W)]))
+end
+
+function isInducedFlag(T::Type{BinaryTreeFlag})
+    return true
 end
