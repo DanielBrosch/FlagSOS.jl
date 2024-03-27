@@ -208,7 +208,8 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
 
     n = maximum(size.(Fs))
 
-    res = Dict()
+    res = QuantumFlag{T, Rational{Int}}[]
+    # res = Dict()
     for f in Fs
         size(f) == n && continue
         tmp = oneVert * f
@@ -218,32 +219,33 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
             @info "Missing some flags to eliminate product of $f"
             continue
         end
-        res[f] = tmp
+        # res[f] = tmp
+        push!(res, tmp - 1//1 * f)
     end
-    res
-    n = length(Fs)
-    m = length(res)
-    A = zeros(Rational{Int}, m,n)
-    display(res)
-    for (f, g) in res 
-        i = findfirst(x->x==f, Fs)
-        A[i, findfirst(x->x==f, Fs)] = 1
-        @show f
-        @show g.coeff
-        for (h, c) in g.coeff
-            A[i, findfirst(x->x==h, Fs)] = -c 
-        end
-    end
-    display(A)
+    return res
+    # n = length(Fs)
+    # m = length(res)
+    # A = zeros(Rational{Int}, m,n)
+    # display(res)
+    # for (f, g) in res 
+    #     i = findfirst(x->x==f, Fs)
+    #     A[i, findfirst(x->x==f, Fs)] = 1
+    #     @show f
+    #     @show g.coeff
+    #     for (h, c) in g.coeff
+    #         A[i, findfirst(x->x==h, Fs)] = -c 
+    #     end
+    # end
+    # display(A)
 
-    for i = m:-1:1
-        j = findlast(x->!iszero(x), A[i, :])
-        A[i, :] .//= A[i, j]
-        @show (i,j)
-        for k = m:-1:1
-            k == i && continue
-            A[k, :] -= A[k, j] * A[i, :]
-        end
-    end
-    A
+    # for i = m:-1:1
+    #     j = findlast(x->!iszero(x), A[i, :])
+    #     A[i, :] .//= A[i, j]
+    #     @show (i,j)
+    #     for k = m:-1:1
+    #         k == i && continue
+    #         A[k, :] -= A[k, j] * A[i, :]
+    #     end
+    # end
+    # A
 end

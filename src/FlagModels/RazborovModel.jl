@@ -14,7 +14,7 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     blockSymmetry::Dict
     sdpData::Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}
     parentModel
-    substitution
+    quotient
 
     function RazborovModel{T,N,D}(parent=nothing) where {T<:Flag,N,D}
         return new(
@@ -319,35 +319,37 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
         display(reduction)
 
-        for i in size(reduction, 1):-1:1
-            j = findlast(x -> !iszero(x), reduction[i, :])
-            @assert reduction[i, j] == 1
-            F = Fs[j]
-            substitution = sum(-reduction[i, k] * Fs[k] for k in 1:(j - 1) if reduction[i,k] != 0)
-            m.substitution[F] = substitution
-            @show F 
-            @show substitution
-            # substitution = labelCanonically(eliminateIsolated(F))
-            # FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
+        m.quotient = reduction
 
-            # @assert substitution.coeff[FNoIsolated] == 1
+        # for i in size(reduction, 1):-1:1
+        #     j = findlast(x -> !iszero(x), reduction[i, :])
+        #     @assert reduction[i, j] == 1
+        #     F = Fs[j]
+        #     quotient = sum(-reduction[i, k] * Fs[k] for k in 1:(j - 1) if reduction[i,k] != 0)
+        #     m.quotient[F] = quotient
+        #     @show F 
+        #     @show quotient
+        #     # quotient = labelCanonically(eliminateIsolated(F))
+        #     # FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
 
-            for (G, c) in substitution.coeff
-                if !haskey(m.sdpData, G)
-                    m.sdpData[G] = Dict()
-                end
-                for (mu, b) in m.sdpData[F]
-                    if !haskey(m.sdpData[G], mu)
-                        m.sdpData[G][mu] = zeros(
-                            Rational{Int}, length(m.basis[mu]), length(m.basis[mu])
-                        )
-                    end
-                    m.sdpData[G][mu] += c * b
-                end
-            end
-            @info "deleting $F"
-            delete!(m.sdpData, F)
-        end
+        #     # @assert quotient.coeff[FNoIsolated] == 1
+
+        #     for (G, c) in quotient.coeff
+        #         if !haskey(m.sdpData, G)
+        #             m.sdpData[G] = Dict()
+        #         end
+        #         for (mu, b) in m.sdpData[F]
+        #             if !haskey(m.sdpData[G], mu)
+        #                 m.sdpData[G][mu] = zeros(
+        #                     Rational{Int}, length(m.basis[mu]), length(m.basis[mu])
+        #                 )
+        #             end
+        #             m.sdpData[G][mu] += c * b
+        #         end
+        #     end
+        #     @info "deleting $F"
+        #     delete!(m.sdpData, F)
+        # end
 
         # total = length(m.sdpData)
         # i = 1
@@ -361,12 +363,12 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         #             continue
         #         end
 
-        #         substitution = labelCanonically(eliminateIsolated(F))
+        #         quotient = labelCanonically(eliminateIsolated(F))
         #         FNoIsolated = labelCanonically(subFlag(F, (1:size(F))[.!v]))
 
-        #         @assert substitution.coeff[FNoIsolated] == 1
+        #         @assert quotient.coeff[FNoIsolated] == 1
 
-        #         for (G, c) in substitution.coeff
+        #         for (G, c) in quotient.coeff
         #             if !haskey(m.sdpData, G)
         #                 m.sdpData[G] = Dict()
         #             end
@@ -463,6 +465,13 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
             end
         end
         graphCoefficients[G] = eG
+    end
+
+    for (i,F) in enumerate(m.quotient)
+        y = @variable(jumpModel, base_name = "quotient$i")
+        for (G, c) in F.coeff
+            graphCoefficients[G] = get(graphCoefficients, G, 0*c*y) + c*y
+        end
     end
 
     return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
