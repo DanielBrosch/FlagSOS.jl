@@ -124,6 +124,7 @@ function size(G::BinaryTreeFlag)::Int
 end
 
 function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
+    @info "Glue no dict"
     if g1 == BinaryTree() && g2 == BinaryTree()
         return 1 // 1 * BinaryTreeFlag(g1)
     end
@@ -177,8 +178,13 @@ function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
     end
 
     return sum(
-        factorial(size(r)) // (aut(r).size * factorial(length(p))) * BinaryTreeFlag(r) for
-        r in res
+        # treeFactor(r) // factorial(length(p)) * BinaryTreeFlag(r) for r in res
+        # 1//treeFactor(r)*
+        # treeFactor(r)//factorial(length(p))*BinaryTreeFlag(r) for r in res
+        # treeFactor(r)//(treeFactor(g1)*treeFactor(g2)*factorial(length(p)))*
+        # BinaryTreeFlag(r) for r in res
+        treeFactor(g1)*treeFactor(g2)//factorial(length(p))*BinaryTreeFlag(r) for r in res
+        # treeFactor(r)//factorial(length(p))*BinaryTreeFlag(r) for r in res
     )
 end
 
@@ -432,10 +438,10 @@ function computeGlueDictC(n)
                 t1l, t1p = labelPerm(t1)
                 t2l, t2p = labelPerm(t2)
 
-                # t1lFactor = treeFactor(t1l)
-                # t2lFactor = treeFactor(t2l)
-                t1lFactor = 1 // 1
-                t2lFactor = 1 // 1
+                t1lFactor = treeFactor(t1l)
+                t2lFactor = treeFactor(t2l)
+                # t1lFactor = 1 // 1
+                # t2lFactor = 1 // 1
                 # global t1test = t1
 
                 @assert t2l == subFlag(t2, t2p)
@@ -572,7 +578,8 @@ function computeGlueDictC(n)
 
     @showprogress 0.1 "turning results into flag combinations" for (T, tDict) in treeDicts
         for (p, c) in collect(tDict)
-            treeGlueDictTmp[p] = get!(treeGlueDictTmp, p, 0 // 1 * BinaryTreeFlag()) + treeFactor(T) * c * BinaryTreeFlag(T)
+            # treeGlueDictTmp[p] = get!(treeGlueDictTmp, p, 0 // 1 * BinaryTreeFlag()) + treeFactor(T) * c * BinaryTreeFlag(T)
+            treeGlueDictTmp[p] = get!(treeGlueDictTmp, p, 0 // 1 * BinaryTreeFlag()) + c * BinaryTreeFlag(T)
         end
     end
 
