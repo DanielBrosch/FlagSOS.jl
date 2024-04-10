@@ -14,6 +14,7 @@ using Combinatorics
 using LinearAlgebra
 using JuMP
 
+include("utils/RoundToRationalPSD.jl")
 include("utils/Nauty.jl")
 include("FlagAlgebras/AbstractFlagAlgebra.jl")
 include("FlagModels/AbstractFlagModel.jl")

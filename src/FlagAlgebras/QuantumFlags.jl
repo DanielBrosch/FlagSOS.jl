@@ -5,18 +5,18 @@ $(TYPEDEF)
 
 A linear combination of Flags of type `F` with coefficients of type `T`.
 """
-mutable struct QuantumFlag{F<:Flag,T<:Real}
+mutable struct QuantumFlag{F<:Flag,T}
     coeff::Dict{F,T}
 
-    QuantumFlag{F,T}(cs::Dict{F,T}) where {F<:Flag,T<:Real} = new(cs)
-    QuantumFlag{F,T}(opts...) where {F<:Flag,T<:Real} = new(Dict{F,T}(opts...))
-    QuantumFlag{F}(fc::QuantumFlag{F,T}) where {F<:Flag,T<:Real} = new{F,T}(fc.coeff)
+    QuantumFlag{F,T}(cs::Dict{F,T}) where {F<:Flag,T} = new(cs)
+    QuantumFlag{F,T}(opts...) where {F<:Flag,T} = new(Dict{F,T}(opts...))
+    QuantumFlag{F}(fc::QuantumFlag{F,T}) where {F<:Flag,T} = new{F,T}(fc.coeff)
 end
 
-function promote_rule(
+function Base.promote_rule(
     ::Type{QuantumFlag{F,T}}, ::Type{QuantumFlag{F,U}}
-) where {F<:Flag,T<:Real,U<:Real}
-    return QuantumFlag{F,promote_rule(T, U)}
+) where {F<:Flag,T,U}
+    return QuantumFlag{F,promote_type(T, U)}
 end
 
 function Base.show(io::IO, Fs::QuantumFlag)
@@ -90,7 +90,8 @@ end
 
 Scalar multiplication of a linear combinations of Flags.
 """
-function Base.:*(c::R, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
+function Base.:*(c::R1, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
+    R = promote_type(R1, R2)
     return QuantumFlag{T,R}(Dict(g => c * d for (g, d) in G.coeff))
 end
 
@@ -117,7 +118,8 @@ end
 
 Adds two linear combinations of Flags.
 """
-function Base.:+(F::QuantumFlag{T,R}, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
+function Base.:+(F::QuantumFlag{T,R1}, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
+    R = promote_type(R1, R2)
     res = QuantumFlag{T,R}(mergewith(+, F.coeff, G.coeff))
 
     filter!(p -> !iszero(p.second), res.coeff)
@@ -140,6 +142,9 @@ function Base.:-(F::T, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
 end
 function Base.:-(F::QuantumFlag{T,R}, G::T) where {T<:Flag,R<:Real}
     return F - 1 * G
+end
+function Base.:+(t::R1, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
+    return t*one(T) + G
 end
 
 """
@@ -183,7 +188,7 @@ end
 
 Subtracts two linear combinations of Flags.
 """
-function Base.:-(F::QuantumFlag{T,R}, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
+function Base.:-(F::QuantumFlag{T,R1}, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
     res = F + (-G)
 
     filter!(p -> !iszero(p.second), res.coeff)
@@ -240,9 +245,25 @@ function removeIsolated(F::QuantumFlag{T,D}) where {T<:Flag,D}
 
     for (f, c) in F.coeff
         isoV = isolatedVertices(f)
-        fIso = subFlag(f, .!isoV)
+        # @show isoV
+        if any(isoV)
+            fIso = subFlag(f, .!isoV)
+        else
+            fIso = f
+        end
         res.coeff[fIso] = get(res.coeff, fIso, zero(D)) + c
     end
 
     return res
+end
+
+import Base.convert
+
+function Base.convert(
+    ::Type{QuantumFlag{T,D}},
+    F::QuantumFlag{T,D2},
+) where {T<:Flag, D, D2}
+    return QuantumFlag{T,D}(
+        F.coeff
+    )
 end

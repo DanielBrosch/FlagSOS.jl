@@ -161,7 +161,7 @@ function computeSDP!(
     m::EqualityModule{T,U,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D}
     m.sdpData = Dict()
-    @assert !isInducedFlag(T) "TODO:"
+    # @assert !isInducedFlag(T) "TODO:"
     # @assert !(T <: InducedFlag) "TODO:"
     # @assert N == :limit "TODO"
     for (i, G) in enumerate(m.basis)
@@ -238,4 +238,31 @@ end
 
 function modelSize(m::EqualityModule)
     return Partition(ones(Int, length(m.basis)))
+end
+
+function verifySOS(m::EqualityModule, sol::Dict; io::IO=stdout)
+    println(io, "Equality module coming from constraint")
+    println(io, "$(m.equality)= 0")
+    for i in keys(sol)
+        if sol[i] != 0 // 1
+            println(io, "Times $(sol[i])$(m.basis[i]) :")
+            print(io, sum(m.sdpData) do (G, B)
+                sum(B) do (j, c)
+                    j != i && return 0 * one(G)
+                    get(sol, j, 0 // 1) * c * G
+                end
+            end
+            )
+            println(io, "= 0")
+        end
+    end
+    res = sum(m.sdpData) do (G, B)
+        sum(B) do (i, c)
+            get(sol, i, 0 // 1) * c * G
+        end
+    end
+    println(io, "Equality module result:")
+    println(io, "$(res)= 0")
+    println(io)
+    res
 end

@@ -18,7 +18,13 @@ struct BinaryTree
 end
 
 function treeFactor(T)
-    return factorial(size(T)) // aut(T).size
+    # @show T
+    if T isa PartiallyLabeledFlag
+        return factorial(size(T) - T.n) // aut(T).size
+    else
+        return factorial(size(T)) // aut(T).size
+
+    end
 end
 # In any leaf order
 struct BinaryTreeFlag <: Flag
@@ -26,6 +32,13 @@ struct BinaryTreeFlag <: Flag
     perm::Vector{Int}
 
     function BinaryTreeFlag(tree, perm)
+        # @show tree 
+        # @show labelCanonically(tree)
+        @assert tree === labelCanonically(tree)
+        # treeL, p = labelPerm(tree)
+        # tree = treeL 
+        # pInv = [findfirst(x->x==i, p) for i = 1:maximum(p; init = 0)]
+        # perm = perm[pInv]
         @assert size(tree) == length(perm)
         auts = aut(tree)
 
@@ -44,7 +57,7 @@ struct BinaryTreeFlag <: Flag
         end
         return new(tree, perm2)
     end
-    BinaryTreeFlag(tree::BinaryTree) = new(tree, 1:size(tree))
+    BinaryTreeFlag(tree::BinaryTree) = BinaryTreeFlag(tree, 1:size(tree))
     function BinaryTreeFlag(isEmptyTree=true)
         return new(BinaryTree(isEmptyTree), isEmptyTree ? Int[] : Int[1])
     end
@@ -61,31 +74,51 @@ function Base.show(io::IO, T::BinaryTree)
     end
 end
 
-function printTree(io::IO, T::BinaryTree, perm::Vector{Int})
+
+function printTree(io::IO, T::BinaryTree, perm::Vector)
     @assert size(T) == length(perm)
     if T.isEmptyTree
-        print(io, "o")
+        print(io, "∅")
     elseif T.left === nothing && T.right === nothing
         print(io, "$(perm[1])")
     else
         print(io, "(")
         printTree(io, T.left, perm[1:size(T.left)])
         # print(io, ")(")
-        print(io, " ")
+        print(io, "")
         printTree(io, T.right, perm[(size(T.left)+1):end])
         print(io, ")")
     end
 end
 
 function Base.show(io::IO, T::BinaryTreeFlag)
+    if T.perm == 1:size(T)
+        return show(io, T.tree)
+    end
     return printTree(io, T.tree, T.perm)
+    # end
+end
+
+function Base.show(io::IO, T::PartiallyLabeledFlag{BinaryTreeFlag})
+    p = convert(Vector{Union{Int64,String}}, T.F.perm)
+    p[p.>T.n] .= "x"
+    return printTree(io, T.F.tree, p)
 end
 
 function ==(A::BinaryTree, B::BinaryTree)
-    return A.isEmptyTree == B.isEmptyTree && A.left == B.left && A.right == B.right
+    return A.isEmptyTree == B.isEmptyTree && (A.left == B.left && A.right == B.right)
+    # return A.isEmptyTree == B.isEmptyTree && ((A.left == B.left && A.right == B.right) || (A.left == B.right && A.right == B.left))
 end
 function ==(A::BinaryTreeFlag, B::BinaryTreeFlag)
+    if size(A) <= 1 || size(B) <= 1
+        return size(B) == size(A) && A.perm == B.perm
+    end
     return A.tree == B.tree && A.perm == B.perm
+    # ALeft = BinaryTreeFlag(A.tree.left, A.perm[1:size(A.tree.left)])
+    # ARight = BinaryTreeFlag(A.tree.right, A.perm[(size(A.tree.left)+1):end])
+    # BLeft = BinaryTreeFlag(B.tree.left, B.perm[1:size(B.tree.left)])
+    # BRight = BinaryTreeFlag(B.tree.right, B.perm[(size(B.tree.left)+1):end])
+    # return (ALeft == BLeft && ARight == BRight) ||(ALeft == BRight && ARight == BLeft) 
 end
 function hash(A::BinaryTree, h::UInt)
     return hash(
@@ -95,7 +128,13 @@ function hash(A::BinaryTree, h::UInt)
     )
 end
 function hash(A::BinaryTreeFlag, h::UInt)
+    # if size(A) <= 1
+    # end
     return hash(A.tree, hash(A.perm, hash(:BinaryTreeFlag, h)))
+
+    # ALeft = BinaryTreeFlag(A.tree.left, A.perm[1:size(A.tree.left)])
+    # ARight = BinaryTreeFlag(A.tree.right, A.perm[(size(A.tree.left)+1):end])
+    # return hash(ALeft, hash(:BinaryTree, h)) + hash(ARight, hash(:BinaryTree, h))
 end
 
 function permute(F::BinaryTreeFlag, p::AbstractVector{Int})
@@ -103,7 +142,12 @@ function permute(F::BinaryTreeFlag, p::AbstractVector{Int})
         return BinaryTreeFlag(BinaryTree(false))
     end
 
-    return BinaryTreeFlag(F.tree, p[F.perm])
+    # @show F, F.perm, p
+    # @show [p[i] for i in F.perm]
+
+    # return BinaryTreeFlag(F.tree, p[F.perm])
+    # return BinaryTreeFlag(F.tree, [F.perm[i] for i in p])
+    return BinaryTreeFlag(F.tree, [p[i] for i in F.perm])
 end
 
 Base.one(::Type{BinaryTree}) = BinaryTree()
@@ -125,6 +169,7 @@ end
 
 function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
     @info "Glue no dict"
+    @assert minimum(p[1:size(g1)]; init=size(g2) + 1) > size(g2)
     if g1 == BinaryTree() && g2 == BinaryTree()
         return 1 // 1 * BinaryTreeFlag(g1)
     end
@@ -183,7 +228,7 @@ function glueNoDict(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
         # treeFactor(r)//factorial(length(p))*BinaryTreeFlag(r) for r in res
         # treeFactor(r)//(treeFactor(g1)*treeFactor(g2)*factorial(length(p)))*
         # BinaryTreeFlag(r) for r in res
-        treeFactor(g1)*treeFactor(g2)//factorial(length(p))*BinaryTreeFlag(r) for r in res
+        treeFactor(g1) * treeFactor(g2) // factorial(length(p)) * BinaryTreeFlag(r) for r in res
         # treeFactor(r)//factorial(length(p))*BinaryTreeFlag(r) for r in res
     )
 end
@@ -393,7 +438,7 @@ function computeGlueDictC(n)
             overlapMin = max(2 * length(c1) - n, 0)
             # overlapMin = 0
             overlapMax = min(n + 2 * length(c1) - 2 * m, n)
-            overlapMax = min(overlapMin, overlapMax)
+            # overlapMax = min(overlapMin, overlapMax)
 
             # @show T, c1, overlapMin, overlapMax
 
@@ -438,13 +483,57 @@ function computeGlueDictC(n)
                 t1l, t1p = labelPerm(t1)
                 t2l, t2p = labelPerm(t2)
 
-                t1lFactor = treeFactor(t1l)
-                t2lFactor = treeFactor(t2l)
+                # t1lFactor = treeFactor(t1l)
+                # t2lFactor = treeFactor(t2l)
+
+                # @show subFlag(BinaryTreeFlag(T), vcat(overlap, setdiff(c1, overlap)))
+                # @show subFlag(BinaryTreeFlag(T), vcat(overlap, setdiff(c2, overlap)))
+                # @show PartiallyLabeledFlag{BinaryTreeFlag}(subFlag(BinaryTreeFlag(T), vcat(overlap, setdiff(c1, overlap))); n = length(overlap))
+                # @show PartiallyLabeledFlag{BinaryTreeFlag}(subFlag(BinaryTreeFlag(T), vcat(overlap, setdiff(c2, overlap))); n = length(overlap))
+
+                pl1 = PartiallyLabeledFlag{BinaryTreeFlag}(subFlag(BinaryTreeFlag(T), vcat(overlap, setdiff(c1, overlap))); n=length(overlap))
+                pl2 = PartiallyLabeledFlag{BinaryTreeFlag}(subFlag(BinaryTreeFlag(T), vcat(overlap, setdiff(c2, overlap))); n=length(overlap))
+                @assert treeFactor(pl1) == treeFactor(labelCanonically(pl1))
+
+                # @show pl2
+                # @show treeFactor(pl2)
+                # @show labelCanonically(pl2)
+                # @show treeFactor(labelCanonically(pl2))
+
+                # @assert treeFactor(pl2) == treeFactor(labelCanonically(pl2))
+
+                t1lFactor = treeFactor(pl1)
+                t2lFactor = treeFactor(pl2)
+
+                # if length(overlap) == 0
+                #     @show t1l
+                #     @show pl1 
+                #     @show treeFactor(t1l)
+                #     @show t1lFactor 
+                #     @show t2l
+                #     @show pl2
+                #     @show treeFactor(t2l)
+                #     @show t2lFactor
+                #     @show aut(t2l)
+                #     @show aut(pl2)
+                #     @show labelCanonically(pl2)
+                #     @show aut(labelCanonically(pl2))
+                #     @assert t1lFactor == treeFactor(t1l)
+                #     @assert t2lFactor == treeFactor(t2l)
+                # end
+
+                # @show subFlag(T, vcat(overlap, setdiff(c1, overlap))
+                # @show subFlag(T, vcat(overlap, setdiff(c2, overlap))
+                # t1lFactor = treeFactor(PartiallyLabeledFlag{BinaryTreeFlag}(subFlag(T, vcat(overlap, setdiff(c1, overlap))), length(overlap)))
+                # t2lFactor = treeFactor(PartiallyLabeledFlag{BinaryTreeFlag}(subFlag(T, vcat(overlap, setdiff(c2, overlap))), length(overlap)))
+
                 # t1lFactor = 1 // 1
                 # t2lFactor = 1 // 1
+
+
                 # global t1test = t1
 
-                @assert t2l == subFlag(t2, t2p)
+                # @assert t2l == subFlag(t2, t2p)
 
                 # Generating all automorphisms of t1, t2
                 genAutost1, genAutost2 = aut(t1l), aut(t2l)
@@ -548,6 +637,9 @@ function computeGlueDictC(n)
                         #     pResCopy
                         # end
                         # # @show rMin
+
+
+
                         treeDictsInner[T][(t1l, t2l, rMin)] =
                             get(treeDictsInner[T], (t1l, t2l, rMin), 0 // 1) +
                             t1lFactor * t2lFactor // k
@@ -603,13 +695,18 @@ function glue(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
         @show p
         @show n = 2 * max(size(g1), size(g2)) - length(intersect(p[1:size(g1)], 1:size(g2)))
 
-        if n > maximum(p; init=0)
-            return glueNoDict(g1, g2, p)
+        if n > maximum(p; init=0) && all(p[1:size(g1)] .> size(g2))
+            # @assert all(p[1:size(g1)] .> size(g2))
+            tmp = glueNoDict(g1, g2, p)
+            treeGlueDict[(g1, g2, p)] = tmp
+            return tmp
         end
 
 
-        computeGlueDictC(maximum(p; init=0))
+        computeGlueDictC(n)#maximum(p; init=0))
         # computeGlueDictC(n)
+
+        @assert haskey(treeGlueDict, (g1, g2, p)) "$n does not compute $((g1,g2,p))"
     end
 
     return treeGlueDict[(g1, g2, p)]
@@ -747,6 +844,46 @@ function subFlag(F::BinaryTree, vertices::AbstractVector{Int})
     end
 end
 
+
+function subFlag(F::BinaryTreeFlag, vertices::AbstractVector{Int})
+
+    # @show F 
+    # @show vertices
+    vertsPermed = Int[findfirst(x -> x == i, F.perm) for i in vertices]
+
+    vertsOrdered = sort(vertsPermed)
+
+    Fs = subFlag(F.tree, vertsOrdered)
+
+    # @show vertsPermed
+    for i = maximum(vertsPermed; init=0):-1:1
+        if !in(i, vertsPermed)
+            vertsPermed[vertsPermed.>i] .-= 1
+        end
+    end
+
+    if length(vertsPermed) > 0
+        vertsPermedInv = [findfirst(x -> x == i, vertsPermed) for i = 1:maximum(vertsPermed)]
+    else
+        vertsPermedInv = vertsPermed
+    end
+
+    # @show vertsPermed
+    @assert sort(vertsPermed) == 1:size(Fs)
+
+    FsL, pl = labelPerm(Fs)
+
+
+
+    # return BinaryTreeFlag(Fs, vertsPermedInv)
+
+    # @assert false "broken here?!"
+
+    return BinaryTreeFlag(FsL, vertsPermedInv[pl])
+
+
+end
+
 function aut(F::BinaryTree)
     if F.left === nothing && F.right === nothing
         if F.isEmptyTree
@@ -762,7 +899,7 @@ function aut(F::BinaryTree)
     end
     ln = size(F.left)
 
-    if F.left === F.right
+    if F.left == F.right
         return (
             gen=vcat(
                 [vcat(g, (ln+1):(2*ln)) for g in leftAut.gen],

@@ -22,7 +22,7 @@ A Flag-model with internal Flag type 'T'.
 mutable struct FlagModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     subModels::Vector{AbstractFlagModel{T,N,D}}
     forbiddenFlags::Set{T}
-    objective::Union{QuantumFlag{T},Nothing}
+    objective::Union{QuantumFlag{T,D},Nothing}
     function FlagModel{T}() where {T<:Flag}
         return new{T,:limit,Int}(AbstractFlagModel{T,:limit,Int}[], Set{T}(), nothing)
     end
@@ -228,7 +228,7 @@ function addEquality!(
 end
 
 function buildJuMPModel(
-    m::FlagModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model()
+    m::FlagModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model(), addBoundVars = false
 ) where {T<:Flag,N,D}
     variables = Dict()
     blocks = []
@@ -242,6 +242,15 @@ function buildJuMPModel(
         push!(blocks, b)
         constraints = push!(constraints, c)
         i += 1
+    end
+
+    if addBoundVars
+        for F in keys(variables)
+            fl = @variable(jumpModel, base_name="lower$F", lower_bound = 0)
+            fu = @variable(jumpModel, base_name="upper$F", lower_bound = 0)
+            variables[F] += fl - fu
+            variables[one(F)] += fu
+        end
     end
 
     if m.objective !== nothing
@@ -260,7 +269,7 @@ function buildJuMPModel(
                 @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
-                # push!(constraints, c <= (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
+                # push!(constraints, c <= (haskey(objL.coeff, G) ? objL.coeff[G] : 0))
                 constraints[end][G] = @constraint(jumpModel, c == get(objL.coeff, G, 0))
                 # constraints[end][G] = @constraint(jumpModel, c <= get(objL.coeff, G, 0))
             end
@@ -276,6 +285,17 @@ function buildJuMPModel(
         end
     end
     return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)
+end
+
+function roundResults(m::FlagModel, jumpModel, variables, blocks, constraints; prec = 1e-5)
+    ex = []
+
+    for i = 1:length(m.subModels)
+        exi = roundResults(m.subModels[i], jumpModel, variables, blocks[i], constraints[i]; prec = prec)
+        push!(ex, exi)
+    end
+
+    return ex
 end
 
 function modelSize(m::FlagModel)
@@ -323,4 +343,29 @@ end
 
 function facialReduction(m::AbstractFlagModel)
     return error("TODO")
+end
+
+function verifySOS(m::FlagModel{T,N,D}, sol::Vector; io = stdout) where {T,N,D}
+    @assert length(sol) == length(m.subModels)
+
+    tmp = sum(verifySOS(m.subModels[i], sol[i]; io = stdout) for i = 1:length(m.subModels))
+    
+    err = Rational{BigInt}(0)
+    constTerm = Rational{BigInt}(0)
+    for (F, c) in tmp.coeff
+        if F == one(T)
+            constTerm += c 
+        else 
+            d = get(m.objective.coeff, F, Rational{BigInt}(0)) - c
+            # if d > 0 
+            #     err += d
+            # end
+            if d > 0 
+                err += abs(d)
+            end
+        end
+    end
+
+    return constTerm + err + m.objective
+
 end

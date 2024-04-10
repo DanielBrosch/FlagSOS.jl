@@ -206,7 +206,7 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
 
     @show Fs
 
-    n = maximum(size.(Fs))
+    n = maximum(size.(Fs); init = 1)
 
     res = QuantumFlag{T, Rational{Int}}[]
     # res = Dict()
@@ -220,6 +220,9 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
             continue
         end
         # res[f] = tmp
+        @show length(res) + 1
+        @show f 
+        @show oneVert * f
         push!(res, tmp - 1//1 * f)
     end
     return res
