@@ -11,9 +11,9 @@ function roundRationalPSD(A; baseType = BigInt, prec = 1e-5)
     egVals[.!posInds] .= 0
 
     cholesky = eg.vectors * Diagonal(sqrt.(egVals))
-    @show cholesky 
+    # @show cholesky 
     cholesky = rationalize.(baseType, cholesky; tol = prec)
-    @show cholesky 
+    # @show cholesky 
 
     # egVecs = rationalize.(baseType, eg.vectors; tol = prec)#; digits = digits)
     # @show egVals 

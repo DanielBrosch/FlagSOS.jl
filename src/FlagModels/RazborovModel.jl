@@ -647,12 +647,12 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
 
         println(io, "PSD matrix:")
         show(io, "text/plain", sol[mu])
-        println()
+        println(io)
 
         println(io, "Nonzero flag products:")
         n = size(m.basis[mu], 1)
-        @show mu
-        @show sol[mu]
+        # @show mu
+        # @show sol[mu]
         psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
         for i = 1:n
             for j = i:n
@@ -681,15 +681,15 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
         )
     end
 
-    println("Quotient:")
+    println(io, "Quotient:")
     for (i, c) in enumerate(m.quotient)
         if haskey(sol, "Q$i") && !iszero(sol["Q$i"])
             println(io, "$(sol["Q$i"]) ⋅ ($c)")
             println(io, "=$(Rational{BigInt}(sol["Q$i"])*c)= 0")
         end
     end
-    println("Quotient sum:")
-    println("$(sum(enumerate(m.quotient)) do (i, F)
+    println(io, "Quotient sum:")
+    println(io, "$(sum(enumerate(m.quotient)) do (i, F)
         Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
     end)=0")
 

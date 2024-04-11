@@ -345,10 +345,10 @@ function facialReduction(m::AbstractFlagModel)
     return error("TODO")
 end
 
-function verifySOS(m::FlagModel{T,N,D}, sol::Vector; io = stdout) where {T,N,D}
+function verifySOS(m::FlagModel{T,N,D}, sol::Vector; io::IO = stdout) where {T,N,D}
     @assert length(sol) == length(m.subModels)
 
-    tmp = sum(verifySOS(m.subModels[i], sol[i]; io = stdout) for i = 1:length(m.subModels))
+    tmp = sum(verifySOS(m.subModels[i], sol[i]; io = io) for i = 1:length(m.subModels))
     
     err = Rational{BigInt}(0)
     constTerm = Rational{BigInt}(0)
