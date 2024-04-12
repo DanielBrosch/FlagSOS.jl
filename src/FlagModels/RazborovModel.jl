@@ -620,78 +620,85 @@ function computeUnreducedRazborovBasis(
     return razborovBasis
 end
 
-function roundResults(m::RazborovModel{T, N, D}, jumpModel, variables, blocks, constraints; prec = 1e-5) where {T,N,D}
+function roundResults(m::RazborovModel{T,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5) where {T,N,D}
     ex = Dict()
 
-    for (mu, b) in blocks 
-        if mu isa String 
-            ex[mu] = rationalize(BigInt, value(b); tol = prec)#; digits = digits)
-        else 
-            ex[mu] = roundRationalPSD(value(b); baseType = BigInt, prec = prec)
+    for (mu, b) in blocks
+        if mu isa String
+            ex[mu] = rationalize(BigInt, value(b); tol=prec)#; digits = digits)
+        else
+            ex[mu] = roundRationalPSD(value(b); baseType=BigInt, prec=prec)
         end
     end
 
     return ex
 end
 
-function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
-    println(io, "Razborov model")
+function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
+    if io !== nothing
+        println(io, "Razborov model")
 
-    for mu in keys(sol)
-        if mu isa String
-            continue
-        end
+        for mu in keys(sol)
+            if mu isa String
+                continue
+            end
 
-        println(io, "\nBlock of type $mu with flags:")
-        println.(io, m.basis[mu])
+            println(io, "\nBlock of type $mu with flags:")
+            println.(io, m.basis[mu])
 
-        println(io, "PSD matrix:")
-        show(io, "text/plain", sol[mu])
-        println()
+            println(io, "PSD matrix:")
+            show(io, "text/plain", sol[mu])
+            println(io)
 
-        println(io, "Nonzero flag products:")
-        n = size(m.basis[mu], 1)
-        @show mu
-        @show sol[mu]
-        psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
-        for i = 1:n
-            for j = i:n
-                if !iszero(psd[i, j])
-                    println(io, "Product $((i,j)) between $(m.basis[mu][i]) and $(m.basis[mu][j]):")
-                    tmp = sum(m.sdpData) do (G, B)
-                        if haskey(B, mu)
-                            return Rational{BigInt}(B[mu][i, j]) * G
-                        else
-                            return BigInt(0) // 1 * G
+            println(io, "Nonzero flag products:")
+            n = size(m.basis[mu], 1)
+            # @show mu
+            # @show sol[mu]
+            psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
+            for i = 1:n
+                for j = i:n
+                    if !iszero(psd[i, j])
+                        println(io, "Product $((i,j)) between $(m.basis[mu][i]) and $(m.basis[mu][j]):")
+                        tmp = sum(m.sdpData) do (G, B)
+                            if haskey(B, mu)
+                                return Rational{BigInt}(B[mu][i, j]) * G
+                            else
+                                return BigInt(0) // 1 * G
+                            end
                         end
+                        println(io, "$(psd[i,j]) ⋅ ($tmp)")
+                        println(io, "=$(Rational{BigInt}(psd[i,j])*tmp)")
                     end
-                    println(io, "$(psd[i,j]) ⋅ ($tmp)")
-                    println(io, "=$(Rational{BigInt}(psd[i,j])*tmp)")
                 end
             end
+            println(io, "Block $mu total:")
+            println(
+                io,
+                "$(sum(m.sdpData) do (G, B)
+             if haskey(B, mu)
+                 return dot(B[mu], psd) * G
+             else
+                 return BigInt(0) // 1 * G
+             end
+         end)>=0"
+            )
         end
-        println(io, "Block $mu total:")
-        println(io,"$(sum(m.sdpData) do (G, B)
-                if haskey(B, mu)
-                    return dot(B[mu], psd) * G
-                else
-                    return BigInt(0) // 1 * G
-                end
-            end)>=0"
+
+        println(io, "Quotient:")
+        for (i, c) in enumerate(m.quotient)
+            if haskey(sol, "Q$i") && !iszero(sol["Q$i"])
+                println(io, "$(sol["Q$i"]) ⋅ ($c)")
+                println(io, "=$(Rational{BigInt}(sol["Q$i"])*c)= 0")
+            end
+        end
+        println(io, "Quotient sum:")
+        println(
+            io,
+            "$(sum(enumerate(m.quotient)) do (i, F)
+    Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
+end)=0"
         )
     end
-
-    println("Quotient:")
-    for (i, c) in enumerate(m.quotient)
-        if haskey(sol, "Q$i") && !iszero(sol["Q$i"])
-            println(io, "$(sol["Q$i"]) ⋅ ($c)")
-            println(io, "=$(Rational{BigInt}(sol["Q$i"])*c)= 0")
-        end
-    end
-    println("Quotient sum:")
-    println("$(sum(enumerate(m.quotient)) do (i, F)
-        Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
-    end)=0")
 
 
     res = sum(m.sdpData) do (G, B)
@@ -709,9 +716,12 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
         Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
     end
 
-    println(io, "\nRazborov model result:")
-    println(io, "$(res)>= 0")
-    println(io)
+    if io !== nothing
+
+        println(io, "\nRazborov model result:")
+        println(io, "$(res)>= 0")
+        println(io)
+    end
 
     res
 end
