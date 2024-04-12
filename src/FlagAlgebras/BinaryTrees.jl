@@ -66,9 +66,9 @@ end
 # import Base.show
 function Base.show(io::IO, T::BinaryTree)
     if T.isEmptyTree
-        print(io, "o")
+        print(io, "∅")
     elseif T.left === nothing && T.right === nothing
-        print(io, "x")
+        print(io, "•")
     else
         print(io, "($(T.left)$(T.right))")
     end
@@ -101,8 +101,48 @@ end
 
 function Base.show(io::IO, T::PartiallyLabeledFlag{BinaryTreeFlag})
     p = convert(Vector{Union{Int64,String}}, T.F.perm)
-    p[p.>T.n] .= "x"
+    p[p.>T.n] .= "•"
     return printTree(io, T.F.tree, p)
+end
+
+
+function printTreeLatex(T::BinaryTree, labels=["" for _ in 1:size(T)])
+
+    function printForestTreeInner(S, labels)
+        if S.left === nothing
+            if labels[1] == ""
+                return "[, treeNode] "
+            else
+                return "[$(labels[1]), treeNodeLabeled] "
+            end
+        else
+            r = "[, treeNodeInner "
+            r *= printForestTreeInner(S.left, labels[1:size(S.left)])
+            r *= printForestTreeInner(S.right, labels[size(S.left)+1:end])
+            r *= "] "
+            return r
+        end
+    end
+
+    # res = "\\begin{alone}\n"
+    res = "\\begin{forest}\n"
+    res *= "[, treeNodeRoot "
+    if T.left !== nothing
+        res *= printForestTreeInner(T.left, labels[1:size(T.left)])
+        res *= printForestTreeInner(T.right, labels[size(T.left)+1:end])
+    end
+    res *= "]\n"
+    res *= "\\end{forest}\n"
+    # res *= "\\end{alone}\n"
+    res
+end
+
+function printTreeLatex(T::BinaryTreeFlag, labels=["" for p in T.perm])
+    return printTreeLatex(T.tree, labels)
+end
+
+function printTreeLatex(T::PartiallyLabeledFlag{BinaryTreeFlag}, labels=[p <= T.n ? "$p" : "" for p in T.F.perm])
+    return printTreeLatex(T.F.tree, labels)
 end
 
 function ==(A::BinaryTree, B::BinaryTree)

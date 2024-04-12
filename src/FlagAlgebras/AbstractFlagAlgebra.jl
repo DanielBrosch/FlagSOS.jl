@@ -174,7 +174,7 @@ glue() = nothing
 
 Glues together the flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. This variant of `glue` is for optimizing over finite objects, given by `N` which should be one of the options `:limit`, `:variable` or an integer. The operation assumes the k vertices that are sent on top of each other by `p` correspond to labels, and assumes that the other vertices are unlabeled, i.e. get sent to all `N-k` other vertices. 
 """
-function glueFinite(N, F::T, G::T, p::AbstractVector{Int} = collect((size(G) + 1):(size(G) + size(F))); labelFlags=true) where {T<:Flag}
+function glueFinite(N, F::T, G::T, p::AbstractVector{Int} = vcat(collect((size(G) + 1):(size(G) + size(F))),1:size(G)); labelFlags=true) where {T<:Flag}
     return glueFinite_internal(N, F, G, p; labelFlags = labelFlags)
 end
 
