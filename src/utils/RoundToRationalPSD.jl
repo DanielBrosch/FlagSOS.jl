@@ -22,9 +22,9 @@ function roundRationalPSD(A; baseType = BigInt, prec = 1e-5)
     # return (psd = cholesky * cholesky', chol = cholesky)
     
     
-    den = round(BigInt, 1/prec)
+    den = round(baseType, 1/prec)
     function roundDen(x)
-        return round(BigInt, den*x)//den
+        return round(baseType, den*x)//den
     end
 
     if size(A,1) == 1
@@ -38,6 +38,7 @@ function roundRationalPSD(A; baseType = BigInt, prec = 1e-5)
 
     cholesky = eg.vectors * Diagonal(sqrt.(egVals))
     # @show cholesky 
+    # den = floor(baseType,sqrt(den))
     cholesky = roundDen.(cholesky)
     # @show cholesky 
 
