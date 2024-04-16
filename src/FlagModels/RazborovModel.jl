@@ -551,6 +551,12 @@ function computeUnreducedRazborovBasis(
 
         for k in n:-2:max((2 * m - n), 0)
             @show k
+
+            # Only maximum number of unlabeled leaves
+            if n != k + 2*(m-k)
+                continue 
+            end
+            
             for c in combinations(1:m, k)
                 # @show c
                 tLabeled = subFlag(T, c)

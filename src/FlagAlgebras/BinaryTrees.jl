@@ -992,6 +992,22 @@ function label(F::BinaryTree)
     end
 end
 
+function labelLex(F::BinaryTree)
+    if F.left === nothing
+        return F
+    end
+    l = labelLex(F.left)
+    r = labelLex(F.right)
+    lS = string(l)
+    rS = string(r)
+    if size(F.left) < size(F.right) || (size(F.left) == size(F.right) && lS <= rS)
+        return BinaryTree(l, r)
+    else
+        return BinaryTree(r, l)
+    end
+
+end
+
 function labelPerm(F::BinaryTree)
     if size(F) == 0
         return F, Int[]
