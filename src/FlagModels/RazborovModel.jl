@@ -37,6 +37,10 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     end
 end
 
+function Base.show(io::IO, m::RazborovModel{T,N,D}) where {T,N,D}
+    println(io, "Flagmatic style blocks with $(length(m.basis)) types and $(sum(length.(values(m.basis)))) flags")
+end
+
 function isAllowed(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
     if m.parentModel !== nothing
         return isAllowed(m.parentModel, F)
@@ -553,10 +557,10 @@ function computeUnreducedRazborovBasis(
             @show k
 
             # Only maximum number of unlabeled leaves
-            if n != k + 2*(m-k)
-                continue 
+            if n != k + 2 * (m - k)
+                continue
             end
-            
+
             for c in combinations(1:m, k)
                 # @show c
                 tLabeled = subFlag(T, c)
@@ -629,9 +633,15 @@ end
 function roundResults(m::RazborovModel{T,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5) where {T,N,D}
     ex = Dict()
 
+    den = round(BigInt, 1 / prec)
+    function roundDen(x)
+        return round(BigInt, den * x) // den
+    end
+
     for (mu, b) in blocks
         if mu isa String
-            ex[mu] = rationalize(BigInt, value(b); tol=prec)#; digits = digits)
+            # ex[mu] = rationalize(BigInt, value(b); tol=prec)#; digits = digits)
+            ex[mu] = roundDen(value(b))
         else
             ex[mu] = roundRationalPSD(value(b); baseType=BigInt, prec=prec)
         end
@@ -642,7 +652,7 @@ end
 
 function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
     if io !== nothing
-        println(io, "Razborov model")
+        println(io, "Flagmatic model")
 
         for mu in keys(sol)
             if mu isa String
@@ -653,8 +663,14 @@ function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
             println.(io, m.basis[mu])
 
             println(io, "PSD matrix:")
-            show(io, "text/plain", sol[mu])
+            psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
+            show(io, "text/plain", psd)
             println(io)
+            if !(sol[mu] isa Matrix) && size(sol[mu].psd, 1) > 1
+                println(io, "With Cholesky factorization:")
+                show(io, "text/plain", sol[mu].chol)
+                println(io)
+            end
 
             println(io, "Nonzero flag products:")
             n = size(m.basis[mu], 1)
@@ -664,7 +680,6 @@ function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
             for i = 1:n
                 for j = i:n
                     if !iszero(psd[i, j])
-                        println(io, "Product $((i,j)) between $(m.basis[mu][i]) and $(m.basis[mu][j]):")
                         tmp = sum(m.sdpData) do (G, B)
                             if haskey(B, mu)
                                 return Rational{BigInt}(B[mu][i, j]) * G
@@ -672,7 +687,8 @@ function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
                                 return BigInt(0) // 1 * G
                             end
                         end
-                        println(io, "$(psd[i,j]) ⋅ ($tmp)")
+                        print(io, "Product at $((i,j)) is $(psd[i,j]) ⋅ $(m.basis[mu][i]) ⋅ $(m.basis[mu][j]) ")
+                        # println(io, "$(psd[i,j]) ⋅ ($tmp)")
                         println(io, "=$(Rational{BigInt}(psd[i,j])*tmp)")
                     end
                 end
@@ -693,7 +709,7 @@ function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
         println(io, "Quotient:")
         for (i, c) in enumerate(m.quotient)
             if haskey(sol, "Q$i") && !iszero(sol["Q$i"])
-                println(io, "$(sol["Q$i"]) ⋅ ($c)")
+                print(io, "$(sol["Q$i"]) ⋅ ($c) ")
                 println(io, "=$(Rational{BigInt}(sol["Q$i"])*c)= 0")
             end
         end

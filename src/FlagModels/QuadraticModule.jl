@@ -157,6 +157,28 @@ mutable struct EqualityModule{T<:Flag,U<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     end
 end
 
+function roundResults(m::EqualityModule{T,U,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5) where {T,U,N,D}
+    ex = Dict()
+
+    den = round(BigInt, 1/prec)
+    function roundDen(x)
+        return round(BigInt, den*x)//den
+    end
+
+    for (mu, b) in blocks
+        # ex[mu] = rationalize(BigInt, value(b); tol=prec)#; digits = digits)
+        ex[mu] = roundDen(value(b))
+    end
+
+    return ex
+end
+
+
+
+function Base.show(io::IO, m::EqualityModule{T,U,N,D}) where {T,U,N,D}
+    println(io, "Equality constraint ($(m.equality) == 0) multiplied with $(length(m.basis)) flags.")
+end
+
 function computeSDP!(
     m::EqualityModule{T,U,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D}
@@ -240,7 +262,7 @@ function modelSize(m::EqualityModule)
     return Partition(ones(Int, length(m.basis)))
 end
 
-function verifySOS(m::EqualityModule, sol::Dict; io::Union{IO, Nothing}=stdout)
+function verifySOS(m::EqualityModule, sol::Dict; io::Union{IO,Nothing}=stdout)
     println(io, "Equality module coming from constraint")
     println(io, "$(m.equality)= 0")
     for i in keys(sol)

@@ -34,6 +34,14 @@ mutable struct FlagModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     end
 end
 
+function Base.show(io::IO, m::FlagModel{T,N,D}) where {T,N,D}
+    println(io, "Flag algebra model of type $T")
+    if m.objective !== nothing
+        println(io, "Objective: $(m.objective)")
+    end
+    Base.show.(io, m.subModels)
+end
+
 function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     #TODO: If non-induced, forbid all graphs that can be obtained by adding edges, as well.
     Fl = labelCanonically(F)
@@ -89,8 +97,7 @@ function addLasserreBlock!(
     return lM
 end
 
-
-function addRazborovBlock!(m::FlagModel{T,N,D}, lvl, maxLabels = lvl) where {T<:Flag,N,D}
+function addRazborovBlock!(m::FlagModel{T,N,D}, lvl, maxLabels=lvl) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
     computeRazborovBasis!(rM, lvl, maxLabels)
@@ -156,7 +163,11 @@ function addInequality_Lasserre!(
     @show genMaxEdges
     @show genMaxVertices
 
-    Fs = generateAll(PartiallyLabeledFlag{T}, numLabels(gl) + genMaxVertices, [numLabels(gl), genMaxEdges])
+    Fs = generateAll(
+        PartiallyLabeledFlag{T},
+        numLabels(gl) + genMaxVertices,
+        [numLabels(gl), genMaxEdges],
+    )
 
     filter!(x -> x.n == numLabels(gl), Fs)
 
@@ -185,7 +196,11 @@ function addEquality!(
 
     qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0)#numLabels(gl))
 
-    Fs = generateAll(PartiallyLabeledFlag{T}, genMaxVertices+numLabels(gl), [numLabels(gl), genMaxEdges])
+    Fs = generateAll(
+        PartiallyLabeledFlag{T},
+        genMaxVertices + numLabels(gl),
+        [numLabels(gl), genMaxEdges],
+    )
 
     filter!(x -> x.n == numLabels(gl), Fs)
 
@@ -228,7 +243,7 @@ function addEquality!(
 end
 
 function buildJuMPModel(
-    m::FlagModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model(), addBoundVars = false
+    m::FlagModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model(), addBoundVars=false
 ) where {T<:Flag,N,D}
     variables = Dict()
     blocks = []
@@ -246,8 +261,8 @@ function buildJuMPModel(
 
     if addBoundVars
         for F in keys(variables)
-            fl = @variable(jumpModel, base_name="lower$F", lower_bound = 0)
-            fu = @variable(jumpModel, base_name="upper$F", lower_bound = 0)
+            fl = @variable(jumpModel, base_name = "lower$F", lower_bound = 0)
+            fu = @variable(jumpModel, base_name = "upper$F", lower_bound = 0)
             variables[F] += fl - fu
             variables[one(F)] += fu
         end
@@ -287,11 +302,13 @@ function buildJuMPModel(
     return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)
 end
 
-function roundResults(m::FlagModel, jumpModel, variables, blocks, constraints; prec = 1e-5)
+function roundResults(m::FlagModel, jumpModel, variables, blocks, constraints; prec=1e-5)
     ex = []
 
-    for i = 1:length(m.subModels)
-        exi = roundResults(m.subModels[i], jumpModel, variables, blocks[i], constraints[i]; prec = prec)
+    for i in 1:length(m.subModels)
+        exi = roundResults(
+            m.subModels[i], jumpModel, variables, blocks[i], constraints[i]; prec=prec
+        )
         push!(ex, exi)
     end
 
@@ -345,27 +362,60 @@ function facialReduction(m::AbstractFlagModel)
     return error("TODO")
 end
 
-function verifySOS(m::FlagModel{T,N,D}, sol::Vector; io::Union{IO, Nothing} = stdout) where {T,N,D}
+function verifySOS(
+    m::FlagModel{T,N,D}, sol::Vector; io::Union{IO,Nothing}=stdout
+) where {T,N,D}
     @assert length(sol) == length(m.subModels)
 
-    tmp = sum(verifySOS(m.subModels[i], sol[i]; io = io) for i = 1:length(m.subModels))
+    Base.show(io, m)
+    println()
+    
+    tmp = sum(verifySOS(m.subModels[i], sol[i]; io=io) for i in 1:length(m.subModels))
+    
+    println(io, "SOS result:")
+    println(io, "$(tmp) >= 0")
     
     err = Rational{BigInt}(0)
     constTerm = Rational{BigInt}(0)
     for (F, c) in tmp.coeff
         if F == one(T)
-            constTerm += c 
-        else 
+            constTerm += c
+        else
             d = get(m.objective.coeff, F, Rational{BigInt}(0)) - c
             # if d > 0 
             #     err += d
             # end
-            if d > 0 
+            if d > 0
                 err += abs(d)
             end
         end
     end
 
-    return constTerm + err + m.objective
+    println(io, "\nSummary:")
+    Base.show(io, m)
+    
+    println(io, "Constant:")
+    println(io, "$(constTerm)")
+    
+    println(io, "Error:")
+    println(io, "$(err)")
+    
+    res = constTerm + err + m.objective
+    println(io, "Final rigorous bound:")
+    println(io, "$(res) >= 0")
+    
+    println(io, "Floating point bound (rounded appropriately):")
+    first = true
+    for (g, cR) in res.coeff
+        c = Float64(cR, RoundUp)
+        if c < 0 || (first && c > 0)
+            print(io, " $c*$g")
+            first = false
+        else
+            print(io, " + $c*$g ")
+        end
+    end
+    println(io, " >= 0")
 
+    return res
 end

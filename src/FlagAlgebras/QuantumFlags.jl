@@ -23,10 +23,10 @@ function Base.show(io::IO, Fs::QuantumFlag)
     first = true
     for (g, c) in Fs.coeff
         if c < 0 || (first && c > 0)
-            print(io, " $c*$g")
+            print(io, " $c $g")
             first = false
         else
-            print(io, " + $c*$g ")
+            print(io, " + $c $g ")
         end
     end
 end
