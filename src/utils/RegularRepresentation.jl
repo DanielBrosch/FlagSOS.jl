@@ -41,103 +41,99 @@ function regularRepresentation(P::Matrix{Int})
     @assert checkAlgebra(P) "The partition given by the entries of P have to correspond to a Matrix-*-Algebra!"
 
 
-    As = Dict(i => sparse(Int.(P .== i)) for i = 1:maximum(P))
-    println("new)")
-    
-    factors = Dict(i => 1 / sqrt(dot(As[i], As[i])) for i = 1:n)
+    As = Dict(i => sparse(Int.(P .== i)) for i in inds)
+    # println("new)")
 
-    Fs = Dict(i => sparse(float.(As[i]))*factors[i] for i = 1:maximum(P))
-    FsTrans = Dict(i => Fs[i]' for i = 1:maximum(P))
+    factors = Dict(i => 1 / sqrt(dot(As[i], As[i])) for i in inds)
 
-    TransposeNumbers = Dict() 
-    for i=1:n
-        for j=1:n 
-            if Fs[i]==FsTrans[j]
-                TransposeNumbers[i]=j
+    Fs = Dict(i => sparse(float.(As[i])) for i in inds)
+    FsTrans = Dict(i => Fs[i]' for i in inds)
+
+    tInd = Dict()
+    for i in inds
+        for j in inds
+            if Fs[i] == FsTrans[j]
+                tInd[i] = j
                 break
             end
         end
-    end 
-    TransposeNumbersUnique=deepcopy(TransposeNumbers)
-    for i=1:n
-        if haskey(TransposeNumbersUnique,i)&&  haskey(TransposeNumbersUnique,TransposeNumbersUnique[i]) && TransposeNumbersUnique[i]!=i 
-                delete!(TransposeNumbersUnique,TransposeNumbersUnique[i])
+    end
+    tIndUnique = deepcopy(tInd)
+    for i in inds
+        if haskey(tIndUnique, i) && haskey(tIndUnique, tIndUnique[i]) && tIndUnique[i] != i
+            delete!(tIndUnique, tIndUnique[i])
         end
     end
-    println(TransposeNumbersUnique)
+    # println(tIndUnique)
     # As(i) = Int.(P .== i)
     # factors = Dict(i => 1 / sqrt(dot(As(i), As(i))) for i = 1:n)
 
     reg = Dict(k => zeros(Float64, s, s) for k in inds)
 
-    BiBj =zeros(size(P)) #zeros(Int, size(P))
+    BiBj = zeros(size(P)) #zeros(Int, size(P))
 
-    if (false) 
-        for i = 1:n
-            for j = 1:n
-                @show (i,j, n)
+    if (false)
+        for (i, a) in enumerate(inds)
+            for (j, b) in enumerate(inds)
+                # for i = 1:n
+                # for j = 1:n
+                # @show (i,j, n)
                 # BiBj = As(i) * As(j)'
-                BiBj .= Fs[i] *FsTrans[j]
-                @show (i,j, n)
-                for k = 1:n
+                # BiBj .= As[a] * As[b]'
+                BiBj .= Fs[a] * FsTrans[b]
+                # @show (i,j, n)
+                for k in inds
+                    # for k = 1:n
                     # reg[k][i, j] = factors[i] * factors[j] * factors[k] * tr3(As[i], As[j]', As[k]')
-                    reg[k][i, j] = dot(BiBj, FsTrans[k])#* factors[i] * factors[j] * factors[k]
-                    # reg[k][i, j] = factors[i] * factors[j] * factors[k] * dot(BiBj, As(k)')
+                    # reg[k][i, j] = factors[i] * factors[j] * factors[k] * dot(BiBj, As[k]')
+                    reg[k][i, j] = factors[a] * factors[b] * dot(BiBj, FsTrans[k])
+                end
+            end
+        end
+        # for i = 1:n
+        #     for j = 1:n
+        #         @show (i,j, n)
+        #         # BiBj = As(i) * As(j)'
+        #         BiBj .= Fs[i] *FsTrans[j]
+        #         @show (i,j, n)
+        #         for k = 1:n
+        #             # reg[k][i, j] = factors[i] * factors[j] * factors[k] * tr3(As[i], As[j]', As[k]')
+        #             reg[k][i, j] = dot(BiBj, FsTrans[k])#* factors[i] * factors[j] * factors[k]
+        #             # reg[k][i, j] = factors[i] * factors[j] * factors[k] * dot(BiBj, As(k)')
+        #         end
+        #     end
+        # end
+    end
+
+    if (true)
+        RegFactors = Dict()
+        for i in inds
+            for j in inds
+                BiBj .= Fs[i] * FsTrans[j]
+                for (k, _) in tIndUnique
+                    # RegFactors[k, i, j] = dot(BiBj, FsTrans[k]) = tr(kij*)
+                    if haskey(RegFactors, (k, i, j))
+                        continue
+                    end
+                    tmp = dot(BiBj, FsTrans[k])
+                    # @show (k,i,j)
+                    RegFactors[k, i, j] = tmp # = tr(kij*)
+                    RegFactors[tInd[j], k, tInd[i]] = tmp # = tr(j*ki)
+                    RegFactors[i, tInd[j], tInd[k]] = tmp # = tr(ij*k)
+                    RegFactors[j, tInd[i], k] = tmp # = tr(ji*k*)
+                    RegFactors[tInd[k], j, i] = tmp # = tr(k*ji*)
+                    RegFactors[tInd[i], tInd[k], tInd[j]] = tmp # = tr(i*k*j)
+                end
+            end
+        end
+
+        for (i, a) in enumerate(inds)
+            for (j, b) in enumerate(inds)
+                for k in inds
+                    reg[k][i, j] = factors[a] * factors[b] * RegFactors[k, a, b]
                 end
             end
         end
     end
-
-    if (true) 
-        RegFactors = Dict() 
-        println(TransposeNumbersUnique.keys)
-        for (i,val) in TransposeNumbersUnique
-            @show(i,n)
-            for (j,val2) in TransposeNumbersUnique
-                BiBj .= Fs[i] *FsTrans[j]
-                for k=1:n
-                    RegFactors[k,i,j] = dot(BiBj, FsTrans[k])
-                end
-            end
-        end
-
-        for i = 1:n
-            for j = 1:n
-                for k = 1:n
-                    used=false 
-                    if haskey(RegFactors,(k,i,j))
-                        reg[k][i, j] =RegFactors[k,i,j];
-                        used=true 
-                    elseif haskey(RegFactors,(TransposeNumbers[j],TransposeNumbers[k],i))
-                        reg[k][i, j] =RegFactors[TransposeNumbers[j],TransposeNumbers[k],i];
-                        used=true
-                    elseif haskey(RegFactors,(TransposeNumbers[i],j,TransposeNumbers[k]))
-                        reg[k][i, j] =RegFactors[TransposeNumbers[i],j,TransposeNumbers[k]];
-                        used=true 
-                    elseif haskey(RegFactors,(TransposeNumbers[k],TransposeNumbers[j],TransposeNumbers[i]))
-                        reg[k][i, j] =RegFactors[TransposeNumbers[k],TransposeNumbers[j],TransposeNumbers[i]];
-                        used=true
-                    elseif haskey(RegFactors,(j,TransposeNumbers[i],k))
-                        reg[k][i, j] =RegFactors[j,TransposeNumbers[i],k];
-                        used=true
-                    elseif haskey(RegFactors,(i,k,TransposeNumbers[j]))
-                        reg[k][i, j] =RegFactors[i,k,TransposeNumbers[j]];            
-                        used=true                                                                                    
-                    end
-                    if used==false
-                        @show (i,j, k)
-                        println(TransposeNumbersUnique)
-                        println("CONCEPTUAL ERROR")
-                        return
-                    end
-                end
-            end
-        end
-
-
-
-
-
-    end
-    reg, factors
+    reg
 end
