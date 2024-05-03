@@ -3,30 +3,7 @@
 
 n = 10
 m = FlagModel{SymmetricFunction, n, Rational{Int}}()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Flag algebra model of type SymmetricFunction
-</code></pre><h2 id="Choosing-a-relaxation"><a class="docs-heading-anchor" href="#Choosing-a-relaxation">Choosing a relaxation</a><a id="Choosing-a-relaxation-1"></a><a class="docs-heading-anchor-permalink" href="#Choosing-a-relaxation" title="Permalink"></a></h2><p>As we are not restricting ourselves to binary variables, our only option is the Lasserre-hierarchy:</p><pre><code class="language-julia hljs">addLasserreBlock!(m, 4);</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">g = m_norm()
-F = m_norm()
-shape = Vector{Int64}[]
-automs = (gen = Vector{Int64}[], size = 1)
-ge = Vector{Int64}[]
-gS = FlagSOS.FlagSymmetries{SymmetricFunction}(m_norm(), Vector{Int64}[], Int64[], (gen = Vector{Int64}[], size = 1, fullGroup = AbstractAlgebra.Perm{Int64}[]))
-g = m_norm(1)
-F = m_norm(1)
-shape = [[1]]
-automs = (gen = Vector{Int64}[], size = 1)
-ge = Any[]
-gS = FlagSOS.FlagSymmetries{SymmetricFunction}(m_norm(1), [[1]], [1], (gen = Any[], size = 1, fullGroup = Any[]))
-g = m_norm(2)
-F = m_norm(2)
-shape = [[1]]
-automs = (gen = Vector{Int64}[], size = 1)
-ge = Any[]
-gS = FlagSOS.FlagSymmetries{SymmetricFunction}(m_norm(2), [[1]], [1], (gen = Any[], size = 1, fullGroup = Any[]))
-g = m_norm(1,1)
-F = m_norm(1,1)
-shape = [[1, 2]]
-automs = (gen = [[2, 1]], size = 2)
-ge = Any[]
-gS = FlagSOS.FlagSymmetries{SymmetricFunction}(m_norm(1,1), [[1, 2]], [1, 2], (gen = Any[], size = 1, fullGroup = Any[]))</code></pre><p>This results in a semidefinite programming problem with block sizes</p><pre><code class="language-julia hljs">modelSize(m)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4₁3₁1₁</code></pre><p>The package normalizes the bases of the algebra such that the coefficients sum to one. So to get</p><p class="math-container">\[e_4 = \sum_{1\leq i&lt;j&lt;k&lt;l\leq n} x_ix_jx_kx_l\]</p><p>we need to multiply the element with <span>$\binom{n}{4}$</span>.</p><pre><code class="language-julia hljs">e4 = 1//1 * binomial(n, 4) * SymmetricFunction([1, 1, 1, 1])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"> 210//1 m_norm(1,1,1,1)</code></pre><p>We need to express <span>$e_1e_3$</span> in the linear basis of normalized monomial sums:</p><p class="math-container">\[\begin{aligned}
+</code></pre><h2 id="Choosing-a-relaxation"><a class="docs-heading-anchor" href="#Choosing-a-relaxation">Choosing a relaxation</a><a id="Choosing-a-relaxation-1"></a><a class="docs-heading-anchor-permalink" href="#Choosing-a-relaxation" title="Permalink"></a></h2><p>As we are not restricting ourselves to binary variables, our only option is the Lasserre-hierarchy:</p><pre><code class="language-julia hljs">addLasserreBlock!(m, 4);</code></pre><p>This results in a semidefinite programming problem with block sizes</p><pre><code class="language-julia hljs">modelSize(m)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4₁3₁1₁</code></pre><p>The package normalizes the bases of the algebra such that the coefficients sum to one. So to get</p><p class="math-container">\[e_4 = \sum_{1\leq i&lt;j&lt;k&lt;l\leq n} x_ix_jx_kx_l\]</p><p>we need to multiply the element with <span>$\binom{n}{4}$</span>.</p><pre><code class="language-julia hljs">e4 = 1//1 * binomial(n, 4) * SymmetricFunction([1, 1, 1, 1])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"> 210//1 m_norm(1,1,1,1)</code></pre><p>We need to express <span>$e_1e_3$</span> in the linear basis of normalized monomial sums:</p><p class="math-container">\[\begin{aligned}
 e_1e_3 &amp;= (x_1+x_2+x_3+x_4+...)(x_1x_2x_3+x_1x_2x_4+...) \\
 &amp;= x_1^2x_3x_4+\dots+4x_1x_2x_3x_4+\dots \\
 &amp;= m(2,1,1) + 4m(1,1,1,1)
@@ -47,4 +24,4 @@ e_2e_2&amp;=(x_1x_2+\dots)(x_1x_2+\dots) \\
 jm = buildJuMPModel(m)
 set_optimizer(jm.model, Hypatia.Optimizer)
 optimize!(jm.model)
-termination_status(jm.model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">OPTIMAL::TerminationStatusCode = 1</code></pre><pre><code class="language-julia hljs">objective_value(jm.model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3.2801235771936887e-9</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ErrorCorrectingCodes/">« Finite + high precision example: Error correcting codes</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.0 on <span class="colophon-date" title="Monday 29 April 2024 07:37">Monday 29 April 2024</span>. Using Julia version 1.10.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+termination_status(jm.model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">OPTIMAL::TerminationStatusCode = 1</code></pre><pre><code class="language-julia hljs">objective_value(jm.model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3.2801235771936887e-9</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ErrorCorrectingCodes/">« Finite + high precision example: Error correcting codes</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Friday 3 May 2024 09:01">Friday 3 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
