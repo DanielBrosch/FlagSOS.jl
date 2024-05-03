@@ -70,7 +70,7 @@ function computeUnreducedRazborovBasis(
 
     for Ftmp in flags
         for m in maxLabels:-2:size(Ftmp)
-            @show m
+            # @show m
             k = Int((n - m) / 2)
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
             FBlock = label(F; removeIsolated=false)[1]
@@ -91,7 +91,7 @@ end
 
 function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T<:Flag,N,D}
     razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
-    display(razborovBasis)
+    # display(razborovBasis)
 
     @info "determining symmetries"
 
@@ -184,10 +184,10 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
                     symmetrizedReg[ind] += reg[i]
                 end
             end
-            for (i, B) in symmetrizedReg
-                @show i
-                display(B)
-            end
+            # for (i, B) in symmetrizedReg
+            #     @show i
+            #     display(B)
+            # end
 
             M.blockSymmetry[mu] = (
                 pattern=P, gen=newGen, reg=symmetrizedReg, n=maximum(P), fullPattern=P

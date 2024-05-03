@@ -160,6 +160,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     end
 
     function investigateNode(coloring::Vector{Int}, nodeInv=UInt[])
+        # @info "investigate node at $coloring, $nodeInv"
         if maximum(coloring) == n
 
             # check for automorphisms
@@ -197,7 +198,8 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
             end
 
             # improve v1 and vStar
-            if first #|| nodeInv < nInv1
+            # if first #|| nodeInv < nInv1
+            if first || nodeInv < nInv1
                 for i in 1:n
                     v1[coloring[i]] = i
                 end
@@ -211,25 +213,31 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
             end
             first = false
         else
-            # pruning 
-            @assert first ||
-                    length(nodeInv) <= length(nInvStar) ||
-                    length(nodeInv) <= length(nInv1)
+            # pruning
+            # if !(first ||
+            #      length(nodeInv) <= length(nInvStar) ||
+            #      length(nodeInv) <= length(nInv1))
+            #     @show F
+            #     display(F)
+            #     @show typeof(F)
+            #     global errorFlag = deepcopy(F)
+            #     @show first
+            #     @show nodeInv
+            #     @show nInvStar
+            #     @show nInv1
+            # end
 
-            if prune &&
-               (!first) &&
-               (
-                   !(
-                       nodeInv[1:min(length(nodeInv), length(nInv1))] ==
-                       nInv1[1:min(length(nodeInv), length(nInv1))]
-                   )
-               ) &&
-               (
-                   !(
-                       nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
-                       nInvStar[1:min(length(nodeInv), length(nInvStar))]
-                   )
-               )
+            # assertion wrong! nodeInv may be longer than nInvStar! We want the lexicographically largest hash vector, not smallest.
+            # @assert first ||
+            #         length(nodeInv) <= length(nInvStar) ||
+            #         length(nodeInv) <= length(nInv1)
+            # @assert first ||
+            #         nodeInv[1:min(length(nodeInv), length(nInvStar))] >= nInvStar[1:min(length(nodeInv), length(nInvStar))] ||
+            #         length(nodeInv) <= length(nInv1)
+
+            @views if prune && !first &&
+               !(nodeInv[1:min(length(nodeInv), length(nInv1))] == nInv1[1:min(length(nodeInv), length(nInv1))]) &&
+               !(nodeInv[1:min(length(nodeInv), length(nInvStar))] >= nInvStar[1:min(length(nodeInv), length(nInvStar))])
                 return 0
             end
             firstBigCell = Int[]

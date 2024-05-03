@@ -48,13 +48,13 @@ struct FlagSymmetries{T<:Flag}
             end
             return setdiff(unique!(res), [collect(1:length(shape))])
         end
-        @show F 
+        # @show F 
         shape = determineShape(F)
-        @show shape
+        # @show shape
         automs = aut(F)
-        @show automs
+        # @show automs
         ge = reduceAutomorphismsToRows(automs.gen, shape)
-        @show ge
+        # @show ge
         s = Integer(automs.size / prod([factorial(length(s)) for s in shape]))
         rowAut = (gen=ge, size=s, fullGroup=generateGroup(perm.(ge), s))
 
@@ -123,10 +123,10 @@ function addFlag!(
     allowedNumberOfLabels=0:size(g),
     maxOutVertices=2 * size(g),
 ) where {T<:Flag,N,D,U<:Flag}
-    @show g
+    # @show g
     g = labelCanonically(g)
     gS = FlagSymmetries(g)
-    @show gS
+    # @show gS
     if gS in m.generators
         return nothing
     end
