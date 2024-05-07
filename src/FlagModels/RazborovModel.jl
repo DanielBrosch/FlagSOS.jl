@@ -93,12 +93,13 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
     razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
     # display(razborovBasis)
 
-    @info "determining symmetries"
-
+    
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
-
+    
     @info "basis reduced"
+    @info "determining symmetries"
     for (mu, B) in reducedBasis
+        @info "determining symmetry pattern for $mu"
         if length(B) == 1
             M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n=1)
             continue
@@ -120,6 +121,9 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
             end
             push!(newGen, gen)
         end
+
+        # @show muAut
+        # @show length(newGen)
 
         P = zeros(Int, length(B), length(B))
         i = 1
@@ -147,6 +151,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
         end
 
         if maximum(P) > size(P, 1) # regular representation makes things worse
+            @info "Regular representation not worth it for block $mu"
             symmetrize = Dict()
             ind = 1
             for i in 1:maximum(P)
@@ -163,13 +168,15 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T
             # @info "Cannot reduce $mu from $(size(P,1)) (squared $(size(P,1)^2))to $(maximum(P)) " 
         else # regular representation makes things better
             # reg, factors = regularRepresentation(P)
+            @info "Computing regular representation for block $mu"
             reg = regularRepresentation(P)
             # @show factors
+            @info "Symmetrizing regular representation for block $mu"
             symmetrizedReg = Dict()
-            for (i, B) in reg
-                @show i
-                display(B)
-            end
+            # for (i, B) in reg
+            #     @show i
+            #     display(B)
+            # end
             for i in 1:maximum(P)
                 c = findfirst(x -> x == i, P)
                 j = P[c[2], c[1]]
