@@ -97,10 +97,10 @@ function addLasserreBlock!(
     return lM
 end
 
-function addRazborovBlock!(m::FlagModel{T,N,D}, lvl, maxLabels=lvl) where {T<:Flag,N,D}
+function addRazborovBlock!(m::FlagModel{T,N,D}, lvl; maxLabels=lvl, maxBlockSize=Inf) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
-    computeRazborovBasis!(rM, lvl, maxLabels)
+    computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize)
 
     return rM
 end

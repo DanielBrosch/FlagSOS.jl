@@ -89,12 +89,15 @@ function computeUnreducedRazborovBasis(
     return razborovBasis
 end
 
-function computeRazborovBasis!(M::RazborovModel{T,N,D}, n, maxLabels=n) where {T<:Flag,N,D}
+function computeRazborovBasis!(M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize = Inf) where {T<:Flag,N,D}
     razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
     # display(razborovBasis)
 
     
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
+    if maxBlockSize < Inf 
+        filter!(x->length(x[2]) < maxBlockSize, reducedBasis)
+    end
     
     @info "basis reduced"
     @info "determining symmetries"
