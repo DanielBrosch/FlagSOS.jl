@@ -40,15 +40,19 @@ function regularRepresentation(P::Matrix{Int})
 
     @assert checkAlgebra(P) "The partition given by the entries of P have to correspond to a Matrix-*-Algebra!"
 
-
+    @info "Computing As"
     As = Dict(i => sparse(Int.(P .== i)) for i in inds)
     # println("new)")
-
+    
+    @info "Computing factors"
     factors = Dict(i => 1 / sqrt(dot(As[i], As[i])) for i in inds)
-
+    
+    @info "Computing Fs"
     Fs = Dict(i => sparse(float.(As[i])) for i in inds)
+    @info "Computing FsTrans"
     FsTrans = Dict(i => Fs[i]' for i in inds)
 
+    @info "Computing indices"
     tInd = Dict()
     for i in inds
         for j in inds
@@ -70,6 +74,7 @@ function regularRepresentation(P::Matrix{Int})
 
     reg = Dict(k => zeros(Float64, s, s) for k in inds)
 
+    @info "Computing coefficients"
     BiBj = zeros(size(P)) #zeros(Int, size(P))
 
     if (false)
@@ -107,9 +112,11 @@ function regularRepresentation(P::Matrix{Int})
 
     if (true)
         RegFactors = Dict()
-        for i in inds
+        @showprogress for i in inds
             for j in inds
-                BiBj .= Fs[i] * FsTrans[j]
+                @show (i,j)
+                # BiBj .= Fs[i] * FsTrans[j]
+                LinearAlgebra.mul!(BiBj, Fs[i], FsTrans[j])
                 for (k, _) in tIndUnique
                     # RegFactors[k, i, j] = dot(BiBj, FsTrans[k]) = tr(kij*)
                     if haskey(RegFactors, (k, i, j))
@@ -123,6 +130,52 @@ function regularRepresentation(P::Matrix{Int})
                     RegFactors[j, tInd[i], k] = tmp # = tr(ji*k*)
                     RegFactors[tInd[k], j, i] = tmp # = tr(k*ji*)
                     RegFactors[tInd[i], tInd[k], tInd[j]] = tmp # = tr(i*k*j)
+
+                    # SDP handbook, chapter Bachoc, Vallentin, Schrijver, Gijswijt
+
+                    # ours: k, i, j
+                    # ours: j, k, i
+                    # handbook: t, r, s
+                    # fixed As[j]
+
+                    # tmp2 = sum(1:length(inds)) do t
+                    #     # indI = findall(As[k][:, t] .== 1)
+                    #     # indJ = findall(As[i][t, :] .== 1)
+                    #     # any(Iterators.product(indI, indJ)) do (a,b)
+                    #     #     # As[j][a,b] == 1
+                    #     #     As[j][b,a] == 1
+                    #     # end ? 1 : 0
+                    # end #* sum(As[i])
+
+                    fixedAsJ = findfirst(As[j] .== 1)
+                    tmp2 = sum(1:length(inds)) do t
+                        # indI = findall(As[k][:, t] .== 1)
+                        # indJ = findall(As[i][t, :] .== 1)
+                        # any(Iterators.product(indI, indJ)) do (a,b)
+                        #     # As[j][a,b] == 1
+                        #     As[j][b,a] == 1
+                        # end ? 1 : 0
+                        # As[k][fixedAsJ[2],t]*As[i][t,fixedAsJ[1]]
+                        # As[k][fixedAsJ[1],t]*As[i][fixedAsJ[2],t]
+                        # As[k][fixedAsJ[2],t]*As[i][fixedAsJ[1],t]
+                        # As[k][fixedAsJ[1],t]*As[i][t,fixedAsJ[2]]
+                        As[k][t,fixedAsJ[1]]*As[i][t,fixedAsJ[2]]
+                    end * sum(As[j])
+                    
+                    # fixedAsJ = findfirst(As[k] .!= 1)
+                    # tmp2 = sum(1:length(inds)) do t
+                    #     # indI = findall(As[k][:, t] .== 1)
+                    #     # indJ = findall(As[i][t, :] .== 1)
+                    #     # any(Iterators.product(indI, indJ)) do (a,b)
+                    #     #     # As[j][a,b] == 1
+                    #     #     As[j][b,a] == 1
+                    #     # end ? 1 : 0
+                    #     As[i][fixedAsJ[2],t]*As[j][fixedAsJ[1],t]
+                    #     As[i][fixedAsJ[2],t]*As[j][t,fixedAsJ[1]]
+                    # end #* sum(As[i])
+                    @show [sum(As[t]) for t in [i,j,k]]
+                    @show (tmp, tmp2)
+                    @assert iszero(tmp) == iszero(tmp2)
                 end
             end
         end
