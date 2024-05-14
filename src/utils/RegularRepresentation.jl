@@ -112,17 +112,30 @@ function regularRepresentation(P::Matrix{Int})
 
     if (true)
         RegFactors = Dict()
+
+        matSize = size(As[1],1)
+
         @showprogress for i in inds
             for j in inds
                 @show (i,j)
                 # BiBj .= Fs[i] * FsTrans[j]
-                LinearAlgebra.mul!(BiBj, Fs[i], FsTrans[j])
+                
+                #LinearAlgebra.mul!(BiBj, Fs[i], FsTrans[j])
+                fixedAsJ = findfirst(As[j] .== 1)
+                
                 for (k, _) in tIndUnique
                     # RegFactors[k, i, j] = dot(BiBj, FsTrans[k]) = tr(kij*)
                     if haskey(RegFactors, (k, i, j))
                         continue
                     end
-                    tmp = dot(BiBj, FsTrans[k])
+                    
+                    #tmp = dot(BiBj, FsTrans[k])
+                    tmp = 0
+                    @inbounds for t=1:matSize
+                        tmp+= As[k][fixedAsJ[1],t]*As[i][t,fixedAsJ[2]]
+                    end
+                    tmp*=sum(As[j])
+
                     # @show (k,i,j)
                     RegFactors[k, i, j] = tmp # = tr(kij*)
                     RegFactors[tInd[j], k, tInd[i]] = tmp # = tr(j*ki)
@@ -147,21 +160,39 @@ function regularRepresentation(P::Matrix{Int})
                     #     # end ? 1 : 0
                     # end #* sum(As[i])
 
-                    fixedAsJ = findfirst(As[j] .== 1)
-                    tmp2 = sum(1:length(inds)) do t
-                        # indI = findall(As[k][:, t] .== 1)
-                        # indJ = findall(As[i][t, :] .== 1)
-                        # any(Iterators.product(indI, indJ)) do (a,b)
-                        #     # As[j][a,b] == 1
-                        #     As[j][b,a] == 1
-                        # end ? 1 : 0
-                        # As[k][fixedAsJ[2],t]*As[i][t,fixedAsJ[1]]
-                        # As[k][fixedAsJ[1],t]*As[i][fixedAsJ[2],t]
-                        # As[k][fixedAsJ[2],t]*As[i][fixedAsJ[1],t]
-                        # As[k][fixedAsJ[1],t]*As[i][t,fixedAsJ[2]]
-                        As[k][t,fixedAsJ[1]]*As[i][t,fixedAsJ[2]]
-                    end * sum(As[j])
-                    
+
+
+                    # tmp23 = 0
+                    # for t=1:size(As[k],1)
+                    #     tmp23+= As[i][fixedAsJ[1],t]*As[k][t,fixedAsJ[2]]
+                    # end
+
+                    # tmp3 = sum(1:length(inds)) do t
+                    #     As[k][fixedAsJ[1],t]*As[j][t,fixedAsJ[2]]
+                    # end #* sum(As[j])
+
+                    # tmp4 = sum(1:length(inds)) do t
+                    #     As[k][t,fixedAsJ[1]]*As[j][fixedAsJ[2],t]
+                    # end #* sum(As[j])
+
+                    # tmp5 = sum(1:length(inds)) do t
+                    #     As[k][fixedAsJ[1],t]*As[j][fixedAsJ[2],t]
+                    # end #* sum(As[j])          
+                    # tmp6 = sum(1:length(inds)) do t
+                    #     As[j][t,fixedAsJ[1]]*As[k][t,fixedAsJ[2]]
+                    # end #* sum(As[j])
+
+                    # tmp7 = sum(1:length(inds)) do t
+                    #     As[j][fixedAsJ[1],t]*As[k][t,fixedAsJ[2]]
+                    # end #* sum(As[j])
+
+                    # tmp8 = sum(1:length(inds)) do t
+                    #     As[j][t,fixedAsJ[1]]*As[k][fixedAsJ[2],t]
+                    # end #* sum(As[j])
+
+                    # tmp9 = sum(1:length(inds)) do t
+                    #     As[j][fixedAsJ[1],t]*As[k][fixedAsJ[2],t]
+                    # end #* sum(As[j])                 
                     # fixedAsJ = findfirst(As[k] .!= 1)
                     # tmp2 = sum(1:length(inds)) do t
                     #     # indI = findall(As[k][:, t] .== 1)
@@ -173,9 +204,9 @@ function regularRepresentation(P::Matrix{Int})
                     #     As[i][fixedAsJ[2],t]*As[j][fixedAsJ[1],t]
                     #     As[i][fixedAsJ[2],t]*As[j][t,fixedAsJ[1]]
                     # end #* sum(As[i])
-                    @show [sum(As[t]) for t in [i,j,k]]
-                    @show (tmp, tmp2)
-                    @assert iszero(tmp) == iszero(tmp2)
+                    #@show [sum(As[t]) for t in [i,j,k]]
+                    #@show (tmp, tmp22)
+                    #@assert tmp == tmp22 
                 end
             end
         end
