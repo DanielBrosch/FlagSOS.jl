@@ -716,9 +716,6 @@ function computeGlueDictC(n)
     end
 
     for (p, c) in treeGlueDictTmp
-        if haskey(treeGlueDict, p)
-            @error "Computing $p double at $n"
-        end
         treeGlueDict[p] = c
     end
 
@@ -730,10 +727,7 @@ end
 
 function glue(g1::BinaryTree, g2::BinaryTree, p::AbstractVector{Int})
     if !haskey(treeGlueDict, (g1, g2, p))
-        @show g1
-        @show g2
-        @show p
-        @show n = 2 * max(size(g1), size(g2)) - length(intersect(p[1:size(g1)], 1:size(g2)))
+        n = 2 * max(size(g1), size(g2)) - length(intersect(p[1:size(g1)], 1:size(g2)))
 
         if n > maximum(p; init=0) && all(p[1:size(g1)] .> size(g2))
             # @assert all(p[1:size(g1)] .> size(g2))

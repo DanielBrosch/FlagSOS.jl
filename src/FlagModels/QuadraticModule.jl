@@ -262,7 +262,7 @@ function modelSize(m::EqualityModule)
     return Partition(ones(Int, length(m.basis)))
 end
 
-function verifySOS(m::EqualityModule, sol::Dict; io::Union{IO,Nothing}=stdout)
+function verifySOS(m::EqualityModule, sol::Dict; io::IO=stdout)
     println(io, "Equality module coming from constraint")
     println(io, "$(m.equality)= 0")
     for i in keys(sol)

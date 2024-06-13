@@ -363,7 +363,7 @@ function facialReduction(m::AbstractFlagModel)
 end
 
 function verifySOS(
-    m::FlagModel{T,N,D}, sol::Vector; io::Union{IO,Nothing}=stdout
+    m::FlagModel{T,N,D}, sol::Vector; io::IO=stdout
 ) where {T,N,D}
     @assert length(sol) == length(m.subModels)
 

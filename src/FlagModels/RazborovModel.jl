@@ -564,7 +564,7 @@ function computeUnreducedRazborovBasis(
         # end
 
         for k in n:-2:max((2 * m - n), 0)
-            @show k
+            # @show k
 
             # Only maximum number of unlabeled leaves
             if n != k + 2 * (m - k)
@@ -660,7 +660,7 @@ function roundResults(m::RazborovModel{T,N,D}, jumpModel, variables, blocks, con
     return ex
 end
 
-function verifySOS(m::RazborovModel, sol::Dict; io::Union{IO,Nothing}=stdout)
+function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
     if io !== nothing
         println(io, "Flagmatic model")
 
