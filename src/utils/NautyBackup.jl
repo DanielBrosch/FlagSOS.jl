@@ -32,7 +32,6 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
 
     # nodeInv = refine!(coloring)
     Q = zeros(UInt, n, n)
-    curCell::BitVector = BitVector(undef, n)
     @inbounds while maximum(coloring) < n
         W::Int = 0
         for i in 1:length(alpha)
@@ -50,15 +49,16 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
         alpha[W] = false
 
         cell::Int = 1
-        newCells = Dict{UInt,Int}()
         while cell <= maximum(coloring)
             vertDistinguish .= 0
             # curCell .= coloring .== cell
+            curCell::BitVector = BitVector(undef, n)
             for i = 1:n
                 curCell[i] = coloring[i] == cell
             end
 
-            empty!(newCells)
+            # empty!(newCells)
+            newCells = Dict{UInt,Int}()
 
             for v in findall(curCell)#findall(x->x==cell, coloring)
                 d::UInt = distinguish(F, v, WCellInd)
@@ -93,9 +93,7 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
 
             # sorting newCellsCol by hashes breaks things?!? But I need to sort!
 
-            for v in 1:n
-                !curCell[v] && continue
-                # findall(curCell)#findall(x->x==cell, coloring)
+            for v in findall(curCell)#findall(x->x==cell, coloring)
                 # coloring[v] = newCells[vertDistinguish[v]]
 
                 d::UInt = vertDistinguish[v]
@@ -143,18 +141,15 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
         # return UInt[nodeInvariant, hash(permute(F, coloring))]
         # return nodeInvariant, hash(permute(F, coloring))
 
-        return UInt[nodeInvariant, hash(permute(F, coloring))]
+        return [nodeInvariant, hash(permute(F, coloring))]
         # return hash(nodeInvariant, hash(permute(F, coloring)))
     end
     return UInt[nodeInvariant]
     # return nodeInv
 end
 
-function investigateNode(F,coloring::Vector{Int}, nodeInv::Vector{UInt},n,nInv1, nInvStar,autG,v1,vStar,curBranch, covered,prune)::Int
+function investigateNode(F,coloring::Vector{Int}, nodeInv::Vector{UInt},n,nInv1, nInvStar,autG,first,v1,vStar,curBranch, covered,prune)::Int
     # @info "investigate node at $coloring, $nodeInv"
-
-    first = length(nInv1) == 0
-
     if maximum(coloring) == n
 
         # check for automorphisms
@@ -177,8 +172,6 @@ function investigateNode(F,coloring::Vector{Int}, nodeInv::Vector{UInt},n,nInv1,
                 for i in 1:length(curBranch)
                     H = stabilizer!(autG, curBranch[1:(i - 1)])
 
-                    @assert H !== nothing
-
                     o = covered[i]
                     orbit!(H, o)
                     if prune && curBranch[i] in o
@@ -199,17 +192,13 @@ function investigateNode(F,coloring::Vector{Int}, nodeInv::Vector{UInt},n,nInv1,
             for i in 1:n
                 v1[coloring[i]] = i
             end
-            resize!(nInv1, length(nodeInv))
-            nInv1 .= nodeInv
-            # nInv1 = nodeInv
+            nInv1 = nodeInv
         end
         if first || nodeInv > nInvStar
             for i in 1:n
                 vStar[coloring[i]] = i
             end
-            resize!(nInvStar, length(nodeInv))
-            nInvStar .= nodeInv
-            # nInvStar = nodeInv
+            nInvStar = nodeInv
         end
         first = false
     else
@@ -258,7 +247,7 @@ function investigateNode(F,coloring::Vector{Int}, nodeInv::Vector{UInt},n,nInv1,
 
         push!(covered, Int[])
         for i in firstBigCell
-            if prune && i in covered[end]
+            if i in covered[end] && prune
                 # @info "Prune $(vcat(curBranch,[i])) via automorphism"
                 continue
             end
@@ -266,20 +255,15 @@ function investigateNode(F,coloring::Vector{Int}, nodeInv::Vector{UInt},n,nInv1,
             newNodeInv::Vector{UInt} = refine!(newC, F, i)
             push!(curBranch, i)
             catNodeInv::Vector{UInt} = vcat(nodeInv, newNodeInv) 
-            t = investigateNode(F,newC, catNodeInv,n,nInv1, nInvStar,autG,v1,vStar,curBranch, covered,prune)
+            t = investigateNode(F,newC, catNodeInv,n,nInv1, nInvStar,autG,first,v1,vStar,curBranch, covered,prune)
 
             if t > 0
                 return t - 1
             end
             pop!(curBranch)
 
-            # union!(covered[end], [i])
-            if prune || !(i in covered[end])
-                push!(covered[end], i)
-            end
-            H = stabilizer!(autG, curBranch)
-            @assert H !== nothing
-            orbit!(H, covered[end])
+            union!(covered[end], [i])
+            orbit!(stabilizer!(autG, curBranch), covered[end])
         end
         pop!(covered)
     end
@@ -324,7 +308,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
 
     autG::Group = Group()
 
-    # first = true
+    first = true
 
     v1::Vector{Int} = zeros(Int, n)
     vStar::Vector{Int} = zeros(Int, n)
@@ -346,12 +330,9 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     # alpha[1] = true
     refine!(col, F, 0)
 
-    investigateNode(F,col,UInt[],n,nInv1, nInvStar,autG,v1,vStar,curBranch, covered,prune)
+    investigateNode(F,col,UInt[],n,nInv1, nInvStar,autG,first,v1,vStar,curBranch, covered,prune)
+    p = Int[findfirst(x -> x == i, vStar) for i in 1:n]
 
-    p = zeros(Int, n)
-    p[vStar] .= 1:n
-    # p = Int[findfirst(x -> x == i, vStar) for i in 1:n]
-    # @assert p == p2
     return permute(F, p), permute!(autG, p), p
 end
 
@@ -402,7 +383,7 @@ function generateAll(
             fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
             uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(newF, fixed, maxPredicates)
             # @show uP
-            uP2 = findUnknownGenerationPredicates(newF, fixed, maxPredicates)
+            uP2::Vector{Vector{predicateType(T)}} = findUnknownGenerationPredicates(newF, fixed, maxPredicates)
             if uP2 !== nothing
                 uP = vcat(uP, uP2)
             end

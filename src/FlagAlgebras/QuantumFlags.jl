@@ -11,6 +11,7 @@ mutable struct QuantumFlag{F<:Flag,T}
     QuantumFlag{F,T}(cs::Dict{F,T}) where {F<:Flag,T} = new(cs)
     QuantumFlag{F,T}(opts...) where {F<:Flag,T} = new(Dict{F,T}(opts...))
     QuantumFlag{F}(fc::QuantumFlag{F,T}) where {F<:Flag,T} = new{F,T}(fc.coeff)
+    QuantumFlag{F,T}(fc::QuantumFlag{F,U}) where {F<:Flag,T, U} = new{F,T}(Dict{F,T}(fc.coeff))
 end
 
 function Base.promote_rule(

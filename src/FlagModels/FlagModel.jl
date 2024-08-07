@@ -87,7 +87,7 @@ function addLasserreBlock!(
     push!(m.subModels, lM)
 
     Fs = generateAll(T, Int(floor(maxVertices / 2)), Int.(floor.(maxEdges / 2)))
-    # @show Fs
+    display(Fs)
     for F in Fs
         if isAllowed(m, F)
             addFlag!(lM, F)
@@ -370,7 +370,7 @@ function verifySOS(
     Base.show(io, m)
     println()
     
-    tmp = sum(verifySOS(m.subModels[i], sol[i]; io=io) for i in 1:length(m.subModels))
+    tmp = labelCanonically(sum(verifySOS(m.subModels[i], sol[i]; io=io) for i in 1:length(m.subModels)))
     
     println(io, "SOS result:")
     println(io, "$(tmp) >= 0")
@@ -400,6 +400,9 @@ function verifySOS(
     println(io, "Error:")
     println(io, "$(err)")
     
+    if haskey(m.objective.coeff, T())
+        constTerm -= m.objective.coeff[T()]
+    end
     res = constTerm + err + m.objective
     println(io, "Final rigorous bound:")
     println(io, "$(res) >= 0")

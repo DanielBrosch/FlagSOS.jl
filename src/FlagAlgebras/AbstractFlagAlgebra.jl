@@ -285,7 +285,7 @@ end
 Returns the sub-Flag indexed by `vertices`, which is a subset of `1:size(F)`.
 """
 function subFlag(F::T, vertices::AbstractVector{Int})::T where {T<:Flag}
-    error("subFlag is not defined for Flag type $T")
+    error("subFlag is not defined for Flag type T")
     return missing
 end
 
@@ -336,7 +336,7 @@ function countEdges(F::T)::Vector{Int} where {T<:Flag}
 end
 
 """
-    isolatedVertices(F::T)::Vector{Int} where{T<:Flag}
+    isolatedVertices(F::T)::BitVector where{T<:Flag}
 
 Returns the indicator vector of isolated vertices of `F`.
 """
@@ -467,4 +467,5 @@ include("EdgeMarkedFlags.jl")
 include("SymmetricFunctions.jl")
 include("HarmonicFlags.jl")
 include("ProductFlag.jl")
+include("FreeVariables.jl")
 include("PartiallyColoredFlags.jl")

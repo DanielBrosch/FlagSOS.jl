@@ -22,7 +22,7 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
             Dict(),
             Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}(),
             parent,
-            Dict()
+            Dict(),
         )
     end
 
@@ -32,13 +32,16 @@ mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
             Dict(),
             Dict{T,Dict{T,SparseMatrixCSC{Int,Int}}}(),
             parent,
-            Dict()
+            Dict(),
         )
     end
 end
 
 function Base.show(io::IO, m::RazborovModel{T,N,D}) where {T,N,D}
-    println(io, "Flagmatic style blocks with $(length(m.basis)) types and $(sum(length.(values(m.basis)))) flags")
+    return println(
+        io,
+        "Flagmatic style blocks with $(length(m.basis)) types and $(sum(length.(values(m.basis)))) flags",
+    )
 end
 
 function isAllowed(m::RazborovModel{T,N,D}, F::T) where {T<:Flag,N,D}
@@ -76,7 +79,7 @@ function computeUnreducedRazborovBasis(
             FBlock = label(F; removeIsolated=false)[1]
             @assert size(FBlock) == m
             # @assert FBlock == label(FBlock; removeIsolated=false)[1]
-            FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
+            FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
 
@@ -89,16 +92,17 @@ function computeUnreducedRazborovBasis(
     return razborovBasis
 end
 
-function computeRazborovBasis!(M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize = Inf) where {T<:Flag,N,D}
+function computeRazborovBasis!(
+    M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf
+) where {T<:Flag,N,D}
     razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
     # display(razborovBasis)
 
-    
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
-    if maxBlockSize < Inf 
-        filter!(x->length(x[2]) < maxBlockSize, reducedBasis)
+    if maxBlockSize < Inf
+        filter!(x -> length(x[2]) < maxBlockSize, reducedBasis)
     end
-    
+
     @info "basis reduced"
     @info "determining symmetries"
     for (mu, B) in reducedBasis
@@ -117,7 +121,7 @@ function computeRazborovBasis!(M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlock
                 @assert length(p) == b.n
                 pb = labelCanonically(
                     PartiallyLabeledFlag{T}(
-                        permute(b.F, vcat(p, (length(p)+1):size(b))), b.n
+                        permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
                     ),
                 )
                 gen[i] = findfirst(x -> x == pb, B)
@@ -226,16 +230,14 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             n = length(B)
             M = zeros(Int, n, n)
             ind = 1
-            for i = 1:n
-                for j = i:n
+            for i in 1:n
+                for j in i:n
                     M[i, j] = ind
                     M[j, i] = ind
                     ind += 1
                 end
             end
-            P = (
-                pattern=M, n=n, fullPattern=M
-            )
+            P = (pattern=M, n=n, fullPattern=M)
         else
             P = m.blockSymmetry[mu]
         end
@@ -258,7 +260,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
             newSize = k + (n1 - k) + (n2 - k)
             p = collect(1:newSize)
-            p[(k+1):n1] = (n2+1):newSize
+            p[(k + 1):n1] = (n2 + 1):newSize
 
             T1 = a.F
             p1 = p[1:size(a.F)]
@@ -272,7 +274,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             p1Fin = p2Inv[p1]
             p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
 
-            @views sort!(p1Fin[(n1+1):end])
+            @views sort!(p1Fin[(n1 + 1):end])
 
             p1Fin = Int.(p1Fin)
 
@@ -338,7 +340,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # m.sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
                     m.sdpData[F][mu] .+= d * P.reg[s]#*factor
                 else
-                    m.sdpData[F][mu][P.pattern.==s] .= d
+                    m.sdpData[F][mu][P.pattern .== s] .= d
                 end
             end
         end
@@ -506,7 +508,6 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
     end
 
     for (i, F) in enumerate(m.quotient)
-
         y = @variable(jumpModel, base_name = "quotient$i")
         Y["Q$i"] = y
         for (G, c) in F.coeff
@@ -606,7 +607,7 @@ function computeUnreducedRazborovBasis(
 
                     q = collect(1:m)
                     q[c] .= 1:k
-                    q[setdiff(1:m, c)] .= (k+1):m
+                    q[setdiff(1:m, c)] .= (k + 1):m
                     # @show k
                     q[c] .= p.d[tCanLabelPermInv[1:k]]
 
@@ -640,12 +641,14 @@ function computeUnreducedRazborovBasis(
     return razborovBasis
 end
 
-function roundResults(m::RazborovModel{T,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5) where {T,N,D}
+function roundResults(
+    m::RazborovModel{T,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5
+) where {T,N,D}
     ex = Dict()
 
     den = round(BigInt, 1 / prec)
     function roundDen(x)
-        return round(BigInt, den * x) // den
+        return round(BigInt, den * x)//den
     end
 
     for (mu, b) in blocks
@@ -687,17 +690,20 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
             # @show mu
             # @show sol[mu]
             psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
-            for i = 1:n
-                for j = i:n
+            for i in 1:n
+                for j in i:n
                     if !iszero(psd[i, j])
                         tmp = sum(m.sdpData) do (G, B)
                             if haskey(B, mu)
                                 return Rational{BigInt}(B[mu][i, j]) * G
                             else
-                                return BigInt(0) // 1 * G
+                                return BigInt(0)//1 * G
                             end
                         end
-                        print(io, "Product at $((i,j)) is $(psd[i,j]) ⋅ $(m.basis[mu][i]) ⋅ $(m.basis[mu][j]) ")
+                        print(
+                            io,
+                            "Product at $((i,j)) is $(psd[i,j]) ⋅ $(m.basis[mu][i]) ⋅ $(m.basis[mu][j]) ",
+                        )
                         # println(io, "$(psd[i,j]) ⋅ ($tmp)")
                         println(io, "=$(Rational{BigInt}(psd[i,j])*tmp)")
                     end
@@ -712,7 +718,7 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
              else
                  return BigInt(0) // 1 * G
              end
-         end)>=0"
+         end)>=0",
             )
         end
 
@@ -728,10 +734,9 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
             io,
             "$(sum(enumerate(m.quotient)) do (i, F)
     Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
-end)=0"
+end)=0",
         )
     end
-
 
     res = sum(m.sdpData) do (G, B)
         sum(B) do (mu, b)
@@ -739,21 +744,20 @@ end)=0"
                 psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
                 return dot(Rational{BigInt}.(psd), b) * G
             else
-                return BigInt(0) // 1 * G
+                return BigInt(0)//1 * G
             end
         end
     end
 
     res += sum(enumerate(m.quotient)) do (i, F)
-        Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
+        Rational{BigInt}(get(sol, "Q$i", 0//1)) * F
     end
 
     if io !== nothing
-
         println(io, "\nRazborov model result:")
         println(io, "$(res)>= 0")
         println(io)
     end
 
-    res
+    return res
 end

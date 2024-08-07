@@ -29,14 +29,19 @@ struct EdgeMarkedFlag{T,P} <: Flag
     # function EdgeMarkedFlag{T}(F::T, marked::Vector) where {T<:Flag}
     #     return new{T,predicateType(T)}(F, marked)
     # end
-    function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag,P}
-        return new{T,predicateType(T)}(F, vcat(marked...))
-    end
-    function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector}) where {T<:Flag}
-        return new{T,predicateType(T)}(F, vcat(marked...))
-    end
+    # function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector{P}}) where {T<:Flag,P}
+    #     allMarks::Vector{predicateType(T)} = vcat(marked...)
+    #     return new{T,predicateType(T)}(F, allMarks)
+    # end
+    # function EdgeMarkedFlag{T}(F::T, marked::Vector{Vector}) where {T<:Flag}
+    #     return new{T,predicateType(T)}(F, vcat(marked...))
+    # end
     function EdgeMarkedFlag{T}(F::T, marked::Vector{P}) where {T<:Flag,P}
-        return new{T,predicateType(T)}(F, marked)
+        if P <: Vector
+            return new{T,predicateType(T)}(F, vcat(marked...))
+        else
+            return new{T,predicateType(T)}(F, marked)
+        end
     end
 end
 
@@ -62,7 +67,7 @@ end
 function findUnknownPredicates(
     F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector
 ) where {U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed, predLimits[1:end-1]), predLimits::Vector
+    return findUnknownPredicates(F.F, fixed, predLimits[1:(end - 1)]), predLimits::Vector
 end
 
 function predicateType(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P}
@@ -83,9 +88,7 @@ function addPredicates(
     return EdgeMarkedFlag{T,predicateType(T)}(addPredicates(G.F, preds), G.marked)
 end
 
-function permute(
-    F::EdgeMarkedFlag{T,P}, p::AbstractVector{Int}
-) where {T<:Flag,P}
+function permute(F::EdgeMarkedFlag{T,P}, p::AbstractVector{Int}) where {T<:Flag,P}
     return EdgeMarkedFlag{T}(permute(F.F, p), P[permute(e, p) for e in F.marked])
 end
 
@@ -107,7 +110,7 @@ function countEdges(F::EdgeMarkedFlag)
     return vcat(countEdges(F.F), [length(F.marked)])
 end
 
-function isolatedVertices(F::EdgeMarkedFlag)
+function isolatedVertices(F::EdgeMarkedFlag)::BitVector
     return BitVector([false for i in 1:size(F)])
 end
 
@@ -208,7 +211,7 @@ function zeta(
 ) where {T<:Flag,D,P<:Predicate}
     # res = moebius(F; label=label)
     # map!(abs, values(res.coeff))
-    res = sum(c*zeta(f) for (f,c) in F.coeff)
+    res = sum(c * zeta(f) for (f, c) in F.coeff)
     return res
 end
 
