@@ -59,7 +59,10 @@ The maximum number of edges of the flags in 'F'.
 function countEdges(F::QuantumFlag)
     length(F.coeff) == 0 && return 0
 
-    return maximum([countEdges(f) for f in keys(F.coeff)])
+    edgeCounts = [countEdges(f) for f in keys(F.coeff)]
+    k = length(edgeCounts[1])
+
+    return [maximum([e[i] for e in edgeCounts]) for i = 1:k] 
 end
 
 """
@@ -206,7 +209,8 @@ function Base.:*(F::T, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
     for (B, d) in G.coeff
         AB = F * B
         AB === nothing && continue
-        res.coeff[AB] = get(res.coeff, AB, zero(R)) + d
+        # res.coeff[AB] = get(res.coeff, AB, zero(R)) + d
+        res += d*AB
     end
 
     filter!(p -> !iszero(p.second), res.coeff)

@@ -181,6 +181,7 @@ function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicat
     tmp2 = Dict{EdgeMarkedFlag{T,P},Int}()
 
     for flippedEdges in 0:k
+        # @show flippedEdges
         for (F2, c2) in tmp
             res += c2 * (-1)^flippedEdges * F2.F
             for (F3, c3) in allWaysToAddOneMarked(F2)

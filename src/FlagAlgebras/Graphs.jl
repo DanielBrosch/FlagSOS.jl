@@ -1,4 +1,4 @@
-export Graph
+export Graph, connectedComponents
 
 """ 
     $(TYPEDEF)
@@ -233,4 +233,33 @@ function isolatedVertices(F::Graph)::BitVector
     map!(!, res, res)
     # return .!vec(any(F.A; dims=1))
     return res
+end
+
+function connectedComponents(G::Graph)::Vector{Graph}
+    n = size(G)
+
+    if n == 0
+        return [G]
+    end
+
+    components = zeros(Int, n)
+    nComp = 0
+    for i = 1:n
+        if components[i] == 0
+            nComp += 1
+            components[i] = nComp
+        end
+        for j = i+1:n
+            if G.A[i,j] == 1
+                if components[j] == 0
+                    components[j] = components[i]
+                else
+                    c = minimum(components[[i,j]])
+                    d = maximum(components[[i,j]])
+                    components[components.==d] .= c
+                end
+            end
+        end
+    end
+    return [subFlag(G, findall(x->x==u, components)) for u in unique(components)]
 end

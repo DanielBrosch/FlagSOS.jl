@@ -181,6 +181,9 @@ end
 function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
     if N == :limit
         res = glue(F, G, p)
+        if res === nothing 
+            return QuantumFlag{T, Rational{Int64}}()
+        end
         if labelFlags
             return labelCanonically(res)
         end
@@ -315,13 +318,13 @@ function findUnknownPredicates(
     F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     error("findUnknownPredicates is not defined for Flag type $T")
-    return missing
+    return nothing
 end
 
 function findUnknownGenerationPredicates(
     F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
-) where {T<:Flag,U<:AbstractVector{Int}}
-    return nothing
+    ) where {T<:Flag,U<:AbstractVector{Int}}
+    return predicateType(T)[]
 end
 
 """
@@ -455,6 +458,15 @@ For most combinatoric models this should return `false`.
 """
 function allowMultiEdges(::Type{T}) where {T<:Flag}
     return false
+end
+
+import Base.^
+function ^(F::T, i::Int) where {T<:Flag}
+    @assert i >= 0
+    if i == 0
+        return one(T)
+    end
+    return F * F^(i-1)
 end
 
 include("InducedFlags.jl")

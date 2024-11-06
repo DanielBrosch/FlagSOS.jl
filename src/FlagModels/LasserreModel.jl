@@ -294,7 +294,7 @@ function multiplyPolytabsAndSymmetrize(
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
 
-    combinedOverlaps = Dict([])
+    combinedOverlaps = Dict{Matrix{Int}, D}()
     for (a, b) in newVariant
         # cord = [2:size(a, 1)..., 1]
         # shiftedMat = a[cord, cord]
@@ -328,7 +328,7 @@ function multiplyPolytabsAndSymmetrize(
     end
 
     # reduce using automorphisms
-    combinedOverlapsReduced = Dict{Any,D}([])
+    combinedOverlapsReduced = Dict{Matrix{Int}, D}()
     if useGroups
         @assert limit "TODO: Fix finite case with group speedup"
         #TODO Current solution does reduce it somewhat, but not fully?

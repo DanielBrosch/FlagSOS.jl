@@ -399,14 +399,16 @@ function symPolytabloidProduct(
 
     # factor out the size of the column stabilizer
     fact = prod([factorial(t) for t in conj(t1.part).part])
-
+    # fact = prod([factorial(t) for t in conj(t1.part).part])*prod([factorial(t) for t in conj(t2.part).part])
+    # @show fact
     for j in (m - 1):-1:1
         # First loop depends on order, second does not matter
         for s in (j + 1):m
             usj = u(s, j)
-
+            
             fact *= factorial(usj)
-
+            # @show fact
+            
             for k in 1:usj
                 res2 = Dict{Matrix{T},T}()
                 for (B, c) in res
@@ -419,14 +421,14 @@ function symPolytabloidProduct(
             end
         end
     end
-
+    
     for j in (m - 1):-1:1
         # First loop depends on order, second does not matter
         for s in (j + 1):m
             rsj = r(s, j)
 
             fact *= factorial(rsj)
-
+            
             for k in 1:rsj
                 res2 = Dict{Matrix{T},T}()
                 for (B, c) in res

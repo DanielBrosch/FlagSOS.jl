@@ -36,14 +36,14 @@ end
 @time Gs = generateAll(Graph, 6, 1000)
 @time Gs = generateAll(Graph, 7, 1000) # 3.2s
 @profview Gs = generateAll(Graph, 7, 1000) recur=:flat 
-@profview Gs = generateAll(Graph, 7, 1000) format=:flat
+# @profview Gs = generateAll(Graph, 7, 1000) format=:flat
 
 
 @profview_allocs Gs = generateAll(Graph, 7, 1000) recur=:flat
 
 
 @time Gs = generateAll(Graph, 8, 1000) # 57s
-@time Gs = generateAll(Graph, 9, 1000) # 57s
+# @time Gs = generateAll(Graph, 9, 1000) # 531s, after some optimization
 
 # Profile.clear()
 # @profile Gs = generateAll(Graph, 7, 1000)

@@ -74,7 +74,7 @@ function findUnknownPredicates(
         if length(predLimits) == length(fieldtypes(FT))
             FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[i])
         else
-            FIP = findUnknownPredicates(F.Fs[i], fixed, [predLimits[1]])
+            FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[1])
         end
 
         # @assert length(FIP) == 1
@@ -101,7 +101,7 @@ function findUnknownGenerationPredicates(
         if length(predLimits) == length(fieldtypes(FT))
             FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
         else
-            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, [predLimits[1]])
+            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[1])
         end
         # FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
         # @assert length(FIP) == 1
@@ -218,3 +218,4 @@ function vertexColor(F::ProductFlag{FT}, v::Int) where {FT}
     # @assert length(unique(cs)) == 1
     # return cs[1]
 end
+

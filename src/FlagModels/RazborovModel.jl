@@ -12,7 +12,7 @@ A (not fully symmetry reduced) Razborov-style model. If T is an InducedFlag, the
 mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     basis::Dict{T,Vector{PartiallyLabeledFlag{T}}}
     blockSymmetry::Dict
-    sdpData::Dict{T,Dict{T,SparseMatrixCSC{D,Int}}}
+    sdpData::Dict{T,Dict{Union{T, String},SparseMatrixCSC{D,Int}}}
     parentModel
     quotient
 
@@ -53,11 +53,15 @@ end
 
 function modelSize(m::RazborovModel)
     # return Partition([m.blockSymmetry[b].n for b in keys(m.basis)])
-    return Partition([length(b) for b in values(m.basis)])
+    return Partition(vcat([length(b) for b in values(m.basis)], [1 for _ in m.quotient]))
 end
 
 function modelBlockSizes(m::RazborovModel)
-    return Dict(F => length(b) for (F, b) in m.basis)
+    res = Dict{Any,Int}(F => length(b) for (F, b) in m.basis)
+    for (i, F) in enumerate(m.quotient)
+        res["Q$i"] = -1
+    end
+    return res
 end
 
 function computeUnreducedRazborovBasis(
@@ -350,14 +354,32 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         # Eliminate linear dependencies 
         @info "Eliminating linear dependencies"
 
-        # Fs = sort(collect(keys(m.sdpData)), by = size)
+        Fs::Vector{T} = sort(collect(keys(m.sdpData)); by=size)
         n = maximum(size.(keys(m.sdpData)))
-        Fs = generateAll(T, n, [99999])
+        union!(Fs, generateAll(T, n, [99999]))
+
+        # expandedFs = T[]
+        # for F in Fs
+        #     for m in size(F):n
+        #         push!(expandedFs, labelCanonically(permute(F, 1:m)))
+        #     end
+        # end
+
+        # reduction = quotient(expandedFs, x -> isAllowed(m.parentModel, x))
         reduction = quotient(Fs, x -> isAllowed(m.parentModel, x))
 
         display(reduction)
 
         m.quotient = reduction
+
+        for (i, F) in enumerate(m.quotient)
+            for (G,c) in F.coeff
+                if !haskey(m.sdpData, G)
+                    m.sdpData[G] = Dict() 
+                end
+                m.sdpData[G]["Q$i"] = D[c;;]
+            end
+        end
 
         # for i in size(reduction, 1):-1:1
         #     j = findlast(x -> !iszero(x), reduction[i, :])
@@ -437,56 +459,65 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
     constraints = Dict()
 
     for (mu, n) in b
-        P = m.blockSymmetry[mu].pattern
-        name = "y[$mu]"
-        # t = maximum(P)
-        t = m.blockSymmetry[mu].n
-        if haskey(m.blockSymmetry[mu], :reg)
-            reg = m.blockSymmetry[mu].reg
-            y = @variable(jumpModel, [keys(reg)], base_name = name)
-            AT = typeof(1 * y[1])
+        if n > 0
+            P = m.blockSymmetry[mu].pattern
+            name = "y[$mu]"
+            # t = maximum(P)
+            t = m.blockSymmetry[mu].n
+            if haskey(m.blockSymmetry[mu], :reg)
+                reg = m.blockSymmetry[mu].reg
+                y = @variable(jumpModel, [keys(reg)], base_name = name)
+                AT = typeof(1 * y[1])
 
-            # Y[mu] = zeros(AT, t, t)
-            # for s in keys(reg)
-            #     Y[mu] .+= reg[s]*y[s]
-            # end
-            Y[mu] = sum(reg[s] * y[s] for s in keys(reg))
-            if size(P, 1) > 1
-                constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
-            else
-                constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
-            end
-        else
-            # numVars = maximum(P)
-            # y = @variable(jumpModel, [1:numVars], base_name = name)
-            # AT = typeof(1 * y[1])
-
-            # Y[mu] = zeros(AT, t, t)
-            # # Y[mu] = zeros(AT, size(P))
-            # for s in 1:numVars
-            #     Y[mu][P .== s] .+= y[s]
-            # end
-
-            # Y[mu] = sum((P .== s) * y[s] for s in 1:numVars)
-            # # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
-            # if size(P, 1) > 1
-            #     constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
-            # else
-            #     constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
-            # end
-
-            Y[mu] = get(replaceBlocks, mu) do
-                name = "Y$mu"
-                if n > 1
-                    v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
-                    constraints[name] = @constraint(jumpModel, v in PSDCone())
-                    return v
+                # Y[mu] = zeros(AT, t, t)
+                # for s in keys(reg)
+                #     Y[mu] .+= reg[s]*y[s]
+                # end
+                Y[mu] = sum(reg[s] * y[s] for s in keys(reg))
+                if size(P, 1) > 1
+                    constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
                 else
-                    v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
-                    constraints[name] = @constraint(jumpModel, v .>= 0)
-                    return v
+                    constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+                end
+            else
+                # numVars = maximum(P)
+                # y = @variable(jumpModel, [1:numVars], base_name = name)
+                # AT = typeof(1 * y[1])
+
+                # Y[mu] = zeros(AT, t, t)
+                # # Y[mu] = zeros(AT, size(P))
+                # for s in 1:numVars
+                #     Y[mu][P .== s] .+= y[s]
+                # end
+
+                # Y[mu] = sum((P .== s) * y[s] for s in 1:numVars)
+                # # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
+                # if size(P, 1) > 1
+                #     constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+                # else
+                #     constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+                # end
+
+                Y[mu] = get(replaceBlocks, mu) do
+                    name = "Y$mu"
+                    if n > 1
+                        v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
+                        constraints[name] = @constraint(jumpModel, v in PSDCone())
+                        return v
+                    else
+                        v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
+                        constraints[name] = @constraint(jumpModel, v .>= 0)
+                        return v
+                    end
                 end
             end
+        else
+            y = @variable(jumpModel, [1:1,1:1], base_name = mu)
+            Y[mu] = y
+            # i = parse(Int,mu[2:end])
+            # for (G, c) in m.quotient[i].coeff
+            #     graphCoefficients[G] = get(graphCoefficients, G, 0 * c * y) + c * y
+            # end
         end
     end
 
@@ -505,14 +536,6 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
             end
         end
         graphCoefficients[G] = eG
-    end
-
-    for (i, F) in enumerate(m.quotient)
-        y = @variable(jumpModel, base_name = "quotient$i")
-        Y["Q$i"] = y
-        for (G, c) in F.coeff
-            graphCoefficients[G] = get(graphCoefficients, G, 0 * c * y) + c * y
-        end
     end
 
     return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
@@ -722,23 +745,28 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
             )
         end
 
-        println(io, "Quotient:")
-        for (i, c) in enumerate(m.quotient)
-            if haskey(sol, "Q$i") && !iszero(sol["Q$i"])
-                print(io, "$(sol["Q$i"]) ⋅ ($c) ")
-                println(io, "=$(Rational{BigInt}(sol["Q$i"])*c)= 0")
+        if length(m.quotient) > 0
+            println(io, "Quotient:")
+            for (i, c) in enumerate(m.quotient)
+                if haskey(sol, "Q$i") && !iszero(sol["Q$i"])
+                    print(io, "$(sol["Q$i"]) ⋅ ($c) ")
+                    println(io, "=$(Rational{BigInt}(sol["Q$i"])*c)= 0")
+                end
             end
+            println(io, "Quotient sum:")
+            println(
+                io,
+                "$(sum(enumerate(m.quotient)) do (i, F)
+        Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
+    end)=0",
+            )
         end
-        println(io, "Quotient sum:")
-        println(
-            io,
-            "$(sum(enumerate(m.quotient)) do (i, F)
-    Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
-end)=0",
-        )
     end
 
     res = sum(m.sdpData) do (G, B)
+        if mu isa String 
+            return BigInt(0)//1
+        end
         sum(B) do (mu, b)
             if haskey(sol, mu)
                 psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd

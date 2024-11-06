@@ -202,28 +202,39 @@ end
 # E.g. adding isolated vertices results in a quantum flag equivalent to the original flag
 function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
     oneVert = permute(T(), [1])
-    @show oneVert
+    # @show oneVert
 
-    @show Fs
+    # @show Fs
 
-    n = maximum(size.(Fs); init = 1)
+    n = maximum(size.(Fs); init=1)
 
-    res = QuantumFlag{T, Rational{Int}}[]
+    res = QuantumFlag{T,Rational{Int}}[]
     # res = Dict()
     for f in Fs
-        size(f) == n && continue
-        tmp = oneVert * f
-        if any(tmp.coeff) do (G, _)
-            isAllowed(G) && !in(G, Fs)
+        for newVerts in 1:2
+            size(f) == n && continue
+            if newVerts == 1
+                tmp = labelCanonically(oneVert * f - 1//1 * f)
+            else
+                tmp = labelCanonically(oneVert * (oneVert * f) - 1//1 * f)
+            end
+            # @show tmp
+            if any(tmp.coeff) do (G, _)
+                isAllowed(G) && !in(G, Fs)
+            end
+                @info "Missing some flags to eliminate product of $f"
+                continue
+            end
+            # res[f] = tmp
+            filter!(x -> isAllowed(x.first), tmp.coeff)
+            # @show length(res) + 1
+            # @show f
+            # @show oneVert * f
+            if !iszero(tmp)
+                push!(res, labelCanonically(tmp))
+            end
+            break
         end
-            @info "Missing some flags to eliminate product of $f"
-            continue
-        end
-        # res[f] = tmp
-        @show length(res) + 1
-        @show f 
-        @show oneVert * f
-        push!(res, tmp - 1//1 * f)
     end
     return res
     # n = length(Fs)
