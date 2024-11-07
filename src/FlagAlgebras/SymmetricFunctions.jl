@@ -108,11 +108,11 @@ function findUnknownPredicates(
     return [[LabelPredicate(i) for i in 1:size(F) if !any((i in part) for part in fixed)]]
 end
 
-function findUnknownGenerationPredicates(
-    F::SymmetricFunction, fixed::Vector{U}, predLimits::Vector
-) where {U<:AbstractVector{Int}}
-    return findUnknownPredicates(F, fixed, predLimits)
-end
+# function findUnknownGenerationPredicates(
+#     F::SymmetricFunction, fixed::Vector{U}, predLimits::Vector
+# ) where {U<:AbstractVector{Int}}
+#     return findUnknownPredicates(F, fixed, predLimits)
+# end
 
 function isSym(F::SymmetricFunction, v1::Int, v2::Int)::Bool
     return get(F.exponents, v1, 0) == get(F.exponents, v2, 0)

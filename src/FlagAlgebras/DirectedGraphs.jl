@@ -102,6 +102,7 @@ function glue(
 
     # res = BitMatrix(zeros(Bool, n, n))
     res = BitMatrix(undef, n, n)
+    res .= 0
     @views res[1:n2, 1:n2] = g2.A
     @views res[p[1:n1], p[1:n1]] .|= g1.A
 

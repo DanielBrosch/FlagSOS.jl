@@ -13,6 +13,19 @@ struct ProductFlag{FT} <: Flag where {FT<:Tuple{Vararg{Flag}}}
     ProductFlag{FT}() where {FT} = new{FT}(Tuple(F() for F in fieldtypes(FT)))
 end
 
+function Base.show(io::IO, F::ProductFlag)
+    print(io, "(")
+    first = true
+    for f in F.Fs
+        if !first
+            print(io, ",")
+        end
+        print(io, f)
+        first = false 
+    end
+    print(io, ")")
+end
+
 import Base.==
 function ==(A::ProductFlag{FT}, B::ProductFlag{FT}) where {FT}
     return all(A.Fs[i] == B.Fs[i] for i = 1:length(A.Fs))
@@ -60,8 +73,8 @@ function findUnknownPredicates(
 
         if length(predLimits) == length(fieldtypes(FT))
             FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[i])
-        else 
-            FIP = findUnknownPredicates(F.Fs[i], fixed, [predLimits[1]])
+        else
+            FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[1])
         end
 
         # @assert length(FIP) == 1
@@ -87,8 +100,8 @@ function findUnknownGenerationPredicates(
         # end
         if length(predLimits) == length(fieldtypes(FT))
             FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
-        else 
-            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, [predLimits[1]])
+        else
+            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[1])
         end
         # FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
         # @assert length(FIP) == 1
@@ -106,7 +119,7 @@ function addPredicates(
     G::ProductFlag{FT}, preds::Vector{Tuple{Int,P}}) where {FT,P}
     tmp = []
     for (i, F) in enumerate(G.Fs)
-        newF = addPredicates(F, [p[2] for p in preds if p[1] == i])
+        newF = addPredicates(F, predicateType(typeof(F))[p[2] for p in preds if p[1] == i])
         push!(tmp, newF)
     end
 
@@ -156,7 +169,11 @@ end
 function permute(
     F::ProductFlag{FT}, p::AbstractVector{Int}
 ) where {FT}
-    return ProductFlag{FT}(Tuple(permute(f, p) for f in F.Fs))
+    pF = [permute(f, p) for f in F.Fs]
+    if any(x -> x === nothing, pF)
+        return nothing
+    end
+    return ProductFlag{FT}(Tuple(pF))
 end
 
 function countEdges(F::ProductFlag)
@@ -180,13 +197,13 @@ end
 
 function vertexColor(F::ProductFlag{FT}, v::Int) where {FT}
     # colorCombinations = sort!(unique([[vertexColor(f, i) for f in F.Fs] for i = 1:size(F)]))
-    
+
     cs = hash(Int[vertexColor(f, v) for f in F.Fs])
     colorCombinations = UInt[cs]
     # colorCombinations = Vector{Int}[cs]
-    
+
     for i = 1:size(F)
-        if i != v 
+        if i != v
             ct = hash(Int[vertexColor(f, i) for f in F.Fs])
             if !(ct in colorCombinations)
                 push!(colorCombinations, ct)
@@ -196,8 +213,9 @@ function vertexColor(F::ProductFlag{FT}, v::Int) where {FT}
     sort!(colorCombinations)
 
 
-    return findfirst(x->x==cs, colorCombinations)
+    return findfirst(x -> x == cs, colorCombinations)
 
     # @assert length(unique(cs)) == 1
     # return cs[1]
 end
+

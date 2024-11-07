@@ -6,7 +6,10 @@ export FlagModel,
     addEquality!,
     buildStandardModel,
     addRazborovBlock!,
-    addBinomialBlock!
+    addBinomialBlock!,
+    buildClusteredLowRankModel
+
+using ClusteredLowRankSolver
 
 """
     FlagModel{T <: Flag, N, D} <: AbstractFlagModel{T, N, D}
@@ -39,7 +42,7 @@ function Base.show(io::IO, m::FlagModel{T,N,D}) where {T,N,D}
     if m.objective !== nothing
         println(io, "Objective: $(m.objective)")
     end
-    Base.show.(io, m.subModels)
+    return Base.show.(io, m.subModels)
 end
 
 function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
@@ -87,7 +90,7 @@ function addLasserreBlock!(
     push!(m.subModels, lM)
 
     Fs = generateAll(T, Int(floor(maxVertices / 2)), Int.(floor.(maxEdges / 2)))
-    # @show Fs
+    display(Fs)
     for F in Fs
         if isAllowed(m, F)
             addFlag!(lM, F)
@@ -97,7 +100,9 @@ function addLasserreBlock!(
     return lM
 end
 
-function addRazborovBlock!(m::FlagModel{T,N,D}, lvl; maxLabels=lvl, maxBlockSize=Inf) where {T<:Flag,N,D}
+function addRazborovBlock!(
+    m::FlagModel{T,N,D}, lvl; maxLabels=lvl, maxBlockSize=Inf
+) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
     computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize)
@@ -187,7 +192,7 @@ function addEquality!(
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
     maxVertices=size(g) +
-                floor((maxEdges - countEdges(g)[2]) / 2) * maxPredicateArguments(T),
+                (maxEdges - countEdges(g)[2]) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
@@ -220,7 +225,7 @@ function addEquality!(
     g::QuantumFlag{T,D},
     maxEdges;
     maxVertices=size(g) +
-                floor((maxEdges - countEdges(g)[1]) / 2) * maxPredicateArguments(T),
+                (maxEdges - countEdges(g)[1]) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
@@ -260,6 +265,7 @@ function buildJuMPModel(
     end
 
     if addBoundVars
+        @warn "Adding bound variables"
         for F in keys(variables)
             fl = @variable(jumpModel, base_name = "lower$F", lower_bound = 0)
             fu = @variable(jumpModel, base_name = "upper$F", lower_bound = 0)
@@ -330,7 +336,9 @@ function modelBlockSizes(m::FlagModel)
     return res
 end
 
+
 function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
+    #TODO: Quotient when using InducedFlags
     obj = labelCanonically(m.objective)
     vars = union([collect(keys(sM.sdpData)) for sM in m.subModels]...)
     filter!(F -> isAllowed(m, F), vars)
@@ -358,23 +366,72 @@ function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
     return (obj=obj, vars=vars, blocks=blocks, blockSizes=blockSizes)
 end
 
+function buildClusteredLowRankModel(m::FlagModel{T,N,D}) where {T,N,D}
+
+    obj, vars, blocks, blockSizes = buildStandardModel(m)
+    o = T()
+
+
+    varDicts = Dict(
+        G => Dict{Any, Any}(
+            mu => Matrix(B[G])
+            for (mu, B) in blocks if haskey(B, G) && blockSizes[mu] > 0
+        )
+        for G in vars
+    )
+
+    # bound variables
+    # for G in vars
+    #     if G != o
+    #         varDicts[G][(:lower, G)] = [1;;]
+    #         varDicts[G][(:upper, G)] = [-1;;]
+    #         varDicts[o][(:upper, G)] = [1;;]
+    #     end
+    # end
+
+    freeVarDicts = Dict(
+        G => Dict(
+            mu => B[G][1, 1]
+            for (mu, B) in blocks if haskey(B, G) && blockSizes[mu] < 0
+        )
+        for G in vars
+    )
+
+
+
+    clObj = Objective(get(obj.coeff, o, 0), get(varDicts, o, Dict()), freeVarDicts[o])
+    clCons = Constraint[]
+
+    for G in vars
+        G == o && continue
+        # @show G
+        # display(varDicts[G])
+        # display(freeVarDicts[G])
+        c = Constraint(get(obj.coeff, G, 0), varDicts[G], freeVarDicts[G])
+        # @show c
+        push!(clCons, c)
+    end
+
+    return Problem(Minimize(clObj), clCons)
+end
+
 function facialReduction(m::AbstractFlagModel)
     return error("TODO")
 end
 
-function verifySOS(
-    m::FlagModel{T,N,D}, sol::Vector; io::IO=stdout
-) where {T,N,D}
+function verifySOS(m::FlagModel{T,N,D}, sol::Vector; io::IO=stdout) where {T,N,D}
     @assert length(sol) == length(m.subModels)
 
     Base.show(io, m)
     println()
-    
-    tmp = sum(verifySOS(m.subModels[i], sol[i]; io=io) for i in 1:length(m.subModels))
-    
+
+    tmp = labelCanonically(
+        sum(verifySOS(m.subModels[i], sol[i]; io=io) for i in 1:length(m.subModels))
+    )
+
     println(io, "SOS result:")
     println(io, "$(tmp) >= 0")
-    
+
     err = Rational{BigInt}(0)
     constTerm = Rational{BigInt}(0)
     for (F, c) in tmp.coeff
@@ -393,17 +450,20 @@ function verifySOS(
 
     println(io, "\nSummary:")
     Base.show(io, m)
-    
+
     println(io, "Constant:")
     println(io, "$(constTerm)")
-    
+
     println(io, "Error:")
     println(io, "$(err)")
-    
+
+    if haskey(m.objective.coeff, T())
+        constTerm -= m.objective.coeff[T()]
+    end
     res = constTerm + err + m.objective
     println(io, "Final rigorous bound:")
     println(io, "$(res) >= 0")
-    
+
     println(io, "Floating point bound (rounded appropriately):")
     first = true
     for (g, cR) in res.coeff

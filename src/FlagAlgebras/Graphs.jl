@@ -1,4 +1,4 @@
-export Graph
+export Graph, connectedComponents
 
 """ 
     $(TYPEDEF)
@@ -12,6 +12,25 @@ struct Graph <: Flag
     Graph(A::Symmetric{Bool,BitMatrix}) = new(A)
     Graph(A::BitMatrix) = new(Symmetric(A))
     Graph() = new(Symmetric(BitMatrix(undef, 0, 0)))
+end
+
+function Base.show(io::IO, G::Graph)
+    if size(G.A,1) == 0
+        print(io, "∅ ")
+    else
+        print(io, "($(size(G.A,1)),")
+        first = true 
+        for c in eachindex(G.A)
+            if c[1] <= c[2] && G.A[c]
+                if !first 
+                    print(io, " ")
+                end
+                print(io, "$(c[1])-$(c[2])")
+                first = false
+            end
+        end
+        print(io, ")")
+    end
 end
 
 import Base.==
@@ -53,18 +72,24 @@ end
 function findUnknownPredicates(
     F::Graph, fixed::Vector{U}, predLimits::Vector
 )::Vector{Vector{EdgePredicate}} where {U<:AbstractVector{Int}}
-    @assert length(predLimits) in [0,1]
+    @assert length(predLimits) in [0, 1]
     res = EdgePredicate[]
     if length(predLimits) == 1 && countEdges(F)[1] >= predLimits[1]
-        return [res] 
+        return [res]
     end
     for e in combinations(1:size(F), 2)
-        if (!F.A[e...]) && !any(issubset(e, f) for f in fixed)
+        if (!F.A[e[1], e[2]]) && !any(issubset(e, f) for f in fixed)
             push!(res, EdgePredicate(e...))
         end
     end
     return [res]
 end
+
+# function findUnknownGenerationPredicates(
+#     F::Graph, fixed::Vector{U}=Vector{Int}[], predLimits::Vector=Int[]
+# ) where {U<:AbstractVector{Int}}
+#     return findUnknownPredicates(F, fixed, predLimits)
+# end
 
 function addPredicates(G::Graph, preds::Vector{EdgePredicate})
     A = Matrix(copy(G.A))
@@ -190,7 +215,7 @@ function isBipartite(F::Graph)
 end
 
 function distinguish(F::Graph, v::Int, W::BitVector)::UInt
-    @views return hash(sum(F.A[W, v]))
+    @inbounds return hash(sum(F.A[W, v]))
 end
 
 function distinguish(F::EdgePredicate, v::Int, W::BitVector)::UInt
@@ -202,5 +227,39 @@ function countEdges(F::Graph)::Vector{Int}
 end
 
 function isolatedVertices(F::Graph)::BitVector
-    return vec(.!any(F.A; dims=1))
+    # res = BitVector(zeros(Bool, size(F)))
+    res = BitArray(undef, size(F))
+    any!(res, F.A)
+    map!(!, res, res)
+    # return .!vec(any(F.A; dims=1))
+    return res
+end
+
+function connectedComponents(G::Graph)::Vector{Graph}
+    n = size(G)
+
+    if n == 0
+        return [G]
+    end
+
+    components = zeros(Int, n)
+    nComp = 0
+    for i = 1:n
+        if components[i] == 0
+            nComp += 1
+            components[i] = nComp
+        end
+        for j = i+1:n
+            if G.A[i,j] == 1
+                if components[j] == 0
+                    components[j] = components[i]
+                else
+                    c = minimum(components[[i,j]])
+                    d = maximum(components[[i,j]])
+                    components[components.==d] .= c
+                end
+            end
+        end
+    end
+    return [subFlag(G, findall(x->x==u, components)) for u in unique(components)]
 end

@@ -62,6 +62,16 @@ struct FlagSymmetries{T<:Flag}
     end
 end
 
+import Base.==
+function ==(A::FlagSymmetries, B::FlagSymmetries)
+    return A.F == B.F
+end
+import Base.hash
+function hash(A::FlagSymmetries, h::UInt)
+    return hash(A.F, hash(:FlagSymmetries, h))
+end
+
+
 struct SpechtFlag{T<:Flag}
     F::FlagSymmetries{T}
     T::AbstractAlgebra.Generic.YoungTableau{Int}
@@ -96,6 +106,13 @@ mutable struct LasserreModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
             parent,
         )
     end
+end
+
+function Base.show(io::IO, m::LasserreModel{T,N,D}) where {T,N,D}
+    return println(
+        io,
+        "Lasserre style blocks based on $(length(m.generators)) different flags with $(length(m.basis)) blocks",
+    )
 end
 
 function modelSize(m::LasserreModel)
@@ -277,7 +294,7 @@ function multiplyPolytabsAndSymmetrize(
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
 
-    combinedOverlaps = Dict([])
+    combinedOverlaps = Dict{Matrix{Int}, D}()
     for (a, b) in newVariant
         # cord = [2:size(a, 1)..., 1]
         # shiftedMat = a[cord, cord]
@@ -311,7 +328,7 @@ function multiplyPolytabsAndSymmetrize(
     end
 
     # reduce using automorphisms
-    combinedOverlapsReduced = Dict{Any,D}([])
+    combinedOverlapsReduced = Dict{Matrix{Int}, D}()
     if useGroups
         @assert limit "TODO: Fix finite case with group speedup"
         #TODO Current solution does reduce it somewhat, but not fully?
@@ -500,7 +517,7 @@ end
 function computeSDP!(m::LasserreModel{T,N,D}, reservedVerts::Int) where {T,N,D}#; maxVert = -1, useGroups = true, splitByOverlaps = false)
     #TODO: Parallelize better
 
-    totalNum = Int64(sum(c * (c + 1) / 2 for c in length.(values(m.basis)); init = 0))
+    totalNum = Int64(sum(c * (c + 1) / 2 for c in length.(values(m.basis)); init=0))
 
     t = 1
 
@@ -649,4 +666,106 @@ function buildJuMPModel(
 
 
     return (model=jumpModel, variables=graphCoefficients, blocks=Y, constraints=constraints)
+end
+
+function roundResults(m::LasserreModel{T,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5) where {T,N,D}
+    ex = Dict()
+
+    den = round(BigInt, 1 / prec)
+    function roundDen(x)
+        return round(BigInt, den * x) // den
+    end
+
+    for (mu, b) in blocks
+        if mu isa String
+            # ex[mu] = rationalize(BigInt, value(b); tol=prec)#; digits = digits)
+            ex[mu] = roundDen(value(b))
+        else
+            ex[mu] = roundRationalPSD(value(b); baseType=BigInt, prec=prec)
+        end
+    end
+
+    return ex
+end
+
+function verifySOS(m::LasserreModel, sol::Dict; io::IO=stdout)
+    if io !== nothing
+        println(io, "Lasserre model")
+
+        for mu in keys(sol)
+            if mu isa String
+                continue
+            end
+
+            println(io, "\nBlock of type $mu with flags:")
+            println.(io, m.basis[mu])
+
+            println(io, "PSD matrix:")
+            psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
+            show(io, "text/plain", psd)
+            println(io)
+            if !(sol[mu] isa Matrix) && size(sol[mu].psd, 1) > 1
+                println(io, "With Cholesky factorization:")
+                show(io, "text/plain", sol[mu].chol)
+                println(io)
+            end
+
+            println(io, "Nonzero flag products:")
+            n = size(m.basis[mu], 1)
+            # @show mu
+            # @show sol[mu]
+            psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
+            for i in 1:n
+                for j in i:n
+                    if !iszero(psd[i, j])
+                        tmp = sum(m.sdpData) do (G, B)
+                            if haskey(B, mu)
+                                return Rational{BigInt}(Symmetric(B[mu])[i, j]) * G
+                            else
+                                return BigInt(0) // 1 * G
+                            end
+                        end
+                        print(
+                            io,
+                            "Product at $((i,j)) is $(psd[i,j]) ⋅ $(m.basis[mu][i]) ⋅ $(m.basis[mu][j]) ",
+                        )
+                        # println(io, "$(psd[i,j]) ⋅ ($tmp)")
+                        println(io, "=$(Rational{BigInt}(psd[i,j])*tmp)")
+                    end
+                end
+            end
+            println(io, "Block $mu total:")
+            println(
+                io,
+                "$(sum(m.sdpData) do (G, B)
+             if haskey(B, mu)
+                 return dot(B[mu], psd) * G
+             else
+                 return BigInt(0) // 1 * G
+             end
+         end)>=0",
+            )
+        end
+
+
+    end
+
+    res = sum(m.sdpData) do (G, B)
+        sum(B) do (mu, b)
+            if haskey(sol, mu)
+                psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
+                return dot(Rational{BigInt}.(psd), Symmetric(b)) * G
+            else
+                return BigInt(0) // 1 * G
+            end
+        end
+    end
+
+    if io !== nothing
+        println(io, "\nLasserre model result:")
+        println(io, "$(res)>= 0")
+        println(io)
+    end
+
+    return res
 end

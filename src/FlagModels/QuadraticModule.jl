@@ -33,6 +33,17 @@ mutable struct QuadraticModule{T<:Flag,U<:Flag,B,N,D} <:
     end
 end
 
+function Base.show(io::IO, m::QuadraticModule{T,U,B,N,D}) where {T,U,B,N,D}
+    println(io, "Quadratic module for inequality $(m.inequality)>=0\nWith base model:")
+    return println(io, m.baseModel)
+end
+
+function roundResults(
+    m::QuadraticModule{T,U,B,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5
+) where {T,U,N,D,B}
+    return roundResults(m.baseModel, jumpModel, variables, blocks, constraints)
+end
+
 function computeSDP!(
     m::QuadraticModule{T,U,B,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
@@ -70,7 +81,9 @@ function modelBlockSizes(m::QuadraticModule)
     return modelBlockSizes(m.baseModel)
 end
 
-function buildJuMPModel(m::QuadraticModule{T,U,B,N,D}, replaceBlocks=Dict(), jumpModel=Model()) where {T,U,B,N,D}
+function buildJuMPModel(
+    m::QuadraticModule{T,U,B,N,D}, replaceBlocks=Dict(), jumpModel=Model()
+) where {T,U,B,N,D}
     b = modelBlockSizes(m)
     Y = Dict()
     constraints = Dict()
@@ -157,12 +170,14 @@ mutable struct EqualityModule{T<:Flag,U<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     end
 end
 
-function roundResults(m::EqualityModule{T,U,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5) where {T,U,N,D}
+function roundResults(
+    m::EqualityModule{T,U,N,D}, jumpModel, variables, blocks, constraints; prec=1e-5
+) where {T,U,N,D}
     ex = Dict()
 
-    den = round(BigInt, 1/prec)
+    den = round(BigInt, 1 / prec)
     function roundDen(x)
-        return round(BigInt, den*x)//den
+        return round(BigInt, den * x)//den
     end
 
     for (mu, b) in blocks
@@ -173,10 +188,11 @@ function roundResults(m::EqualityModule{T,U,N,D}, jumpModel, variables, blocks, 
     return ex
 end
 
-
-
 function Base.show(io::IO, m::EqualityModule{T,U,N,D}) where {T,U,N,D}
-    println(io, "Equality constraint ($(m.equality) == 0) multiplied with $(length(m.basis)) flags.")
+    return println(
+        io,
+        "Equality constraint ($(m.equality) == 0) multiplied with $(length(m.basis)) flags.",
+    )
 end
 
 function computeSDP!(
@@ -217,7 +233,9 @@ function modelBlockSizes(m::EqualityModule)
     return Dict(i => -1 for i in 1:length(m.basis))
 end
 
-function buildJuMPModel(m::EqualityModule{T,U,N,D}, replaceBlocks=Dict(), jumpModel=Model()) where {T,U,N,D}
+function buildJuMPModel(
+    m::EqualityModule{T,U,N,D}, replaceBlocks=Dict(), jumpModel=Model()
+) where {T,U,N,D}
     @assert length(replaceBlocks) == 0
 
     b = modelBlockSizes(m)
@@ -266,25 +284,46 @@ function verifySOS(m::EqualityModule, sol::Dict; io::IO=stdout)
     println(io, "Equality module coming from constraint")
     println(io, "$(m.equality)= 0")
     for i in keys(sol)
-        if sol[i] != 0 // 1
+        if sol[i] != 0//1
             println(io, "Times $(sol[i])$(m.basis[i]) :")
-            print(io, sum(m.sdpData) do (G, B)
-                sum(B) do (j, c)
-                    j != i && return 0 * one(G)
-                    get(sol, j, 0 // 1) * c * G
-                end
-            end
+            print(
+                io,
+                sum(m.sdpData) do (G, B)
+                    sum(B) do (j, c)
+                        j != i && return 0 * one(G)
+                        get(sol, j, 0//1) * c * G
+                    end
+                end,
             )
             println(io, "= 0")
         end
     end
     res = sum(m.sdpData) do (G, B)
         sum(B) do (i, c)
-            get(sol, i, 0 // 1) * c * G
+            get(sol, i, 0//1) * c * G
         end
     end
     println(io, "Equality module result:")
     println(io, "$(res)= 0")
     println(io)
-    res
+    return res
+end
+
+function verifySOS(
+    m::QuadraticModule{T,U,B,N,D}, sol::Dict; io::IO=stdout
+) where {T,U,B,N,D}
+    println(io, "Quadratic module coming from constraint")
+    println(io, "$(m.inequality)>= 0")
+    println(io, "With base model:")
+    res = verifySOS(m.baseModel, sol; io=io)
+
+    res = labelCanonically(typeof(res)(m.inequality) * res)
+
+    if io !== nothing
+        println(io, "\nQuadratic module result:")
+        println(io, "$(res)>= 0")
+        println(io)
+    end
+
+    return res
 end

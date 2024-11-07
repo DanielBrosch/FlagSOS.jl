@@ -829,7 +829,7 @@ function isSym(g::BinaryTreeFlag, v1::Int, v2::Int)::Bool
     return isSym(g.tree, v1p, v2p)
 end
 
-function subFlag(F::BinaryTree, vertices::AbstractVector{Int})
+function subFlag(F::BinaryTree, vertices::AbstractVector{Int})::BinaryTree
     if length(vertices) == 0
         return BinaryTree()
     end
@@ -879,7 +879,7 @@ function subFlag(F::BinaryTree, vertices::AbstractVector{Int})
 end
 
 
-function subFlag(F::BinaryTreeFlag, vertices::AbstractVector{Int})
+function subFlag(F::BinaryTreeFlag, vertices::AbstractVector{Int})::BinaryTreeFlag
 
     # @show F 
     # @show vertices

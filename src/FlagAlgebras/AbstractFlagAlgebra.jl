@@ -181,6 +181,9 @@ end
 function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
     if N == :limit
         res = glue(F, G, p)
+        if res === nothing 
+            return QuantumFlag{T, Rational{Int64}}()
+        end
         if labelFlags
             return labelCanonically(res)
         end
@@ -285,7 +288,7 @@ end
 Returns the sub-Flag indexed by `vertices`, which is a subset of `1:size(F)`.
 """
 function subFlag(F::T, vertices::AbstractVector{Int})::T where {T<:Flag}
-    error("subFlag is not defined for Flag type $T")
+    error("subFlag is not defined for Flag type T")
     return missing
 end
 
@@ -315,13 +318,13 @@ function findUnknownPredicates(
     F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     error("findUnknownPredicates is not defined for Flag type $T")
-    return missing
+    return nothing
 end
 
 function findUnknownGenerationPredicates(
     F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
-) where {T<:Flag,U<:AbstractVector{Int}}
-    return nothing
+    ) where {T<:Flag,U<:AbstractVector{Int}}
+    return predicateType(T)[]
 end
 
 """
@@ -336,7 +339,7 @@ function countEdges(F::T)::Vector{Int} where {T<:Flag}
 end
 
 """
-    isolatedVertices(F::T)::Vector{Int} where{T<:Flag}
+    isolatedVertices(F::T)::BitVector where{T<:Flag}
 
 Returns the indicator vector of isolated vertices of `F`.
 """
@@ -457,6 +460,15 @@ function allowMultiEdges(::Type{T}) where {T<:Flag}
     return false
 end
 
+import Base.^
+function ^(F::T, i::Int) where {T<:Flag}
+    @assert i >= 0
+    if i == 0
+        return one(T)
+    end
+    return F * F^(i-1)
+end
+
 include("InducedFlags.jl")
 include("Graphs.jl")
 include("ConstantWeightCodes.jl")
@@ -467,4 +479,5 @@ include("EdgeMarkedFlags.jl")
 include("SymmetricFunctions.jl")
 include("HarmonicFlags.jl")
 include("ProductFlag.jl")
+include("FreeVariables.jl")
 include("PartiallyColoredFlags.jl")

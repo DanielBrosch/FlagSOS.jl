@@ -40,7 +40,9 @@ function permute(
 )::PartiallyLabeledFlag{T} where {T<:Flag}
     F.n > 0 && @assert 1:(F.n) == p[1:(F.n)]
 
-    return PartiallyLabeledFlag{T}(permute(F.F, p), F.n)
+    tmp = permute(F.F, p)
+
+    return PartiallyLabeledFlag{T}(tmp, F.n)
 end
 
 function permute(pred::LabelPredicate, p::AbstractVector{Int})
@@ -101,7 +103,7 @@ function glue(
     FG === nothing && return nothing
 
     if FG isa QuantumFlag
-        return QuantumFlag(PartiallyLabeledFlag{T}(f, max(F.n, G.n)) => d for (f, d) in FG.coeff)
+        return QuantumFlag{PartiallyLabeledFlag{T}, typeof(FG).parameters[2]}(PartiallyLabeledFlag{T}(f, max(F.n, G.n)) => d for (f, d) in FG.coeff)
     end
     return PartiallyLabeledFlag{T}(FG, max(F.n, G.n))
 end
@@ -245,7 +247,7 @@ function toInduced(F::Union{PartiallyLabeledFlag{T}, QuantumFlag{PartiallyLabele
     tmp = zeta(F)
     res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T}}, Int}()
     for (G,c) in tmp.coeff
-        res += c*PartiallyLabeledFlag{InducedFlag{T}}(InducedFlag(G.F), G.n)
+        res += c*PartiallyLabeledFlag{InducedFlag{T}}(InducedFlag{T}(G.F), G.n)
     end
     return res
 end
