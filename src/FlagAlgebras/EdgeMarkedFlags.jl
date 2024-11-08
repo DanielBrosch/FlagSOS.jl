@@ -89,7 +89,8 @@ function addPredicates(
 end
 
 function permute(F::EdgeMarkedFlag{T,P}, p::AbstractVector{Int}) where {T<:Flag,P}
-    return EdgeMarkedFlag{T}(permute(F.F, p), P[permute(e, p) for e in F.marked])
+    Fp = permute(F.F, p)
+    return EdgeMarkedFlag{T}(Fp, P[permute(e, p, F.F, Fp) for e in F.marked])
 end
 
 function maxPredicateArguments(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P<:Predicate}
@@ -117,13 +118,18 @@ end
 function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}) where {T<:Flag,P}
     res = Dict{EdgeMarkedFlag{T,P},Int}()
     for e in F.marked
-        added = addPredicates(F.F, [e])
-        if added !== nothing
-            markedN = P[p for p in F.marked if p != e && isAllowed(added, p)]
-            # markedN = setdiff(F.marked, [e])#filter!(x -> isAllowed(added, x), setdiff(F.marked, [e]))
-            Fn = EdgeMarkedFlag{T}(added, markedN)
-            Fl = labelCanonically(Fn)
-            res[Fl] = get(res, Fl, 0) + 1
+        newF = addPredicates(F.F, [e])
+        if !(newF isa Vector)
+            newF = [newF]
+        end
+        for added in newF
+            if added !== nothing
+                markedN = P[p for p in F.marked if p != e && isAllowed(added, p)]
+                # markedN = setdiff(F.marked, [e])#filter!(x -> isAllowed(added, x), setdiff(F.marked, [e]))
+                Fn = EdgeMarkedFlag{T}(added, markedN)
+                Fl = labelCanonically(Fn)
+                res[Fl] = get(res, Fl, 0) + 1
+            end
         end
     end
     return res
@@ -171,17 +177,17 @@ end
 Computes the moebius transform of an edge-marked flag on the marked edges. 
 """
 function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicate}
+    # @show F
     res = 0 * F.F
     k = length(F.marked)
     if k == 0
         return 1 * F.F
     end
 
-    tmp = Dict{EdgeMarkedFlag{T,P},Int}(F => 1)
-    tmp2 = Dict{EdgeMarkedFlag{T,P},Int}()
+    tmp = Dict{EdgeMarkedFlag{T,P},Rational{Int}}(F => 1)
+    tmp2 = Dict{EdgeMarkedFlag{T,P},Rational{Int}}()
 
     for flippedEdges in 0:k
-        # @show flippedEdges
         for (F2, c2) in tmp
             res += c2 * (-1)^flippedEdges * F2.F
             for (F3, c3) in allWaysToAddOneMarked(F2)
@@ -190,7 +196,7 @@ function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicat
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
-        map!(x -> Int(x//(flippedEdges + 1)), values(tmp2))
+        map!(x -> x//(flippedEdges + 1), values(tmp2))
         if label
             empty!(tmp)
             for (F, c) in tmp2

@@ -42,6 +42,11 @@ function permute(pred::P, p::AbstractVector{Int}) where {P<:Predicate}
     return nothing
 end
 
+# Optional third and fourth argument: flag which this predicate is permuted with, before and after. Does potentially change the color in colorblind EdgeColoredGraphs
+function permute(pred::P, p::AbstractVector{Int}, ::T, ::T) where {P<:Predicate, T<:Flag}
+    return permute(pred, p)
+end
+
 """
     addPredicates(::T, ::U, ::Vararg{U} where {T<:Flag,U<:Predicate}
 
@@ -403,6 +408,7 @@ Checks if two flags are isomorphic.
 """
 function isIsomorphic(F::T, G::T) where {T<:Flag}
     # Can be optimized! Do not need to run the full algorithm.
+    countEdges(F) != countEdges(G) && return false
     return labelCanonically(F) == labelCanonically(G)
 end
 
@@ -473,6 +479,7 @@ include("InducedFlags.jl")
 include("Graphs.jl")
 include("ConstantWeightCodes.jl")
 include("DirectedGraphs.jl")
+include("EdgeColoredGraphs.jl")
 include("PartiallyLabeledFlags.jl")
 include("BinaryTrees.jl")
 include("EdgeMarkedFlags.jl")

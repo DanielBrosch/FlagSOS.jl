@@ -54,7 +54,7 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
         while cell <= maximum(coloring)
             vertDistinguish .= 0
             # curCell .= coloring .== cell
-            for i = 1:n
+            for i in 1:n
                 curCell[i] = coloring[i] == cell
             end
 
@@ -81,12 +81,12 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
             end
 
             # coloring[coloring .> cell] .+= numNewCells
-            for i in length(alpha):-1:(cell+numNewCells+1)
-                alpha[i] = alpha[i-numNewCells]
+            for i in length(alpha):-1:(cell + numNewCells + 1)
+                alpha[i] = alpha[i - numNewCells]
             end
             # @views alpha[(cell + numNewCells + 1):end] .= alpha[(cell + 1):(end - numNewCells)]
 
-            alpha[(cell+1):(cell+numNewCells)] .= true
+            alpha[(cell + 1):(cell + numNewCells)] .= true
 
             newCellsCol::Vector{Pair{UInt,Int}} = collect(newCells)
             sort!(newCellsCol; by=x -> x[1])
@@ -128,7 +128,7 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
                 end
 
                 # Remove biggest new cell
-                alpha[maxCellInd+cell-1] = false
+                alpha[maxCellInd + cell - 1] = false
             end
 
             cell += length(newCellsCol)
@@ -149,7 +149,20 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
     # return nodeInv
 end
 
-function investigateNode(F, coloring::Vector{Int}, nodeInv::Vector{UInt}, n, nInv1, nInvStar, autG, v1, vStar, curBranch, covered, prune)::Int
+function investigateNode(
+    F,
+    coloring::Vector{Int},
+    nodeInv::Vector{UInt},
+    n,
+    nInv1,
+    nInvStar,
+    autG,
+    v1,
+    vStar,
+    curBranch,
+    covered,
+    prune,
+)::Int
     # @info "investigate node at $coloring, $nodeInv"
 
     first = length(nInv1) == 0
@@ -174,7 +187,7 @@ function investigateNode(F, coloring::Vector{Int}, nodeInv::Vector{UInt}, n, nIn
                 # @info "Added onto stabilizer, new order is $(order(autG))"
                 stabilizer!(autG, curBranch)
                 for i in 1:length(curBranch)
-                    H = stabilizer!(autG, curBranch[1:(i-1)])
+                    H = stabilizer!(autG, curBranch[1:(i - 1)])
 
                     @assert H !== nothing
 
@@ -236,15 +249,15 @@ function investigateNode(F, coloring::Vector{Int}, nodeInv::Vector{UInt}, n, nIn
         #         length(nodeInv) <= length(nInv1)
 
         @views if prune &&
-                  !first &&
-                  !(
-                      nodeInv[1:min(length(nodeInv), length(nInv1))] ==
-                      nInv1[1:min(length(nodeInv), length(nInv1))]
-                  ) &&
-                  !(
-                      nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
-                      nInvStar[1:min(length(nodeInv), length(nInvStar))]
-                  )
+            !first &&
+            !(
+                nodeInv[1:min(length(nodeInv), length(nInv1))] ==
+                nInv1[1:min(length(nodeInv), length(nInv1))]
+            ) &&
+            !(
+                nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
+                nInvStar[1:min(length(nodeInv), length(nInvStar))]
+            )
             return 0
         end
         firstBigCell = Int[]
@@ -266,7 +279,20 @@ function investigateNode(F, coloring::Vector{Int}, nodeInv::Vector{UInt}, n, nIn
             newNodeInv::Vector{UInt} = refine!(newC, F, i)
             push!(curBranch, i)
             catNodeInv::Vector{UInt} = vcat(nodeInv, newNodeInv)
-            t = investigateNode(F, newC, catNodeInv, n, nInv1, nInvStar, autG, v1, vStar, curBranch, covered, prune)
+            t = investigateNode(
+                F,
+                newC,
+                catNodeInv,
+                n,
+                nInv1,
+                nInvStar,
+                autG,
+                v1,
+                vStar,
+                curBranch,
+                covered,
+                prune,
+            )
 
             if t > 0
                 return t - 1
@@ -341,12 +367,13 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     # curCell = BitVector(undef, n)
     # newCells = Dict{UInt,Int}()
 
-
     col::Vector{Int} = Int[vertexColor(F, v) for v in 1:n]
     # alpha[1] = true
     refine!(col, F, 0)
 
-    investigateNode(F, col, UInt[], n, nInv1, nInvStar, autG, v1, vStar, curBranch, covered, prune)
+    investigateNode(
+        F, col, UInt[], n, nInv1, nInvStar, autG, v1, vStar, curBranch, covered, prune
+    )
 
     p = zeros(Int, n)
     p[vStar] .= 1:n
@@ -368,7 +395,11 @@ end
 Generates all Flags of type `F` with up to `maxVertices` vertices and up to `maxPredicates` non-zero predicate values. 'maxPredicates' is a vector, for the case that there are multiple predicates. If a function `withProperty:F->{true, false}` is given, keeps adding edges to flags as long as the property holds.
 """
 function generateAll(
-    ::Type{T}, maxVertices::Int, maxPredicates::Vector; withProperty=(F::T) -> true
+    ::Type{T},
+    maxVertices::Int,
+    maxPredicates::Vector;
+    withProperty=(F::T) -> true,
+    withInducedProperty=(F::T) -> true,
 ) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     for i in 1:maxVertices
@@ -385,7 +416,9 @@ function generateAll(
 
             # @show newF
             # @show size(newF)
-            push!(nextGraphs, newF)
+            if withInducedProperty(newF)
+                push!(nextGraphs, newF)
+            end
             currentEdges = countEdges(newF)
             # @show currentEdges
             # @show length(currentEdges)
@@ -400,8 +433,10 @@ function generateAll(
                 continue
             end
 
-            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i-1))]
-            uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(newF, fixed, maxPredicates)
+            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
+            uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(
+                newF, fixed, maxPredicates
+            )
             # @show uP
             uP2 = findUnknownGenerationPredicates(newF, fixed, maxPredicates)
             if uP2 !== nothing
@@ -425,16 +460,16 @@ function generateAll(
                     F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
                 end
                 # @show F
-                cP = countEdges(F)[1:(end-1)]
+                cP = countEdges(F)[1:(end - 1)]
                 # @show cP
                 # @assert length(maxPredicates) == length(cP)
                 if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
                     pq[F] = cP
                 elseif all(
-                           cP[1:(length(maxPredicates)-1)] .<= maxPredicates[1:(end-1)]
-                       ) &&
-                       maxPredicates[end] isa Union{Int, Vector{Int}} &&
-                       sum(sum.(cP[length(maxPredicates):end])) <= sum(maxPredicates[end])
+                        cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]
+                    ) &&
+                    maxPredicates[end] isa Union{Int,Vector{Int}} &&
+                    sum(sum.(cP[length(maxPredicates):end])) <= sum(maxPredicates[end])
                     pq[F] = cP
                 end
             end
@@ -444,15 +479,15 @@ function generateAll(
             FMarked = dequeue!(pq)
             # @show (length(pq), sum(countEdges(FMarked.F)))
             # @show FMarked
-            if withProperty(FMarked.F)
+            if withInducedProperty(FMarked.F)
                 # continue
                 push!(nextGraphs, FMarked.F)
             end
             cP = countEdges(FMarked.F)
             if length(maxPredicates) == length(cP) && all(cP .== maxPredicates)
                 continue
-            elseif all(cP[1:(length(maxPredicates)-1)] .== maxPredicates[1:(end-1)]) &&
-                   sum(cP[length(maxPredicates):end]) == maxPredicates[end]
+            elseif all(cP[1:(length(maxPredicates) - 1)] .== maxPredicates[1:(end - 1)]) &&
+                sum(cP[length(maxPredicates):end]) == maxPredicates[end]
                 continue
             end
             # if !all(countEdges(FMarked.F) .== maxPredicates)
@@ -474,7 +509,8 @@ function generateAll(
                 if !withProperty(F.F)
                     continue
                 end
-                cP = countEdges(F)[1:(end-1)]
+
+                cP = countEdges(F)[1:(end - 1)]
                 # if all(cP .<= maxPredicates)
                 #     pq[F] = cP
                 # end
@@ -483,8 +519,8 @@ function generateAll(
                 if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
                     pq[F] = cP
                 elseif maxPredicates[end] isa Int &&
-                       all(cP[1:(length(maxPredicates)-1)] .<= maxPredicates[1:(end-1)]) &&
-                       sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
+                    all(cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]) &&
+                    sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
                     pq[F] = cP
                 end
             end

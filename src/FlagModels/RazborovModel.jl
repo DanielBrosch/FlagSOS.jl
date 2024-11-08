@@ -70,13 +70,16 @@ function computeUnreducedRazborovBasis(
     razborovBasis = Dict()
 
     @info "Generating flags up to isomorphism..."
-    flags = generateAll(T, maxLabels, [99999])
+    flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
     @info "Splitting $(length(flags)) flags..."
 
     filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
         for m in maxLabels:-2:size(Ftmp)
+            if T <: InducedFlag && size(Ftmp) != m 
+                continue 
+            end 
             # @show m
             k = Int((n - m) / 2)
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
@@ -91,6 +94,7 @@ function computeUnreducedRazborovBasis(
                 PartiallyLabeledFlag{T}(FExtended, m), preds
             )
             razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
+            filter!(x->isAllowed(M.parentModel, x.F),razborovBasis[FBlock])
         end
     end
     return razborovBasis
@@ -117,6 +121,7 @@ function computeRazborovBasis!(
         end
 
         muAut = aut(mu)
+        @show muAut
 
         newGen = []
         for p in muAut.gen
@@ -128,6 +133,8 @@ function computeRazborovBasis!(
                         permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
                     ),
                 )
+                @show pb
+                display.(B)
                 gen[i] = findfirst(x -> x == pb, B)
             end
             push!(newGen, gen)
@@ -356,7 +363,8 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
         Fs::Vector{T} = sort(collect(keys(m.sdpData)); by=size)
         n = maximum(size.(keys(m.sdpData)))
-        union!(Fs, generateAll(T, n, [99999]))
+        # union!(Fs, generateAll(T, n, [99999]))
+        union!(Fs, generateAll(T, n, [99999], withInducedProperty = x->isAllowed(m.parentModel, x)))
 
         # expandedFs = T[]
         # for F in Fs

@@ -86,7 +86,7 @@ function glue(
     pred = pred[1]
 
     FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
-    res = sum(c//1 * G for (G, c) in zeta(FGMarked; label=true).coeff)
+    res = sum(c // 1 * G for (G, c) in zeta(FGMarked; label=true).coeff)
 
     return res
     # elseif U == T
@@ -122,6 +122,9 @@ function addPredicates(F::InducedFlag{T}, preds::Vector{U}) where {T<:Flag,U<:Pr
     tmp = addPredicates(F.F, preds)
     if tmp === nothing
         return nothing
+    end
+    if tmp isa Vector
+        return [InducedFlag{T}(f) for f in tmp]
     end
     return InducedFlag{T}(tmp)
 end
@@ -210,21 +213,25 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
 
     res = QuantumFlag{T,Rational{Int}}[]
     # res = Dict()
-    for f in Fs
-        for newVerts in 1:2
-            size(f) == n && continue
-            if newVerts == 1
-                tmp = labelCanonically(oneVert * f - 1//1 * f)
-            else
-                tmp = labelCanonically(oneVert * (oneVert * f) - 1//1 * f)
-            end
+    ek = 1 * T()
+    for newVerts in 1:n
+        ek = ek * oneVert
+        for f in Fs
+            size(f) + newVerts > n && continue
+            tmp = labelCanonically(ek*f - 1//1 * f)
+            # size(f) == n && continue
+            # if newVerts == 1
+            #     tmp = labelCanonically(oneVert * f - 1//1 * f)
+            # else
+            #     tmp = labelCanonically(oneVert * (oneVert * f) - 1//1 * f)
+            # end
             # @show tmp
-            if any(tmp.coeff) do (G, _)
-                isAllowed(G) && !in(G, Fs)
-            end
-                @info "Missing some flags to eliminate product of $f"
-                continue
-            end
+            # if any(tmp.coeff) do (G, _)
+            #     isAllowed(G) && !in(G, Fs)
+            # end
+            #     @info "Missing some flags to eliminate product of $f"
+            #     continue
+            # end
             # res[f] = tmp
             filter!(x -> isAllowed(x.first), tmp.coeff)
             # @show length(res) + 1
