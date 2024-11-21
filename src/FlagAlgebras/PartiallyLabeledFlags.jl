@@ -271,3 +271,7 @@ function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
         return isAllowed(F.F, p)
     end
 end
+
+function labelCanonically(F::PartiallyLabeledFlag{InducedFlag{T}})::PartiallyLabeledFlag{InducedFlag{T}} where {T<:Flag}
+    return label(F; removeIsolated=false)[1]
+end

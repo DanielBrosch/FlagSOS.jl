@@ -103,9 +103,8 @@ end
 function computeRazborovBasis!(
     M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf
 ) where {T<:Flag,N,D}
-    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
-    # display(razborovBasis)
 
+    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
     if maxBlockSize < Inf
         filter!(x -> length(x[2]) < maxBlockSize, reducedBasis)
@@ -331,6 +330,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             end
 
             for (F, d) in t.coeff
+                !isAllowed(m.parentModel,F) && continue
                 if !haskey(m.sdpData, F)
                     m.sdpData[F] = Dict()
                 end
@@ -374,7 +374,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         # end
 
         # reduction = quotient(expandedFs, x -> isAllowed(m.parentModel, x))
-        reduction = quotient(Fs, x -> isAllowed(m.parentModel, x))
+        reduction = []#quotient(Fs, x -> isAllowed(m.parentModel, x))
 
         display(reduction)
 

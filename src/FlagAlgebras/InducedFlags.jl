@@ -68,26 +68,36 @@ function glue(
     end
 
     # Regular glue 
-    FG = glue(F.F, G.F, p)
+    fg = glue(F.F, G.F, p)
 
-    if FG === nothing
+    if fg === nothing
         return QuantumFlag{InducedFlag{T},Rational{Int}}()
     end
 
     # if U == InducedFlag{T}
 
-    # Determine all ways to combine the leaves
-    pred = findUnknownPredicates(FG, [collect(1:m), p[1:n]])
-
-    if length(pred) > 1
-        @error "TODO: Multiple predicate types"
+    if !(fg isa QuantumFlag)
+        fg = 1 // 1 * FG
     end
 
-    pred = pred[1]
 
-    FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
-    res = sum(c // 1 * G for (G, c) in zeta(FGMarked; label=true).coeff)
+    res = QuantumFlag{InducedFlag{T},Rational{Int}}()
 
+    for (FG, c) in fg.coeff
+
+        # Determine all ways to combine the leaves of the sunflower
+        pred = findUnknownPredicates(FG, [collect(1:m), p[1:n]])
+
+        if length(pred) > 1
+            @error "TODO: Multiple predicate types"
+        end
+
+        pred = pred[1]
+
+        FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
+        res += sum(c // 1 * G for (G, c) in zeta(FGMarked; label=true).coeff)
+        
+    end
     return res
     # elseif U == T
     #     # Convert to non-induced
@@ -130,7 +140,8 @@ function addPredicates(F::InducedFlag{T}, preds::Vector{U}) where {T<:Flag,U<:Pr
 end
 
 function permute(F::InducedFlag{T}, p::AbstractVector{Int}) where {T<:Flag}
-    return InducedFlag{T}(glue(F.F, one(T), p))
+    # return InducedFlag{T}(glue(F.F, one(T), p))
+    return InducedFlag{T}(permute(F.F, p))
 end
 
 function findUnknownPredicates(
@@ -216,9 +227,10 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
     ek = 1 * T()
     for newVerts in 1:n
         ek = ek * oneVert
+        @error "Better to do vertex by vertex, filter by allowed every time"
         for f in Fs
             size(f) + newVerts > n && continue
-            tmp = labelCanonically(ek*f - 1//1 * f)
+            tmp = labelCanonically(ek * f - 1 // 1 * f)
             # size(f) == n && continue
             # if newVerts == 1
             #     tmp = labelCanonically(oneVert * f - 1//1 * f)

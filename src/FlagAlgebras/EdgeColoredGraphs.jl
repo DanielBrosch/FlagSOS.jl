@@ -105,7 +105,24 @@ function ==(A::ColoredEdgePredicate, B::ColoredEdgePredicate)
     return A.i == B.i && A.j == B.j && A.c == B.c
 end
 
-function permute(pred::ColoredEdgePredicate, p::AbstractVector{Int}) where {N}
+function permute(
+    F::EdgeColoredGraph{N,B}, p::AbstractVector{Int}
+)::EdgeColoredGraph{N,B} where {N,B}
+    pInv = zero(p)
+    n = maximum(p)
+    pInv[p] .= 1:n
+
+    A = zeros(Int, n, n)
+    m = size(F)
+    if m > 0
+        A[1:m, 1:m] .= F.A[pInv[1:m], pInv[1:m]]
+    end
+    return EdgeColoredGraph{N,B}(
+        A
+    )
+end
+
+function permute(pred::ColoredEdgePredicate, p::AbstractVector{Int})
     return ColoredEdgePredicate(p[pred.i], p[pred.j], pred.c)
 end
 
@@ -236,25 +253,50 @@ function glue(
         end
     end
 
-    for (c, cT) in colorTranslate
-        if cT == -1
-            hC += 1
-            colorTranslate[c] = hC
+    colorsOnlyG2 = unique(g2.A)
+    setdiff!(colorsOnlyG2, 0)
+    setdiff!(colorsOnlyG2, values(colorTranslate))
+
+    colorsOnlyG1 = [c for (c, d) in colorTranslate if d == -1]
+
+    res = QuantumFlag{EdgeColoredGraph{N,true},Rational{Int}}()
+
+    # need to assign all colors in colorsOnlyG1 with potential matches of 
+    for i in 0:min(length(colorsOnlyG1), length(colorsOnlyG2))
+        for G1Cs in combinations(colorsOnlyG1, i), G2Cs in combinations(colorsOnlyG2, i)
+            for σ in SymmetricGroup(i)
+
+                colorTranslate2 = deepcopy(colorTranslate)
+                for (j, c) in enumerate(G1Cs)
+                    colorTranslate2[c] = G2Cs[σ[j]]
+                end
+
+                hC = highestColor(g2)
+                for (c, cT) in colorTranslate2
+                    if cT == -1
+                        hC += 1
+                        colorTranslate2[c] = hC
+                    end
+                end
+
+                N > -1 && hC > N && continue
+
+                A = zeros(Int, n, n)
+                A[1:n2, 1:n2] .= g2.A
+
+                for i in 1:n1, j in 1:n1
+                    g1.A[i, j] == 0 && continue
+
+                    A[p[i], p[j]] = colorTranslate2[g1.A[i, j]]
+                end
+                # @show A
+
+                res += EdgeColoredGraph{N,true}(A)
+            end
         end
     end
 
-    N > -1 && hC > N && return nothing
-
-    res = zeros(Int, n, n)
-    res[1:n2, 1:n2] = g2.A
-
-    for i in 1:n1, j in 1:n1
-        g1.A[i, j] == 0 && continue
-
-        res[p[i], p[j]] = colorTranslate[g1.A[i, j]]
-    end
-
-    return EdgeColoredGraph{N,true}(res)
+    return res
 end
 
 # function glue(Gs::Vararg{EdgeColoredGraph})::EdgeColoredGraph

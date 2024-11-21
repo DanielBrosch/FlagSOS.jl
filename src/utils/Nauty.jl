@@ -403,6 +403,7 @@ function generateAll(
 ) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     for i in 1:maxVertices
+        @show (i, maxVertices)
         nextGraphs = T[]
 
         # pq = PriorityQueue{EdgeMarkedFlag{T,predicateType(T)},Vector{Int}}()
@@ -475,7 +476,14 @@ function generateAll(
             end
         end
 
+        t = time()
+
         while !isempty(pq)
+
+            if time() - t > 1 
+                @show length(pq)
+                t = time()
+            end
             FMarked = dequeue!(pq)
             # @show (length(pq), sum(countEdges(FMarked.F)))
             # @show FMarked
