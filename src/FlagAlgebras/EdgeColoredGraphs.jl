@@ -31,12 +31,16 @@ function sortEntries!(A::Matrix{Int})
     # filter!(x -> x != 0, cs)
     k = maximum(A; init=0)
     found = zeros(Bool, k)
-    cs = Int[]
+    cs = zeros(Int, k)#
+    # cs = Int[]
+    noFound = 0
     for i in eachindex(A)
         c = A[i]
         if c > 0 && found[c] == 0
-            push!(cs, c)
             found[c] = true 
+            # push!(cs, c)
+            noFound += 1
+            cs[noFound] = c
         end
         if all(found)
             break 
@@ -47,6 +51,7 @@ function sortEntries!(A::Matrix{Int})
 
     translate = zeros(Int,k)
     for (i,c) in enumerate(cs)
+        c == 0 && continue
         translate[c] = i
     end
 
