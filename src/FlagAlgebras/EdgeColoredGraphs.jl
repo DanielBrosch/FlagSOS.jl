@@ -27,11 +27,30 @@ end
 
 # In the colorblind setting the colors should always be `1...highestColor(F)` and the non-edge 0. The colors should appear in this order for the first time.
 function sortEntries!(A::Matrix{Int})
-    cs::Vector{Int} = unique(A)
-    filter!(x -> x != 0, cs)
-    translate = Dict{Int,Int}(c => i for (i, c) in enumerate(cs))
-    translate[0] = 0
-    map!(c -> translate[c], A, A)
+    # cs::Vector{Int} = unique(A)
+    # filter!(x -> x != 0, cs)
+    k = maximum(A; init=0)
+    found = zeros(Bool, k)
+    cs = Int[]
+    for i in eachindex(A)
+        c = A[i]
+        if c > 0 && found[c] == 0
+            push!(cs, c)
+            found[c] = true 
+        end
+        if all(found)
+            break 
+        end
+    end
+    # translate = Dict{Int,Int}(c => i for (i, c) in enumerate(cs))
+    # translate[0] = 0
+
+    translate = zeros(Int,k)
+    for (i,c) in enumerate(cs)
+        translate[c] = i
+    end
+
+    map!(c -> c == 0 ? 0 : translate[c], A, A)
     return A
 end
 
@@ -375,7 +394,7 @@ end
 function distinguish(F::EdgeColoredGraph, v::Int, W::BitVector)::UInt
     cs = unique(F.A[W, v])
     counts = sort!([length(findall(x -> x == c, F.A[W, v])) for c in cs])
-    @inbounds return hash(counts)
+    return hash(counts)
 end
 
 function distinguish(F::ColoredEdgePredicate, v::Int, W::BitVector)::UInt
