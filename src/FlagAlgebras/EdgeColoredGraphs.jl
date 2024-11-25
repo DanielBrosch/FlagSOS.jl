@@ -30,6 +30,7 @@ function sortEntries!(A::Matrix{Int})
     # cs::Vector{Int} = unique(A)
     # filter!(x -> x != 0, cs)
     k = maximum(A; init=0)
+    # found = BitVector(false for _ in 1:k)
     found = zeros(Bool, k)
     cs = zeros(Int, k)#
     # cs = Int[]
@@ -37,20 +38,20 @@ function sortEntries!(A::Matrix{Int})
     for i in eachindex(A)
         c = A[i]
         if c > 0 && found[c] == 0
-            found[c] = true 
+            found[c] = true
             # push!(cs, c)
             noFound += 1
             cs[noFound] = c
         end
         if all(found)
-            break 
+            break
         end
     end
     # translate = Dict{Int,Int}(c => i for (i, c) in enumerate(cs))
     # translate[0] = 0
 
-    translate = zeros(Int,k)
-    for (i,c) in enumerate(cs)
+    translate = zeros(Int, k)
+    for (i, c) in enumerate(cs)
         c == 0 && continue
         translate[c] = i
     end
@@ -397,8 +398,22 @@ function maxPredicateArguments(::Type{EdgeColoredGraph})
 end
 
 function distinguish(F::EdgeColoredGraph, v::Int, W::BitVector)::UInt
-    cs = unique(F.A[W, v])
-    counts = sort!([length(findall(x -> x == c, F.A[W, v])) for c in cs])
+    # AWv = @view F.A[W,v]
+    # cs = unique(AWv)
+    # counts = sort!(Int[count(x -> x == c, AWv) for c in cs])
+
+    counts = zeros(Int, maximum(F.A))
+    for i = 1:size(F.A, 1)
+        if W[i]
+            c = F.A[i, v]
+            if c != 0
+                counts[F.A[i, v]] += 1
+            end
+        end
+    end
+
+    sort!(counts)
+
     return hash(counts)
 end
 
