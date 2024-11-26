@@ -31,19 +31,23 @@ function sortEntries!(A::Matrix{Int})
     # filter!(x -> x != 0, cs)
     k = maximum(A; init=0)
     # found = BitVector(false for _ in 1:k)
-    found = zeros(Bool, k)
+    # found = zeros(Bool, k)
+    found = BitSet()
     cs = zeros(Int, k)#
     # cs = Int[]
     noFound = 0
     for i in eachindex(A)
         c = A[i]
-        if c > 0 && found[c] == 0
-            found[c] = true
+        # if c > 0 && found[c] == 0
+        if c > 0 && !(c in found)
+            # found[c] = true
+            push!(found,c)
             # push!(cs, c)
             noFound += 1
             cs[noFound] = c
         end
-        if all(found)
+        if length(found) == k
+        # if all(found)
             break
         end
     end
