@@ -120,7 +120,7 @@ The automorphisms of `F`. Returns a named tuple with fields
 function aut(
     F::T
 )::NamedTuple{(:gen, :size),Tuple{Vector{Vector{Int64}},Int64}} where {T<:Flag}
-    grp = label(F; removeIsolated=false)[2]
+    grp = label(F; removeIsolated=false)[3]
     return (gen=grp.gen, size=order(grp))
 end
 

@@ -340,7 +340,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     n::Int = size(F)
 
     if n == 0
-        return F, Group(), []
+        return F, Group(), Group(), []
     end
 
     nInv1::Vector{UInt} = UInt[]
@@ -379,7 +379,8 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     p[vStar] .= 1:n
     # p = Int[findfirst(x -> x == i, vStar) for i in 1:n]
     # @assert p == p2
-    return permute(F, p), permute!(autG, p), p
+    autGp = permute!(deepcopy(autG),p)
+    return permute(F, p), autGp, autG, p
 end
 
 function generateAll(
