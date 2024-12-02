@@ -147,7 +147,7 @@ function permute(
     A = zeros(Int, n, n)
     m = size(F)
     if m > 0
-        A[1:m, 1:m] .= F.A[pInv[1:m], pInv[1:m]]
+        @views A[1:m, 1:m] .= F.A[pInv[1:m], pInv[1:m]]
     end
     return EdgeColoredGraph{N,B}(
         A
