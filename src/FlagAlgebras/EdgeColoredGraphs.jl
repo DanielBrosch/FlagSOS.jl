@@ -116,11 +116,14 @@ function isAllowed(G::EdgeColoredGraph{N,B}, e::ColoredEdgePredicate) where {N,B
     N > -1 && -e.c >= N && return false
     c = G.A[e.i, e.j]
     c == 0 && return true
-    if e.c > 0
-        return c == e.c
-    else
-        return c > -e.c
-    end
+    
+    # if e.c > 0
+    #     return c == e.c
+    # else
+    #     return c > -e.c
+    # end
+
+    return false
 end
 
 function predicateType(::Type{EdgeColoredGraph{N,B}}) where {N,B}
@@ -224,6 +227,7 @@ function addPredicates(
         N > -1 && c > N && continue
         A = Matrix(G.A)
         A[p.i, p.j] = c
+        A[p.j, p.i] = c
 
         G2 = EdgeColoredGraph{N,B}(A)
 

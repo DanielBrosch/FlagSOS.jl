@@ -12,24 +12,27 @@ mutable struct Group
     O::Vector{Int} # Orbit of b
     order::Vector{Int} # target order of basis elements (usually 1:n, does get modified when point-wise stabilizers are searched for)
     subGroup::Union{Group,Nothing}
-    Group() = new(-1, Vector{Int}[], -1, Int[], Int[], Int[], nothing)
+    # Group() = new(-1, Vector{Int}[], -1, Int[], Int[], Int[], nothing)
+    Group(n::Int) = new(n, Vector{Int}[], -1, Int[], Int[], 1:n, nothing)
 
     function Group(gens::Vector{Vector{Int}}, order=1:length(gens[1]))
-        G = Group()
-        G.order = order
+        n = length(gens[1])
+        G = Group(n)
+        G.order .= order
 
         # does not remove duplicates
         if length(gens) > 0
             G.gen = gens
-            G.n = length(gens[1])
+            # G.n = length(gens[1])
             schreier_sims!(G)
         end
         return G
     end
 
     function Group(gen::Vector{Int}, order=1:length(gen))
-        G = Group()
-        G.order = order
+        n = length(gen)
+        G = Group(n)
+        G.order .= order
         addGen!(G, gen)
         return G
     end
@@ -94,6 +97,23 @@ end
 
 function findInvRepr(G::Group, v::Int)
     g = collect(1:(G.n))
+    # g = 1:(G.n)
+
+    while v != G.b
+        k = G.SV[v]
+        if k == 0
+            return Int[]
+        end
+        p = G.gen[k]
+        g .= p[g]
+        v = p[v]
+    end
+    return g
+end
+
+function findInvRepr!(g::Vector{Int}, G::Group, v::Int)
+    # g = collect(1:(G.n))
+    g .= 1:(G.n)
 
     while v != G.b
         k = G.SV[v]
@@ -133,9 +153,9 @@ function schreier_sims!(G0::Union{Group,Nothing})
     @assert G.b != -1
 
     if oldB != G.b
-        G2 = Group()
+        G2 = Group(G.n)
         G2.n = G.n
-        G2.order = G.order
+        G2.order .= G.order
         G.subGroup = G2
         # G.subGroup = Group()
     elseif G.subGroup.order != G.order
@@ -153,14 +173,22 @@ function schreier_sims!(G0::Union{Group,Nothing})
 
     rs = zeros(Int, G.n)
 
+    tmp = zeros(Int, G.n)
+    tmp2 = zeros(Int, G.n)
+    tmp3 = zeros(Int, G.n)
+
     for i in G.O
-        r = findInvRepr(G, i)
+        # r = findInvRepr(G, i)
+        r = findInvRepr!(tmp, G, i)
         if length(r) == G.n
             for s in G.gen
                 # rs = inv(r)*s 
                 # rs s[r]
                 rs[r] .= s
-                rsrsbar = sift(G.subGroup, findInvRepr(G, rs[G.b])[rs])
+                # rsrsbar = sift(G.subGroup, findInvRepr(G, rs[G.b])[rs])
+                findInvRepr!(tmp2, G, rs[G.b])
+                # @views tmp3 .= tmp2[rs]
+                rsrsbar = sift(G.subGroup, tmp2[rs])
                 # if !isone(rsrsbar)
                 if rsrsbar != 1:(G.n)
                     # @show G.gen
@@ -267,8 +295,10 @@ function stabilizer!(G::Union{Group, Nothing}, S::Vector{Int}, keepOrder=false)
         return G 
     end
     if keepOrder
-        order = vcat(S, setdiff(1:(G.n), S))
-        G.order = order
+        # order = vcat(S, setdiff(1:(G.n), S))
+        # G.order = order
+        G.order[1:length(S)] .= S
+        G.order[length(S)+1:end] .= setdiff(1:(G.n), S)
         schreier_sims!(G)
         while G.b in S
             G = G.subGroup
@@ -285,8 +315,13 @@ function stabilizer!(G::Union{Group, Nothing}, S::Vector{Int}, keepOrder=false)
         if G2 === nothing 
             return G2 
         end
-        order = vcat(covered, setdiff(S, covered), setdiff(1:(G2.n), S))
-        G2.order = order
+        # order = vcat(covered, setdiff(S, covered), setdiff(1:(G2.n), S))
+        # G2.order = order
+        G2.n > 0 && resize!(G2.order, G2.n)
+        G2.order[1:length(covered)] .= covered 
+        SnC = setdiff(S, covered)
+        G2.order[length(covered)+1:length(covered)+length(SnC)] .= SnC
+        @views G2.order[length(covered)+length(SnC)+1:end] .= setdiff(1:(G2.n), S)
         schreier_sims!(G2)
         while G2.b in S
             G2 = G2.subGroup

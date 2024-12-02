@@ -340,7 +340,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     n::Int = size(F)
 
     if n == 0
-        return F, Group(), Group(), []
+        return F, Group(n), Group(n), []
     end
 
     nInv1::Vector{UInt} = UInt[]
@@ -348,7 +348,7 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     # p1 = Int[]
     # pStar = Int[]
 
-    autG::Group = Group()
+    autG::Group = Group(n)
 
     # first = true
 
@@ -536,7 +536,24 @@ function generateAll(
             # end
         end
 
-        push!(generatedGraphs, unique(labelCanonically.(nextGraphs)))
+        @show length(nextGraphs)
+        unique!(nextGraphs)
+        @show length(nextGraphs)
+        k = length(nextGraphs)
+        res = T[]
+        t = time()
+        for (i,G) in enumerate(nextGraphs)
+            if time() - t > 1 
+                @show i, k
+                t = time()
+            end
+            push!(res, labelCanonically(G))
+        end
+        unique!(res)
+
+
+        push!(generatedGraphs, res)
+        # push!(generatedGraphs, unique(labelCanonically.(nextGraphs)))
     end
     return unique(vcat(generatedGraphs...))
 end
