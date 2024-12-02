@@ -400,7 +400,9 @@ function generateAll(
     maxVertices::Int,
     maxPredicates::Vector;
     withProperty=(F::T) -> true,
-    withInducedProperty=(F::T) -> true,
+    # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
+    withPropertyMarked=(F) -> true,
+    # withInducedProperty=(F::T) -> true,
 ) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     for i in 1:maxVertices
@@ -418,7 +420,8 @@ function generateAll(
 
             # @show newF
             # @show size(newF)
-            if withInducedProperty(newF)
+            # if withInducedProperty(newF) && 
+            if withProperty(newF)
                 push!(nextGraphs, newF)
             end
             currentEdges = countEdges(newF)
@@ -488,7 +491,8 @@ function generateAll(
             FMarked = dequeue!(pq)
             # @show (length(pq), sum(countEdges(FMarked.F)))
             # @show FMarked
-            if withInducedProperty(FMarked.F)
+            # if withInducedProperty(FMarked.F) && withProperty(FMarked.F)
+            if withProperty(FMarked.F)
                 # continue
                 push!(nextGraphs, FMarked.F)
             end
@@ -515,7 +519,8 @@ function generateAll(
                     end
                 end
                 # @assert sum(countEdges(FMarked.F)) < sum(countEdges(F.F))
-                if !withProperty(F.F)
+                # if !withProperty(F.F)
+                if !withPropertyMarked(F)
                     continue
                 end
 

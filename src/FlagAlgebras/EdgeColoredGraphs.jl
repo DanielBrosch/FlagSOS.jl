@@ -112,6 +112,10 @@ struct ColoredEdgePredicate <: Predicate
     ColoredEdgePredicate(i, j, c) = new(min(i, j), max(i, j), c)
 end
 
+function finalized_subgraph(P::ColoredEdgePredicate, c::Vector{Int})
+    return !issubset([P.i,P.j],c)
+end
+
 function isAllowed(G::EdgeColoredGraph{N,B}, e::ColoredEdgePredicate) where {N,B}
     N > -1 && -e.c >= N && return false
     c = G.A[e.i, e.j]

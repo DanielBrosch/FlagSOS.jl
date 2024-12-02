@@ -12,7 +12,7 @@ A (not fully symmetry reduced) Razborov-style model. If T is an InducedFlag, the
 mutable struct RazborovModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     basis::Dict{T,Vector{PartiallyLabeledFlag{T}}}
     blockSymmetry::Dict
-    sdpData::Dict{T,Dict{Union{T, String},SparseMatrixCSC{D,Int}}}
+    sdpData::Dict{T,Dict{Union{T,String},SparseMatrixCSC{D,Int}}}
     parentModel
     quotient
 
@@ -70,16 +70,23 @@ function computeUnreducedRazborovBasis(
     razborovBasis = Dict()
 
     @info "Generating flags up to isomorphism..."
-    flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
+    # flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
+    flags = generateAll(
+        T,
+        maxLabels,
+        [99999];
+        withProperty=x -> isAllowed(M.parentModel, x),
+        withPropertyMarked=x -> isAllowed(M.parentModel, x),
+    )
     @info "Splitting $(length(flags)) flags..."
 
     filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
         for m in maxLabels:-2:size(Ftmp)
-            if T <: InducedFlag && size(Ftmp) != m 
-                continue 
-            end 
+            if T <: InducedFlag && size(Ftmp) != m
+                continue
+            end
             # @show m
             k = Int((n - m) / 2)
             F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
@@ -94,7 +101,7 @@ function computeUnreducedRazborovBasis(
                 PartiallyLabeledFlag{T}(FExtended, m), preds
             )
             razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
-            filter!(x->isAllowed(M.parentModel, x.F),razborovBasis[FBlock])
+            filter!(x -> isAllowed(M.parentModel, x.F), razborovBasis[FBlock])
         end
     end
     return razborovBasis
@@ -103,7 +110,6 @@ end
 function computeRazborovBasis!(
     M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf
 ) where {T<:Flag,N,D}
-
     razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
     if maxBlockSize < Inf
@@ -330,7 +336,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             end
 
             for (F, d) in t.coeff
-                !isAllowed(m.parentModel,F) && continue
+                !isAllowed(m.parentModel, F) && continue
                 if !haskey(m.sdpData, F)
                     m.sdpData[F] = Dict()
                 end
@@ -364,7 +370,12 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         Fs::Vector{T} = sort(collect(keys(m.sdpData)); by=size)
         n = maximum(size.(keys(m.sdpData)))
         # union!(Fs, generateAll(T, n, [99999]))
-        union!(Fs, generateAll(T, n, [99999], withInducedProperty = x->isAllowed(m.parentModel, x)))
+        union!(
+            Fs,
+            generateAll(
+                T, n, [99999]; withInducedProperty=x -> isAllowed(m.parentModel, x)
+            ),
+        )
 
         # expandedFs = T[]
         # for F in Fs
@@ -381,9 +392,9 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         m.quotient = reduction
 
         for (i, F) in enumerate(m.quotient)
-            for (G,c) in F.coeff
+            for (G, c) in F.coeff
                 if !haskey(m.sdpData, G)
-                    m.sdpData[G] = Dict() 
+                    m.sdpData[G] = Dict()
                 end
                 m.sdpData[G]["Q$i"] = D[c;;]
             end
@@ -520,7 +531,7 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
                 end
             end
         else
-            y = @variable(jumpModel, [1:1,1:1], base_name = mu)
+            y = @variable(jumpModel, [1:1, 1:1], base_name = mu)
             Y[mu] = y
             # i = parse(Int,mu[2:end])
             # for (G, c) in m.quotient[i].coeff
@@ -772,7 +783,7 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
     end
 
     res = sum(m.sdpData) do (G, B)
-        if mu isa String 
+        if mu isa String
             return BigInt(0)//1
         end
         sum(B) do (mu, b)

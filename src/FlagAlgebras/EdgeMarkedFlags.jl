@@ -58,10 +58,40 @@ function hash(A::EdgeMarkedFlag, h::UInt)
     # return hash(Set(A.marked), hash(A.F, hash(:EdgeMarkedFlag, h)))
 end
 
+# should return true only if there are no more marked edges in the vertices in c
+function finalized_subgraph(F::EdgeMarkedFlag{T,P}, c::Vector{Int})::Bool where {T,P}
+    return all(finalized_subgraph(m,c) for m in F.marked)
+end
+
+function finalized_subgraph(p::P, c::Vector{Int})::Bool where {P<:Predicate}
+    @warn "finalized_subgraph not implemented for $P" maxlog = 10
+    return false
+end
+
 Base.one(::Type{EdgeMarkedFlag{T,P}}) where {T,P} = EdgeMarkedFlag{T}(one(T), Vector{P}())
 
 function size(G::EdgeMarkedFlag)::Int
     return size(G.F)
+end
+
+function isSubFlag(F::T, G::EdgeMarkedFlag{T}; induced=F isa InducedFlag) where {T<:Flag}
+    # Very basic brute force algorithm
+    m = size(F)
+    n = size(G)
+    for c in combinations(1:n, m)
+        if induced
+            if finalized_subgraph(G, c) && isIsomorphic(F, subFlag(G.F, c))
+                return true
+            end
+        else
+            for d in SymmetricGroup(m)
+                if subFlag(G, c) == glue(F, subFlag(G, c), d.d)
+                    return true
+                end
+            end
+        end
+    end
+    return false
 end
 
 function findUnknownPredicates(

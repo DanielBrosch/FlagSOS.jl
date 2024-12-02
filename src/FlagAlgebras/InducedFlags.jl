@@ -128,6 +128,10 @@ function isolatedVertices(F::InducedFlag{T})::BitVector where {T<:Flag}
     return isolatedVertices(F.F)
 end
 
+function isAllowed(F::InducedFlag{T}, e) where {T<:Flag}
+    return isAllowed(F.F, e)
+end
+
 function addPredicates(F::InducedFlag{T}, preds::Vector{U}) where {T<:Flag,U<:Predicate}
     tmp = addPredicates(F.F, preds)
     if tmp === nothing
