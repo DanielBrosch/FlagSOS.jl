@@ -60,14 +60,14 @@ end
 
 Base.size(F::PartiallyColoredFlag)::Int = size(F.F)
 
-function Base.:*(F::PartiallyColoredFlag{T}, G::PartiallyColoredFlag{T}) where {T<:Flag}
+function Base.:*(F::PartiallyColoredFlag{T}, G::PartiallyColoredFlag{T}; isAllowed=(f) -> true) where {T<:Flag}
     @assert F.c == G.c
     @assert Set(collect(keys(F.c))) == Set(1:length(F.c))
 
     n = size(F)
     m = size(G)
 
-    return glue(F, G, vcat(1:length(F.c), (m+1):(m+n-length(F.c))))
+    return glue(F, G, vcat(1:length(F.c), (m+1):(m+n-length(F.c))); isAllowed=isAllowed)
 end
 
 function subFlag(
@@ -122,8 +122,9 @@ function glueFinite(
     G::PartiallyColoredFlag{T},
     p::AbstractVector{Int}=vcat(1:length(F.c), (size(G)+1):(size(G)+size(F)-length(F.c)));
     labelFlags=true,
+    isAllowed=(f) -> true,
 ) where {T<:Flag}
-    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags)
+    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
 end
 
 function vertexColor(F::PartiallyColoredFlag{T}, v::Int) where {T<:Flag}

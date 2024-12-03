@@ -44,7 +44,7 @@ function permute(pred::P, p::AbstractVector{Int}) where {P<:Predicate}
 end
 
 # Optional third and fourth argument: flag which this predicate is permuted with, before and after. Does potentially change the color in colorblind EdgeColoredGraphs
-function permute(pred::P, p::AbstractVector{Int}, ::T, ::T) where {P<:Predicate, T<:Flag}
+function permute(pred::P, p::AbstractVector{Int}, ::T, ::T) where {P<:Predicate,T<:Flag}
     return permute(pred, p)
 end
 
@@ -104,12 +104,11 @@ end
 
 The gluing operation of type `T`. Should, for example, glue unlabeled vertices to distinct vertices in the result. Default implementation glues the Flags on fully distinct vertices.
 """
-function Base.:*(F::T, G::T) where {T<:Flag}
+function Base.:*(F::T, G::T; isAllowed=(f) -> true) where {T<:Flag}
     n = size(F)
     m = size(G)
-    return glue(F, G, vcat((m + 1):(m + n), 1:m))
+    return glue(F, G, vcat((m + 1):(m + n), 1:m); isAllowed=isAllowed)
 end
-
 
 """
     aut(F::T)::NamedTuple{(:gen, :size),Tuple{Vector{Vector{Int64}},Int64}} where {T<:Flag}
@@ -148,7 +147,7 @@ end
 
 Glues together the two Flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. `p` may be a permutation involving more than `size(F)` vertices, in which case the result should have at least `maximum(p)` vertices. Optionally specifices a different output Flag type, for cases where the internal Flag type differs and there are performance advantages (such as the case of internal non-induced Graphs and the gluing of two induced Graphs).
 """
-function glue(F::T, G::T, p::AbstractVector{Int}) where {T<:Flag}
+function glue(F::T, G::T, p::AbstractVector{Int}; isAllowed=(f) -> true) where {T<:Flag}
     error("glue is not defined for Flag type $T with target type $T")
     return missing
 end
@@ -164,13 +163,15 @@ is equivalent to
 
     glue(F, glue(G, H, 1:size(G)), 1:size(F))
 """
-function glue(Fs::Vararg{T}) where {T<:Flag}
+function glue(Fs::Vararg{T}; isAllowed=(f) -> true) where {T<:Flag}
     if length(Fs) == 1
         return Fs[1]
     elseif length(Fs) == 2
-        return glue(Fs..., 1:size(Fs[1]))
+        return glue(Fs..., 1:size(Fs[1]); isAllowed=isAllowed)
     end
-    @views return glue(Fs[1], glue(Fs[2:end]...), 1:size(Fs[1]))
+    @views return glue(
+        Fs[1], glue(Fs[2:end]...; isAllowed=isAllowed), 1:size(Fs[1]); isAllowed=isAllowed
+    )
 end
 
 glue() = nothing
@@ -180,15 +181,24 @@ glue() = nothing
 
 Glues together the flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. This variant of `glue` is for optimizing over finite objects, given by `N` which should be one of the options `:limit`, `:variable` or an integer. The operation assumes the k vertices that are sent on top of each other by `p` correspond to labels, and assumes that the other vertices are unlabeled, i.e. get sent to all `N-k` other vertices. 
 """
-function glueFinite(N, F::T, G::T, p::AbstractVector{Int} = vcat(collect((size(G) + 1):(size(G) + size(F))),1:size(G)); labelFlags=true) where {T<:Flag}
-    return glueFinite_internal(N, F, G, p; labelFlags = labelFlags)
+function glueFinite(
+    N,
+    F::T,
+    G::T,
+    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag}
+    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
 end
 
-function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true) where {T<:Flag}
+function glueFinite_internal(
+    N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true, isAllowed=(f) -> true
+) where {T<:Flag}
     if N == :limit
-        res = glue(F, G, p)
-        if res === nothing 
-            return QuantumFlag{T, Rational{Int64}}()
+        res = glue(F, G, p; isAllowed=isAllowed)
+        if res === nothing
+            return QuantumFlag{T,Rational{Int64}}()
         end
         if labelFlags
             return labelCanonically(res)
@@ -215,7 +225,7 @@ function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=t
     freeG = setdiff(1:size(G), labelsG)
 
     if length(freeF) == 0 || length(freeG) == 0
-        tmp = glue(F, G, p)
+        tmp = glue(F, G, p; isAllowed=isAllowed)
         if tmp === nothing
             return QuantumFlag{T,Rational{Int}}()
         end
@@ -251,7 +261,7 @@ function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=t
             # @show freeG[j]
             po[freeF[i]] = freeG[j]
         end
-        newG = glue(F, G, po)
+        newG = glue(F, G, po; isAllowed=isAllowed)
         if newG !== nothing
             res += c * factor * newG
         end
@@ -264,10 +274,9 @@ function glueFinite_internal(N, F::T, G::T, p::AbstractVector{Int}; labelFlags=t
     end
 end
 
-function glueFinite(N, F::T, G::QuantumFlag{T, D}) where {T,D}
-    return sum(c*glueFinite(N, F, g) for (g,c) in G.coeff)
+function glueFinite(N, F::T, G::QuantumFlag{T,D}; isAllowed=(f) -> true) where {T,D}
+    return sum(c * glueFinite(N, F, g; isAllowed=isAllowed) for (g, c) in G.coeff)
 end
-
 
 """
     permute(F::T, p::AbstractVector{Int})::T where {T<:Flag}
@@ -321,15 +330,15 @@ The only unclear predicate here is the edge [2,3], i.e. this function should ret
     [[EdgePredicate(2,3)]]
 """
 function findUnknownPredicates(
-    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
+    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector=Int[]
 ) where {T<:Flag,U<:AbstractVector{Int}}
     error("findUnknownPredicates is not defined for Flag type $T")
     return nothing
 end
 
 function findUnknownGenerationPredicates(
-    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector = Int[]
-    ) where {T<:Flag,U<:AbstractVector{Int}}
+    F::T, fixed::Vector{U}=Vector{Int}[], predLimits::Vector=Int[]
+) where {T<:Flag,U<:AbstractVector{Int}}
     return predicateType(T)[]
 end
 
@@ -473,7 +482,7 @@ function ^(F::T, i::Int) where {T<:Flag}
     if i == 0
         return one(T)
     end
-    return F * F^(i-1)
+    return F * F^(i - 1)
 end
 
 include("InducedFlags.jl")

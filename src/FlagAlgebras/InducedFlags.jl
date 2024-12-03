@@ -55,7 +55,10 @@ end
 Glues together the two induced Flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. `p` may be a permutation involving more than `size(F)` vertices. Since these Flags describe induced densities, the result is a linear combination of every possible combination of "unknown" edges between the added vertices from eachothers perspectives (or equivalent). If the common part is different, they are orthogonal to each other and thus return an empty Vector.
 """
 function glue(
-    F::InducedFlag{T}, G::InducedFlag{T}, p::AbstractVector{Int}
+    F::InducedFlag{T},
+    G::InducedFlag{T},
+    p::AbstractVector{Int};
+    isAllowed=(f) -> true,
 )::QuantumFlag{InducedFlag{T},Rational{Int}} where {T<:Flag}
     n = size(F)
     m = size(G)
@@ -68,7 +71,8 @@ function glue(
     end
 
     # Regular glue 
-    fg = glue(F.F, G.F, p)
+    fg = glue(F.F, G.F, p)#; isAllowed = isAllowed)
+
 
     if fg === nothing
         return QuantumFlag{InducedFlag{T},Rational{Int}}()
@@ -77,11 +81,13 @@ function glue(
     # if U == InducedFlag{T}
 
     if !(fg isa QuantumFlag)
-        fg = 1 // 1 * FG
+        fg = 1//1 * FG
     end
 
-
     res = QuantumFlag{InducedFlag{T},Rational{Int}}()
+
+    tmp = QuantumFlag{EdgeMarkedFlag{InducedFlag{T}, predicateType(InducedFlag{T})}, Rational{Int}}()
+
 
     for (FG, c) in fg.coeff
 
@@ -95,9 +101,15 @@ function glue(
         pred = pred[1]
 
         FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
-        res += sum(c // 1 * G for (G, c) in zeta(FGMarked; label=true).coeff)
-        
+        tmp += (c//1)*FGMarked
+        # res += sum(c//1 * G for (G, c) in zeta(FGMarked; label=true, isAllowed=isAllowed).coeff)
     end
+
+    @show length(tmp.coeff)
+    tmp = labelCanonically(tmp)
+    @show length(tmp.coeff)
+    res = zeta(tmp; label=true, isAllowed=isAllowed)
+
     return res
     # elseif U == T
     #     # Convert to non-induced
@@ -234,7 +246,7 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag}
         @error "Better to do vertex by vertex, filter by allowed every time"
         for f in Fs
             size(f) + newVerts > n && continue
-            tmp = labelCanonically(ek * f - 1 // 1 * f)
+            tmp = labelCanonically(ek * f - 1//1 * f)
             # size(f) == n && continue
             # if newVerts == 1
             #     tmp = labelCanonically(oneVert * f - 1//1 * f)

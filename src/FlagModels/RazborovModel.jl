@@ -89,7 +89,11 @@ function computeUnreducedRazborovBasis(
             end
             # @show m
             k = Int((n - m) / 2)
-            F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
+            if m > 0
+                F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
+            else
+                F = Ftmp 
+            end
             FBlock = label(F; removeIsolated=false)[1]
             @assert size(FBlock) == m
             # @assert FBlock == label(FBlock; removeIsolated=false)[1]
@@ -100,7 +104,7 @@ function computeUnreducedRazborovBasis(
             FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(
                 PartiallyLabeledFlag{T}(FExtended, m), preds
             )
-            razborovBasis[FBlock] = collect(keys(moebius(FMarked).coeff))
+            razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x.F)).coeff))
             filter!(x -> isAllowed(M.parentModel, x.F), razborovBasis[FBlock])
         end
     end
@@ -325,7 +329,11 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # @show T1
                     # @show T2
                     # @show p1Fin
-                    t = glueFinite(N, T1, T2, p1Fin; labelFlags=true)
+                    @show T1 
+                    @show T2 
+                    @show p1Fin
+                    t = glueFinite(N, T1, T2, p1Fin; labelFlags=true, isAllowed = (f)->isAllowed(m.parentModel, f))
+                    @info "done"
                     # @show t
                 else
                     t = glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=true)

@@ -63,14 +63,16 @@ end
 
 Base.size(F::PartiallyLabeledFlag)::Int = size(F.F)
 
-function Base.:*(F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}) where {T<:Flag}
+function Base.:*(
+    F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}; isAllowed=(f) -> true
+) where {T<:Flag}
     if F.n > G.n
-        return G * F
+        return *(G, F; isAllowed=isAllowed)
     end
     n = size(F)
     m = size(G)
 
-    return glue(F, G, vcat(1:(F.n), (m+1):(m+n-F.n)))
+    return glue(F, G, vcat(1:(F.n), (m + 1):(m + n - F.n)); isAllowed=isAllowed)
 end
 
 function subFlag(
@@ -103,13 +105,22 @@ function glue(
     FG === nothing && return nothing
 
     if FG isa QuantumFlag
-        return QuantumFlag{PartiallyLabeledFlag{T},typeof(FG).parameters[2]}(PartiallyLabeledFlag{T}(f, max(F.n, G.n)) => d for (f, d) in FG.coeff)
+        return QuantumFlag{PartiallyLabeledFlag{T},typeof(FG).parameters[2]}(
+            PartiallyLabeledFlag{T}(f, max(F.n, G.n)) => d for (f, d) in FG.coeff
+        )
     end
     return PartiallyLabeledFlag{T}(FG, max(F.n, G.n))
 end
 
-function glueFinite(N, F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}, p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n)); labelFlags=true) where {T<:Flag}
-    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags)
+function glueFinite(
+    N,
+    F::PartiallyLabeledFlag{T},
+    G::PartiallyLabeledFlag{T},
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag}
+    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
 end
 
 function vertexColor(F::PartiallyLabeledFlag{T}, v::Int) where {T<:Flag}
@@ -159,7 +170,11 @@ function findUnknownGenerationPredicates(
     if length(predLimits) > 0 && predLimits[1] <= F.n
         return LabelPredicate[]
     end
-    return [LabelPredicate[LabelPredicate(i) for i in F.n+1:size(F) if !(i in vcat(fixed...))]]
+    return [
+        LabelPredicate[
+            LabelPredicate(i) for i in (F.n + 1):size(F) if !(i in vcat(fixed...))
+        ],
+    ]
 end
 
 function countEdges(F::PartiallyLabeledFlag{T})::Vector where {T<:Flag}
@@ -167,9 +182,7 @@ function countEdges(F::PartiallyLabeledFlag{T})::Vector where {T<:Flag}
     return [F.n, cP...]
 end
 
-function addPredicates(
-    F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:Flag,U}
-
+function addPredicates(F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:Flag,U}
     labelPreds = filter(x -> x isa LabelPredicate, preds)
     otherPreds = filter(x -> !(x isa LabelPredicate), preds)
 
@@ -181,17 +194,15 @@ function addPredicates(
     end
     res = PartiallyLabeledFlag{T}[]
     for F2 in F2s
-
-
         if length(labelPreds) == 0
-            push!(res,PartiallyLabeledFlag{T}(F2, F.n))
+            push!(res, PartiallyLabeledFlag{T}(F2, F.n))
             continue
             # return PartiallyLabeledFlag{T}(F2, F.n)
         end
 
         newLabels = setdiff!([p.i for p in labelPreds], 1:(F.n))
 
-        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n+1):size(F), newLabels))
+        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
         p = zeros(Int, size(F))
         for i in 1:size(F)
             p[pGoal[i]] = i
@@ -199,7 +210,6 @@ function addPredicates(
         F3 = permute(F2, p)
         push!(res, PartiallyLabeledFlag{T}(F3, F.n + length(newLabels)))
         # return PartiallyLabeledFlag{T}(F3, F.n + length(newLabels))
-
 
         # if U == LabelPredicate
         #     F2 = length(preds) > 0 ? addPredicates(F.F, preds) : F.F
@@ -254,8 +264,9 @@ function QuantumFlag{T}(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T<:Fla
     return res
 end
 
-
-function toInduced(F::Union{PartiallyLabeledFlag{T},QuantumFlag{PartiallyLabeledFlag{T}}}) where {T<:Flag}
+function toInduced(
+    F::Union{PartiallyLabeledFlag{T},QuantumFlag{PartiallyLabeledFlag{T}}}
+) where {T<:Flag}
     tmp = zeta(F)
     res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T}},Int}()
     for (G, c) in tmp.coeff
@@ -272,6 +283,8 @@ function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
     end
 end
 
-function labelCanonically(F::PartiallyLabeledFlag{InducedFlag{T}})::PartiallyLabeledFlag{InducedFlag{T}} where {T<:Flag}
+function labelCanonically(
+    F::PartiallyLabeledFlag{InducedFlag{T}}
+)::PartiallyLabeledFlag{InducedFlag{T}} where {T<:Flag}
     return label(F; removeIsolated=false)[1]
 end

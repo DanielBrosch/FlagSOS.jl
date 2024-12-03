@@ -11,7 +11,9 @@ mutable struct QuantumFlag{F<:Flag,T}
     QuantumFlag{F,T}(cs::Dict{F,T}) where {F<:Flag,T} = new(cs)
     QuantumFlag{F,T}(opts...) where {F<:Flag,T} = new(Dict{F,T}(opts...))
     QuantumFlag{F}(fc::QuantumFlag{F,T}) where {F<:Flag,T} = new{F,T}(fc.coeff)
-    QuantumFlag{F,T}(fc::QuantumFlag{F,U}) where {F<:Flag,T, U} = new{F,T}(Dict{F,T}(fc.coeff))
+    function QuantumFlag{F,T}(fc::QuantumFlag{F,U}) where {F<:Flag,T,U}
+        return new{F,T}(Dict{F,T}(fc.coeff))
+    end
 end
 
 function Base.promote_rule(
@@ -62,7 +64,7 @@ function countEdges(F::QuantumFlag)
     edgeCounts = [countEdges(f) for f in keys(F.coeff)]
     k = length(edgeCounts[1])
 
-    return [maximum([e[i] for e in edgeCounts]) for i = 1:k] 
+    return [maximum([e[i] for e in edgeCounts]) for i in 1:k]
 end
 
 """
@@ -70,11 +72,14 @@ end
 
 The gluing operation of type `T` extended to linear combinations of Flags.
 """
-function Base.:*(F::QuantumFlag{T,R}, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
+function Base.:*(
+    F::QuantumFlag{T,R}, G::QuantumFlag{T,R}; isAllowed=(f) -> true
+) where {T<:Flag,R<:Real}
     res = QuantumFlag{T,R}()
     for (A, c) in F.coeff
         for (B, d) in G.coeff
-            AB = A * B
+            # AB = A * B
+            AB = *(A, B; isAllowed=isAllowed)
             if AB isa QuantumFlag
                 for (C, e) in AB.coeff
                     res.coeff[C] = get(res.coeff, C, zero(R)) + c * d * e
@@ -94,7 +99,7 @@ end
 
 Scalar multiplication of a linear combinations of Flags.
 """
-function Base.:*(c::R1, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
+function Base.:*(c::R1, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real,R2<:Real}
     R = promote_type(R1, R2)
     return QuantumFlag{T,R}(Dict(g => c * d for (g, d) in G.coeff))
 end
@@ -122,7 +127,9 @@ end
 
 Adds two linear combinations of Flags.
 """
-function Base.:+(F::QuantumFlag{T,R1}, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
+function Base.:+(
+    F::QuantumFlag{T,R1}, G::QuantumFlag{T,R2}
+) where {T<:Flag,R1<:Real,R2<:Real}
     R = promote_type(R1, R2)
     res = QuantumFlag{T,R}(mergewith(+, F.coeff, G.coeff))
 
@@ -147,8 +154,8 @@ end
 function Base.:-(F::QuantumFlag{T,R}, G::T) where {T<:Flag,R<:Real}
     return F - 1 * G
 end
-function Base.:+(t::R1, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
-    return t*one(T) + G
+function Base.:+(t::R1, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real,R2<:Real}
+    return t * one(T) + G
 end
 
 """
@@ -192,7 +199,9 @@ end
 
 Subtracts two linear combinations of Flags.
 """
-function Base.:-(F::QuantumFlag{T,R1}, G::QuantumFlag{T,R2}) where {T<:Flag,R1<:Real, R2<:Real}
+function Base.:-(
+    F::QuantumFlag{T,R1}, G::QuantumFlag{T,R2}
+) where {T<:Flag,R1<:Real,R2<:Real}
     res = F + (-G)
 
     filter!(p -> !iszero(p.second), res.coeff)
@@ -204,13 +213,14 @@ end
 
 The gluing operation of type `T` extended to linear combinations of Flags.
 """
-function Base.:*(F::T, G::QuantumFlag{T,R}) where {T<:Flag,R<:Real}
+function Base.:*(F::T, G::QuantumFlag{T,R}; isAllowed=(f) -> true) where {T<:Flag,R<:Real}
     res = QuantumFlag{T,R}()
     for (B, d) in G.coeff
-        AB = F * B
+        # AB = F * B
+        AB = *(F, B; isAllowed=isAllowed)
         AB === nothing && continue
         # res.coeff[AB] = get(res.coeff, AB, zero(R)) + d
-        res += d*AB
+        res += d * AB
     end
 
     filter!(p -> !iszero(p.second), res.coeff)
@@ -222,8 +232,9 @@ end
 
 The gluing operation of type `T` extended to linear combinations of Flags.
 """
-function Base.:*(G::QuantumFlag{T,R}, F::T) where {T<:Flag,R<:Real}
-    return F * G
+function Base.:*(G::QuantumFlag{T,R}, F::T; isAllowed=(f) -> true) where {T<:Flag,R<:Real}
+    return *(F, G; isAllowed=isAllowed)
+    # return F * G
 end
 
 """
@@ -264,11 +275,6 @@ end
 
 import Base.convert
 
-function Base.convert(
-    ::Type{QuantumFlag{T,D}},
-    F::QuantumFlag{T,D2},
-) where {T<:Flag, D, D2}
-    return QuantumFlag{T,D}(
-        F.coeff
-    )
+function Base.convert(::Type{QuantumFlag{T,D}}, F::QuantumFlag{T,D2}) where {T<:Flag,D,D2}
+    return QuantumFlag{T,D}(F.coeff)
 end

@@ -60,7 +60,7 @@ end
 
 # should return true only if there are no more marked edges in the vertices in c
 function finalized_subgraph(F::EdgeMarkedFlag{T,P}, c::Vector{Int})::Bool where {T,P}
-    return all(finalized_subgraph(m,c) for m in F.marked)
+    return all(finalized_subgraph(m, c) for m in F.marked)
 end
 
 function finalized_subgraph(p::P, c::Vector{Int})::Bool where {P<:Predicate}
@@ -97,7 +97,7 @@ end
 function findUnknownPredicates(
     F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector
 ) where {U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed, predLimits[1:(end - 1)]), predLimits::Vector
+    return findUnknownPredicates(F.F, fixed, predLimits[1:(end-1)]), predLimits::Vector
 end
 
 function predicateType(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P}
@@ -181,20 +181,22 @@ end
 
 Computes the zeta transform of a flag on the vertices 'verts'
 """
-function zeta(F::T, verts=1:size(F); label=false) where {T<:Flag}
+function zeta(F::T, verts=1:size(F); label=false, isAllowed=(f) -> true) where {T<:Flag}
     @assert verts == 1:size(F) "TODO"
     markedF = EdgeMarkedFlag{T}(F, findUnknownPredicates(F))
-    return zeta(markedF; label=label)
+    return zeta(markedF; label=label, isAllowed=isAllowed)
 end
 
-function zeta(F::QuantumFlag{T,D}; label=false) where {T<:Flag,D}
+function zeta(F::QuantumFlag{T,D}; label=false, isAllowed=(f) -> true) where {T<:Flag,D}
     tmp = sum(c * EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G, c) in F.coeff)
-    return zeta(tmp; label=label)
+    return zeta(tmp; label=label, isAllowed=isAllowed)
 end
 
-function moebius(F::QuantumFlag{T,D}; label=false) where {T<:Flag,D}
+function moebius(
+    F::QuantumFlag{T,D}; label=false, isAllowed=(f) -> true
+) where {T<:Flag,D}
     tmp = sum(c * EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G, c) in F.coeff)
-    return moebius(tmp; label=label)
+    return moebius(tmp; label=label, isAllowed=isAllowed)
 end
 
 function vertexColor(F::EdgeMarkedFlag, v::Int)
@@ -206,7 +208,9 @@ end
 
 Computes the moebius transform of an edge-marked flag on the marked edges. 
 """
-function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicate}
+function moebius(
+    F::EdgeMarkedFlag{T,P}; label=false, isAllowed=(f) -> true
+) where {T<:Flag,P<:Predicate}
     # @show F
     res = 0 * F.F
     k = length(F.marked)
@@ -219,14 +223,17 @@ function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicat
 
     for flippedEdges in 0:k
         for (F2, c2) in tmp
-            res += c2 * (-1)^flippedEdges * F2.F
+            if isAllowed(F2.F)
+                res += c2 * (-1)^flippedEdges * F2.F
+            end
             for (F3, c3) in allWaysToAddOneMarked(F2)
+                !isAllowed(F3) && continue
                 # F3L = label ? labelCanonically(F3) : F3
                 # tmp2[F3L] = get(tmp2, F3L, 0) + c2 * c3
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
-        map!(x -> x//(flippedEdges + 1), values(tmp2))
+        map!(x -> x // (flippedEdges + 1), values(tmp2))
         if label
             empty!(tmp)
             for (F, c) in tmp2
@@ -244,22 +251,28 @@ function moebius(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicat
 end
 
 function zeta(
-    F::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false
+    F::QuantumFlag{EdgeMarkedFlag{T,P},D};
+    label=false,
+    isAllowed=(f) -> true,
 ) where {T<:Flag,D,P<:Predicate}
     # res = moebius(F; label=label)
     # map!(abs, values(res.coeff))
-    res = sum(c * zeta(f) for (f, c) in F.coeff)
+    res = sum(c * zeta(f; label=label, isAllowed=isAllowed) for (f, c) in F.coeff)
     return res
 end
 
-function zeta(F::EdgeMarkedFlag{T,P}; label=false) where {T<:Flag,P<:Predicate}
-    res = moebius(F; label=label)
+function zeta(
+    F::EdgeMarkedFlag{T,P}; label=false, isAllowed=(f) -> true
+) where {T<:Flag,P<:Predicate}
+    res = moebius(F; label=label, isAllowed=isAllowed)
     map!(abs, values(res.coeff))
     return res
 end
 
 function moebius(
-    Fs::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false
+    Fs::QuantumFlag{EdgeMarkedFlag{T,P},D};
+    label=false,
+    isAllowed=(f) -> true,
 ) where {T<:Flag,D,P<:Predicate}
     if length(Fs.coeff) == 0
         return QuantumFlag{T,D}()
@@ -277,12 +290,13 @@ function moebius(
             res += c2 * (-1)^flippedEdges * (label ? labelCanonically(F2.F) : F2.F)
 
             for (F3, c3) in allWaysToAddOneMarked(F2)
+                !isAllowed(F3) && continue
                 # F3L = label ? labelCanonically(F3) : F3
                 # tmp2[F3L] = get(tmp2, F3L, 0) + c2 * c3
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
-        map!(x -> D(x//(flippedEdges + 1)), values(tmp2))
+        map!(x -> D(x // (flippedEdges + 1)), values(tmp2))
 
         if label
             empty!(tmp)

@@ -41,13 +41,13 @@ function sortEntries!(A::Matrix{Int})
         # if c > 0 && found[c] == 0
         if c > 0 && !(c in found)
             # found[c] = true
-            push!(found,c)
+            push!(found, c)
             # push!(cs, c)
             noFound += 1
             cs[noFound] = c
         end
         if length(found) == k
-        # if all(found)
+            # if all(found)
             break
         end
     end
@@ -113,14 +113,14 @@ struct ColoredEdgePredicate <: Predicate
 end
 
 function finalized_subgraph(P::ColoredEdgePredicate, c::Vector{Int})
-    return !issubset([P.i,P.j],c)
+    return !issubset([P.i, P.j], c)
 end
 
 function isAllowed(G::EdgeColoredGraph{N,B}, e::ColoredEdgePredicate) where {N,B}
     N > -1 && -e.c >= N && return false
     c = G.A[e.i, e.j]
     c == 0 && return true
-    
+
     # if e.c > 0
     #     return c == e.c
     # else
@@ -153,9 +153,7 @@ function permute(
     if m > 0
         @views A[1:m, 1:m] .= F.A[pInv[1:m], pInv[1:m]]
     end
-    return EdgeColoredGraph{N,B}(
-        A
-    )
+    return EdgeColoredGraph{N,B}(A)
 end
 
 function permute(pred::ColoredEdgePredicate, p::AbstractVector{Int})
@@ -224,7 +222,7 @@ function addPredicates(
     # for p in preds
     nC = Int[p.c]
     if p.c <= 0
-        nC = collect((-p.c+1):(hC+1))
+        nC = collect((-p.c + 1):(hC + 1))
     end
 
     for c in nC
@@ -247,7 +245,10 @@ end
 
 # apply p to g1, then glue together
 function glue(
-    g1::EdgeColoredGraph{N,false}, g2::EdgeColoredGraph{N,false}, p::AbstractVector{Int}
+    g1::EdgeColoredGraph{N,false},
+    g2::EdgeColoredGraph{N,false},
+    p::AbstractVector{Int};
+    isAllowed=(f) -> true,
 ) where {N}
     n1 = size(g1)
     n2 = size(g2)
@@ -264,11 +265,20 @@ function glue(
         res[p[i], p[j]] = g1.A[i, j]
     end
 
-    return EdgeColoredGraph{N,false}(res)
+    F = EdgeColoredGraph{N,false}(res)
+
+    if !isAllowed(F)
+        return nothing
+    end
+
+    return F
 end
 
 function glue(
-    g1::EdgeColoredGraph{N,true}, g2::EdgeColoredGraph{N,true}, p::AbstractVector{Int}
+    g1::EdgeColoredGraph{N,true},
+    g2::EdgeColoredGraph{N,true},
+    p::AbstractVector{Int};
+    isAllowed=(f) -> true,
 ) where {N}
     n1 = size(g1)
     n2 = size(g2)
@@ -302,7 +312,6 @@ function glue(
     for i in 0:min(length(colorsOnlyG1), length(colorsOnlyG2))
         for G1Cs in combinations(colorsOnlyG1, i), G2Cs in combinations(colorsOnlyG2, i)
             for σ in SymmetricGroup(i)
-
                 colorTranslate2 = deepcopy(colorTranslate)
                 for (j, c) in enumerate(G1Cs)
                     colorTranslate2[c] = G2Cs[σ[j]]
@@ -328,7 +337,10 @@ function glue(
                 end
                 # @show A
 
-                res += EdgeColoredGraph{N,true}(A)
+                F = EdgeColoredGraph{N,true}(A)
+                if isAllowed(F)
+                    res += F
+                end
             end
         end
     end
@@ -415,7 +427,7 @@ function distinguish(F::EdgeColoredGraph, v::Int, W::BitVector)::UInt
     # counts = sort!(Int[count(x -> x == c, AWv) for c in cs])
 
     counts = zeros(Int, maximum(F.A))
-    for i = 1:size(F.A, 1)
+    for i in 1:size(F.A, 1)
         if W[i]
             c = F.A[i, v]
             if c != 0
