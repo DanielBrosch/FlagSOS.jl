@@ -373,7 +373,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         union!(
             Fs,
             generateAll(
-                T, n, [99999]; withInducedProperty=x -> isAllowed(m.parentModel, x)
+                T, n, [99999]; withProperty=x -> isAllowed(m.parentModel, x), withPropertyMarked = x -> isAllowed(m.parentModel, x)
             ),
         )
 
