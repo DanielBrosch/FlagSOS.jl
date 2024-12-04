@@ -66,6 +66,10 @@ function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{T}) where {T<:Flag,N,D
     return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
 end
 
+function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{PartiallyLabeledFlag{T}}) where {T<:Flag,N,D}
+    return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+end
+
 function isAllowed(m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{T}) where {T<:Flag,N,D}
     F2 = labelCanonically(F.F)
     return isAllowed(m, F2)

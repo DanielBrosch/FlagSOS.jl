@@ -79,7 +79,7 @@ function computeUnreducedRazborovBasis(
         withPropertyMarked=x -> isAllowed(M.parentModel, x),
     )
     @info "Splitting $(length(flags)) flags..."
-
+    
     filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
@@ -104,7 +104,8 @@ function computeUnreducedRazborovBasis(
             FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(
                 PartiallyLabeledFlag{T}(FExtended, m), preds
             )
-            razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x.F)).coeff))
+            razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x)).coeff))
+            # razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x.F)).coeff))
             filter!(x -> isAllowed(M.parentModel, x.F), razborovBasis[FBlock])
         end
     end
@@ -119,6 +120,8 @@ function computeRazborovBasis!(
     if maxBlockSize < Inf
         filter!(x -> length(x[2]) < maxBlockSize, reducedBasis)
     end
+
+    display(reducedBasis)
 
     @info "basis reduced"
     @info "determining symmetries"
@@ -142,8 +145,8 @@ function computeRazborovBasis!(
                         permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
                     ),
                 )
-                @show pb
-                display.(B)
+                # @show pb
+                # display.(B)
                 gen[i] = findfirst(x -> x == pb, B)
             end
             push!(newGen, gen)
@@ -326,14 +329,12 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # @show a
                     # @show b
                     # @show mu
-                    # @show T1
-                    # @show T2
-                    # @show p1Fin
+                    println()
                     @show T1 
                     @show T2 
                     @show p1Fin
                     t = glueFinite(N, T1, T2, p1Fin; labelFlags=true, isAllowed = (f)->isAllowed(m.parentModel, f))
-                    @info "done"
+                    # @info "done"
                     # @show t
                 else
                     t = glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=true)

@@ -94,6 +94,26 @@ function isSubFlag(F::T, G::EdgeMarkedFlag{T}; induced=F isa InducedFlag) where 
     return false
 end
 
+function isSubFlag(F::T, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=F isa InducedFlag) where {T<:Flag}
+    # Very basic brute force algorithm
+    m = size(F)
+    n = size(G)
+    for c in combinations(1:n, m)
+        if induced
+            if finalized_subgraph(G, c) && isIsomorphic(F, subFlag(G.F.F, c))
+                return true
+            end
+        else
+            for d in SymmetricGroup(m)
+                if subFlag(G, c) == glue(F, subFlag(G, c), d.d)
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 function findUnknownPredicates(
     F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector
 ) where {U<:AbstractVector{Int}}

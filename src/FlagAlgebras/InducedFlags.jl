@@ -105,9 +105,7 @@ function glue(
         # res += sum(c//1 * G for (G, c) in zeta(FGMarked; label=true, isAllowed=isAllowed).coeff)
     end
 
-    @show length(tmp.coeff)
     tmp = labelCanonically(tmp)
-    @show length(tmp.coeff)
     res = zeta(tmp; label=true, isAllowed=isAllowed)
 
     return res
