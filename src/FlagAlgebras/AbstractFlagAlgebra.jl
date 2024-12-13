@@ -303,7 +303,7 @@ end
 Returns the sub-Flag indexed by `vertices`, which is a subset of `1:size(F)`.
 """
 function subFlag(F::T, vertices::AbstractVector{Int})::T where {T<:Flag}
-    error("subFlag is not defined for Flag type T")
+    error("subFlag is not defined for Flag type $T")
     return missing
 end
 

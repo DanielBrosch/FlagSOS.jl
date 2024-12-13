@@ -100,7 +100,7 @@ function addPredicates(G::Graph, preds::Vector{EdgePredicate})
 end
 
 # apply p to g1, then glue together
-function glue(g1::Graph, g2::Graph, p::AbstractVector{Int})::Graph
+function glue(g1::Graph, g2::Graph, p::AbstractVector{Int}; isAllowed=(f) -> true)::Graph
     n1 = size(g1)
     n2 = size(g2)
     n = max(n2, length(p) > 0 ? maximum(p) : 0)
@@ -118,7 +118,7 @@ function glue(g1::Graph, g2::Graph, p::AbstractVector{Int})::Graph
     return Graph(Symmetric(res))
 end
 
-function glue(Gs::Vararg{Graph})::Graph
+function glue(Gs::Vararg{Graph}; isAllowed=(f) -> true)::Graph
     if length(Gs) == 1
         return Gs[1]
     elseif length(Gs) == 2

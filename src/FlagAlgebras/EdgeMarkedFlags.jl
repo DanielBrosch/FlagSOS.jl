@@ -78,38 +78,37 @@ function isSubFlag(F::T, G::EdgeMarkedFlag{T}; induced=F isa InducedFlag) where 
     # Very basic brute force algorithm
     m = size(F)
     n = size(G)
-    for c in combinations(1:n, m)
-        if induced
+    if induced
+        for c in combinations(1:n, m)
             if finalized_subgraph(G, c) && isIsomorphic(F, subFlag(G.F, c))
                 return true
             end
-        else
-            for d in SymmetricGroup(m)
-                if subFlag(G, c) == glue(F, subFlag(G, c), d.d)
-                    return true
-                end
-            end
         end
+    else
+        return isSubFlag(F, G.F)
     end
     return false
 end
 
-function isSubFlag(F::T, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=F isa InducedFlag) where {T<:Flag}
+function isSubFlag(
+    F::T, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=F isa InducedFlag
+) where {T<:Flag}
     # Very basic brute force algorithm
     m = size(F)
     n = size(G)
-    for c in combinations(1:n, m)
-        if induced
+    if induced
+        for c in combinations(1:n, m)
             if finalized_subgraph(G, c) && isIsomorphic(F, subFlag(G.F.F, c))
                 return true
             end
-        else
-            for d in SymmetricGroup(m)
-                if subFlag(G, c) == glue(F, subFlag(G, c), d.d)
-                    return true
-                end
-            end
         end
+    else
+        return isSubFlag(F, G.F.F)
+        # for d in SymmetricGroup(m)
+        #     if subFlag(G, c) == glue(F, subFlag(G, c), d.d)
+        #         return true
+        #     end
+        # end
     end
     return false
 end
@@ -117,7 +116,7 @@ end
 function findUnknownPredicates(
     F::EdgeMarkedFlag, fixed::Vector{U}, predLimits::Vector
 ) where {U<:AbstractVector{Int}}
-    return findUnknownPredicates(F.F, fixed, predLimits[1:(end-1)]), predLimits::Vector
+    return findUnknownPredicates(F.F, fixed, predLimits[1:(end - 1)]), predLimits::Vector
 end
 
 function predicateType(::Type{EdgeMarkedFlag{T,P}}) where {T<:Flag,P}
@@ -212,9 +211,7 @@ function zeta(F::QuantumFlag{T,D}; label=false, isAllowed=(f) -> true) where {T<
     return zeta(tmp; label=label, isAllowed=isAllowed)
 end
 
-function moebius(
-    F::QuantumFlag{T,D}; label=false, isAllowed=(f) -> true
-) where {T<:Flag,D}
+function moebius(F::QuantumFlag{T,D}; label=false, isAllowed=(f) -> true) where {T<:Flag,D}
     tmp = sum(c * EdgeMarkedFlag{T}(G, findUnknownPredicates(G)) for (G, c) in F.coeff)
     return moebius(tmp; label=label, isAllowed=isAllowed)
 end
@@ -253,7 +250,7 @@ function moebius(
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
-        map!(x -> x // (flippedEdges + 1), values(tmp2))
+        map!(x -> x//(flippedEdges + 1), values(tmp2))
         if label
             empty!(tmp)
             for (F, c) in tmp2
@@ -271,9 +268,7 @@ function moebius(
 end
 
 function zeta(
-    F::QuantumFlag{EdgeMarkedFlag{T,P},D};
-    label=false,
-    isAllowed=(f) -> true,
+    F::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false, isAllowed=(f) -> true
 ) where {T<:Flag,D,P<:Predicate}
     # res = moebius(F; label=label)
     # map!(abs, values(res.coeff))
@@ -290,9 +285,7 @@ function zeta(
 end
 
 function moebius(
-    Fs::QuantumFlag{EdgeMarkedFlag{T,P},D};
-    label=false,
-    isAllowed=(f) -> true,
+    Fs::QuantumFlag{EdgeMarkedFlag{T,P},D}; label=false, isAllowed=(f) -> true
 ) where {T<:Flag,D,P<:Predicate}
     if length(Fs.coeff) == 0
         return QuantumFlag{T,D}()
@@ -316,7 +309,7 @@ function moebius(
                 tmp2[F3] = get(tmp2, F3, 0) + c2 * c3
             end
         end
-        map!(x -> D(x // (flippedEdges + 1)), values(tmp2))
+        map!(x -> x/D(flippedEdges + 1), values(tmp2))
 
         if label
             empty!(tmp)

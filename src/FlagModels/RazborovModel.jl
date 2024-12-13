@@ -1,6 +1,6 @@
 export RazborovModel, computeRazborovBasis!
 
-using SparseArrays
+using SparseArrays, SDPSymmetryReduction
 
 include("../utils/RegularRepresentation.jl")
 
@@ -53,11 +53,34 @@ end
 
 function modelSize(m::RazborovModel)
     # return Partition([m.blockSymmetry[b].n for b in keys(m.basis)])
-    return Partition(vcat([length(b) for b in values(m.basis)], [1 for _ in m.quotient]))
+    # return Partition(vcat([length(b) for b in values(m.basis)], [1 for _ in m.quotient]))
+
+    tmp = Int[]
+    for (mu, b) in m.basis
+        if haskey(m.blockSymmetry[mu], :Q)
+            tmp = vcat(tmp, [size(Q, 2) for Q in m.blockSymmetry[mu].Q])
+        else
+            tmp = vcat(tmp, length(b))
+        end
+    end
+    tmp = vcat(tmp, [1 for _ in m.quotient])
+    return Partition(tmp)
 end
 
 function modelBlockSizes(m::RazborovModel)
-    res = Dict{Any,Int}(F => length(b) for (F, b) in m.basis)
+    # res = Dict{Any,Int}(F => length(b) for (F, b) in m.basis)
+
+    res = Dict{Any,Int}()
+    for (mu, b) in m.basis
+        if haskey(m.blockSymmetry[mu], :Q)
+            for i in eachindex(m.blockSymmetry[mu].Q)
+                res["($mu, $i)"] = size(m.blockSymmetry[mu].Q[i], 2)
+            end
+        else
+            res[mu] = length(b)
+        end
+    end
+
     for (i, F) in enumerate(m.quotient)
         res["Q$i"] = -1
     end
@@ -79,7 +102,7 @@ function computeUnreducedRazborovBasis(
         withPropertyMarked=x -> isAllowed(M.parentModel, x),
     )
     @info "Splitting $(length(flags)) flags..."
-    
+
     filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
@@ -92,7 +115,7 @@ function computeUnreducedRazborovBasis(
             if m > 0
                 F = permute(Ftmp, 1:m) # add isolated vertices in labeled part
             else
-                F = Ftmp 
+                F = Ftmp
             end
             FBlock = label(F; removeIsolated=false)[1]
             @assert size(FBlock) == m
@@ -104,7 +127,9 @@ function computeUnreducedRazborovBasis(
             FMarked = EdgeMarkedFlag{PartiallyLabeledFlag{T}}(
                 PartiallyLabeledFlag{T}(FExtended, m), preds
             )
-            razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x)).coeff))
+            razborovBasis[FBlock] = collect(
+                keys(moebius(FMarked; isAllowed=x -> isAllowed(M.parentModel, x)).coeff)
+            )
             # razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x.F)).coeff))
             filter!(x -> isAllowed(M.parentModel, x.F), razborovBasis[FBlock])
         end
@@ -165,7 +190,7 @@ function computeRazborovBasis!(
             c[2] = pos[2]
             newPos = [c]
             P[c[1], c[2]] = i
-            # P[c[2], c[1]] = i
+            P[c[2], c[1]] = i
             while !isempty(newPos)
                 ci = popfirst!(newPos)
                 for p in newGen
@@ -173,14 +198,37 @@ function computeRazborovBasis!(
                     if P[pc[1], pc[2]] == 0
                         push!(newPos, pc)
                         P[pc[1], pc[2]] = i
-                        # P[pc[2], pc[1]] = i
+                        P[pc[2], pc[1]] = i
                     end
                 end
             end
             i += 1
         end
 
-        if maximum(P) > size(P, 1) # regular representation makes things worse
+        if true # block-diagonalize numerically using SDPSymmetryReduction
+            part = SDPSymmetryReduction.Partition{Int}(P)
+
+            Q = SDPSymmetryReduction.diagonalize(Float64, part)
+            # basisImage = SDPSymmetryReduction.basis_image_thr(Q, part)
+            # symmetrizedRepr = Dict()
+            # for i in 1:SDPSymmetryReduction.dim(part)
+            #     c = findfirst(x -> x == i, P)
+            #     j = P[c[2], c[1]]
+
+            #     ind = min(i, j)
+
+            #     if !haskey(symmetrizedRepr, ind)
+            #         symmetrizedRepr[ind] = basisImage[i]
+            #     else
+            #         symmetrizedRepr[ind] += basisImage[i]
+            #     end
+            # end
+
+            M.blockSymmetry[mu] = (
+                pattern=P, gen=newGen, Q=Q, n=SDPSymmetryReduction.dim(part), fullPattern=P
+            )
+
+        elseif maximum(P) > size(P, 1) # regular representation makes things worse
             @info "Regular representation not worth it for block $mu"
             symmetrize = Dict()
             ind = 1
@@ -241,7 +289,8 @@ function computeRazborovBasis!(
 end
 
 function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
-    m.sdpData = Dict()
+    sdpData = Dict()
+    # m.sdpData = Dict()
 
     for (muc, (mu, B)) in enumerate(m.basis)
         @show muc, maximum(m.blockSymmetry[mu].pattern), length(B), mu
@@ -330,10 +379,17 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # @show b
                     # @show mu
                     println()
-                    @show T1 
-                    @show T2 
+                    @show T1
+                    @show T2
                     @show p1Fin
-                    t = glueFinite(N, T1, T2, p1Fin; labelFlags=true, isAllowed = (f)->isAllowed(m.parentModel, f))
+                    t = glueFinite(
+                        N,
+                        T1,
+                        T2,
+                        p1Fin;
+                        labelFlags=true,
+                        isAllowed=(f) -> isAllowed(m.parentModel, f),
+                    )
                     # @info "done"
                     # @show t
                 else
@@ -346,14 +402,15 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
             for (F, d) in t.coeff
                 !isAllowed(m.parentModel, F) && continue
-                if !haskey(m.sdpData, F)
-                    m.sdpData[F] = Dict()
+                if !haskey(sdpData, F)
+                    sdpData[F] = Dict()
                 end
-                if !haskey(m.sdpData[F], mu)
+                # if !haskey(P, :Q)
+                if !haskey(sdpData[F], mu)
                     if haskey(P, :reg)
-                        m.sdpData[F][mu] = zeros(Float64, P.n, P.n)
+                        sdpData[F][mu] = zeros(Float64, P.n, P.n)
                     else
-                        m.sdpData[F][mu] = zeros(Rational{Int}, length(B), length(B))
+                        sdpData[F][mu] = zeros(Rational{Int}, length(B), length(B))
                     end
                 end
                 if haskey(P, :reg)
@@ -363,14 +420,37 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # if t != s 
                     #     A += Int.(P.pattern .== t)
                     # end
-                    # m.sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
-                    m.sdpData[F][mu] .+= d * P.reg[s]#*factor
+                    # sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
+                    sdpData[F][mu] .+= d * P.reg[s]#*factor
                 else
-                    m.sdpData[F][mu][P.pattern .== s] .= d
+                    sdpData[F][mu][P.pattern .== s] .= d
                 end
+                # else # Symmetry reduction: basis change matrices in P.Q
+                # @show P.Q
+                # end
             end
         end
     end
+
+    # Apply block-diagonalization from symmetry reduction
+    blockDiagonalData = Dict()
+    for (F, Bs) in sdpData
+        blockDiagonalData[F] = Dict()
+        for (mu, B) in Bs
+            P = m.blockSymmetry[mu]
+            if haskey(P, :Q)
+                for i in eachindex(P.Q)
+                    BQi = SDPSymmetryReduction.conjugate(B, P.Q[i])
+                    blockDiagonalData[F]["($mu, $i)"] = BQi
+                end
+            else
+                blockDiagonalData[F][mu] = B
+            end
+        end
+    end
+
+    # m.sdpData = sdpData
+    m.sdpData = blockDiagonalData
 
     if isInducedFlag(T)# <: InducedFlag
         # Eliminate linear dependencies 
@@ -382,7 +462,11 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         union!(
             Fs,
             generateAll(
-                T, n, [99999]; withProperty=x -> isAllowed(m.parentModel, x), withPropertyMarked = x -> isAllowed(m.parentModel, x)
+                T,
+                n,
+                [99999];
+                withProperty=x -> isAllowed(m.parentModel, x),
+                withPropertyMarked=x -> isAllowed(m.parentModel, x),
             ),
         )
 
@@ -488,56 +572,56 @@ function buildJuMPModel(m::RazborovModel, replaceBlocks=Dict(), jumpModel=Model(
 
     for (mu, n) in b
         if n > 0
-            P = m.blockSymmetry[mu].pattern
-            name = "y[$mu]"
-            # t = maximum(P)
-            t = m.blockSymmetry[mu].n
-            if haskey(m.blockSymmetry[mu], :reg)
-                reg = m.blockSymmetry[mu].reg
-                y = @variable(jumpModel, [keys(reg)], base_name = name)
-                AT = typeof(1 * y[1])
+            # P = m.blockSymmetry[mu].pattern
+            # name = "y[$mu]"
+            # # t = maximum(P)
+            # t = m.blockSymmetry[mu].n
+            # if haskey(m.blockSymmetry[mu], :reg)
+            #     reg = m.blockSymmetry[mu].reg
+            #     y = @variable(jumpModel, [keys(reg)], base_name = name)
+            #     AT = typeof(1 * y[1])
 
-                # Y[mu] = zeros(AT, t, t)
-                # for s in keys(reg)
-                #     Y[mu] .+= reg[s]*y[s]
-                # end
-                Y[mu] = sum(reg[s] * y[s] for s in keys(reg))
-                if size(P, 1) > 1
-                    constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+            #     # Y[mu] = zeros(AT, t, t)
+            #     # for s in keys(reg)
+            #     #     Y[mu] .+= reg[s]*y[s]
+            #     # end
+            #     Y[mu] = sum(reg[s] * y[s] for s in keys(reg))
+            #     if size(P, 1) > 1
+            #         constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+            #     else
+            #         constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+            #     end
+            # else
+            # numVars = maximum(P)
+            # y = @variable(jumpModel, [1:numVars], base_name = name)
+            # AT = typeof(1 * y[1])
+
+            # Y[mu] = zeros(AT, t, t)
+            # # Y[mu] = zeros(AT, size(P))
+            # for s in 1:numVars
+            #     Y[mu][P .== s] .+= y[s]
+            # end
+
+            # Y[mu] = sum((P .== s) * y[s] for s in 1:numVars)
+            # # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
+            # if size(P, 1) > 1
+            #     constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
+            # else
+            #     constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+            # end
+
+            Y[mu] = get(replaceBlocks, mu) do
+                name = "Y$mu"
+                if n > 1
+                    v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
+                    constraints[name] = @constraint(jumpModel, v in PSDCone())
+                    return v
                 else
-                    constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
+                    v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
+                    constraints[name] = @constraint(jumpModel, v .>= 0)
+                    return v
                 end
-            else
-                # numVars = maximum(P)
-                # y = @variable(jumpModel, [1:numVars], base_name = name)
-                # AT = typeof(1 * y[1])
-
-                # Y[mu] = zeros(AT, t, t)
-                # # Y[mu] = zeros(AT, size(P))
-                # for s in 1:numVars
-                #     Y[mu][P .== s] .+= y[s]
                 # end
-
-                # Y[mu] = sum((P .== s) * y[s] for s in 1:numVars)
-                # # Y[mu] = @variable(jumpModel, [1:size(P,1),1:size(P,1)], PSD)
-                # if size(P, 1) > 1
-                #     constraints[name] = @constraint(jumpModel, Y[mu] in PSDCone())
-                # else
-                #     constraints[name] = @constraint(jumpModel, Y[mu] .>= 0)
-                # end
-
-                Y[mu] = get(replaceBlocks, mu) do
-                    name = "Y$mu"
-                    if n > 1
-                        v = @variable(jumpModel, [1:n, 1:n], Symmetric, base_name = name)
-                        constraints[name] = @constraint(jumpModel, v in PSDCone())
-                        return v
-                    else
-                        v = @variable(jumpModel, [1:1, 1:1], Symmetric, base_name = name)
-                        constraints[name] = @constraint(jumpModel, v .>= 0)
-                        return v
-                    end
-                end
             end
         else
             y = @variable(jumpModel, [1:1, 1:1], base_name = mu)
