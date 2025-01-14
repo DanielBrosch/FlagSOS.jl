@@ -164,16 +164,16 @@ function isolatedVertices(F::EdgeMarkedFlag)::BitVector
     return BitVector([false for i in 1:size(F)])
 end
 
-function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}) where {T<:Flag,P}
+function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}; removeEarlierMarked = false) where {T<:Flag,P}
     res = Dict{EdgeMarkedFlag{T,P},Int}()
-    for e in F.marked
+    for (i,e) in enumerate(F.marked)
         newF = addPredicates(F.F, [e])
         if !(newF isa Vector)
             newF = [newF]
         end
         for added in newF
             if added !== nothing
-                markedN = P[p for p in F.marked if p != e && isAllowed(added, p)]
+                markedN = P[p for (j,p) in enumerate(F.marked) if p != e && isAllowed(added, p) && (!removeEarlierMarked || j > i)]
                 # markedN = setdiff(F.marked, [e])#filter!(x -> isAllowed(added, x), setdiff(F.marked, [e]))
                 Fn = EdgeMarkedFlag{T}(added, markedN)
                 Fl = labelCanonically(Fn)

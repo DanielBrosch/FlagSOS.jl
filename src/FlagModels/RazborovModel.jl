@@ -206,6 +206,8 @@ function computeRazborovBasis!(
         end
 
         if true # block-diagonalize numerically using SDPSymmetryReduction
+            # @show P
+            # @show SDPSymmetryReduction.Partition{Int}(P)
             part = SDPSymmetryReduction.Partition{Int}(P)
 
             Q = SDPSymmetryReduction.diagonalize(Float64, part)
@@ -408,9 +410,9 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                 # if !haskey(P, :Q)
                 if !haskey(sdpData[F], mu)
                     if haskey(P, :reg)
-                        sdpData[F][mu] = zeros(Float64, P.n, P.n)
+                        sdpData[F][mu] = zeros(D, P.n, P.n)
                     else
-                        sdpData[F][mu] = zeros(Rational{Int}, length(B), length(B))
+                        sdpData[F][mu] = zeros(D, length(B), length(B))
                     end
                 end
                 if haskey(P, :reg)

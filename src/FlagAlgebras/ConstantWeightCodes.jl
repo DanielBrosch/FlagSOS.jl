@@ -110,7 +110,7 @@ function addPredicates(
 end
 
 function glue(
-    g1::ConstantWeightCode{W,D}, g2::ConstantWeightCode{W,D}, p::AbstractVector{Int}
+    g1::ConstantWeightCode{W,D}, g2::ConstantWeightCode{W,D}, p::AbstractVector{Int}; isAllowed=(f) -> true
 ) where {W,D}
     n1 = size(g1)
     n2 = size(g2)
