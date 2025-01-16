@@ -2,7 +2,7 @@
 
 using DocStringExtensions
 using Combinatorics
-using Memoize # for isIsomorphic. Replace with more efficient algorithm later?
+using Memoize, ThreadSafeDicts # for isIsomorphic. Replace with more efficient algorithm later?
 
 export Flag, labelCanonically, aut, glue, permute, countEdges
 import Base.zero
@@ -416,7 +416,8 @@ end
 
 Checks if two flags are isomorphic.
 """
-@memoize Dict{Tuple{Flag,Flag},Bool} function isIsomorphic(F::T, G::T) where {T<:Flag}
+# @memoize Dict{Tuple{Flag,Flag},Bool} 
+@memoize ThreadSafeDict{Tuple{Flag,Flag},Bool} function isIsomorphic(F::T, G::T) where {T<:Flag}
     # Can be optimized! Do not need to run the full algorithm.
     countEdges(F) != countEdges(G) && return false
     return labelCanonically(F) == labelCanonically(G)
