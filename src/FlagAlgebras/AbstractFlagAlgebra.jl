@@ -417,10 +417,13 @@ end
 Checks if two flags are isomorphic.
 """
 # @memoize Dict{Tuple{Flag,Flag},Bool} 
-@memoize ThreadSafeDict{Tuple{Flag,Flag},Bool} function isIsomorphic(F::T, G::T) where {T<:Flag}
+@memoize ThreadSafeDict{Tuple{Flag,Flag, Bool},Bool} function isIsomorphic(
+    F::T, G::T; FLabelled = false
+) where {T<:Flag}
     # Can be optimized! Do not need to run the full algorithm.
     countEdges(F) != countEdges(G) && return false
-    return labelCanonically(F) == labelCanonically(G)
+    FL = FLabelled ? F : labelCanonically(F)
+    return FL == labelCanonically(G)
 end
 
 """
@@ -432,9 +435,10 @@ function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
     # Very basic brute force algorithm
     m = size(F)
     n = size(G)
+    FL = labelCanonically(F)
     for c in combinations(1:n, m)
         if induced
-            if isIsomorphic(F, subFlag(G, c))
+            if isIsomorphic(FL, subFlag(G, c); FLabelled = true)
                 return true
             end
         else
@@ -442,6 +446,29 @@ function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
                 if subFlag(G, c) == glue(F, subFlag(G, c), d.d)
                     return true
                 end
+            end
+        end
+    end
+    return false
+end
+
+# Checks if ANY flag in Fs is a subflag of G. ASSUMES Fs are labelled!
+function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::T; induced=G isa InducedFlag) where {T<:Flag}
+    # Very basic brute force algorithm
+    ms = unique(size.(Fs))
+    n = size(G)
+    #FsL = labelCanonically.(Fs)
+    for m in ms
+        for c in combinations(1:n, m)
+            if induced
+                Gc = labelCanonically(subFlag(G, c))
+                for F in Fs
+                    if size(F) == m && F == Gc #isIsomorphic(F, Gc)
+                        return true
+                    end
+                end
+            else
+                @error "TODO"
             end
         end
     end

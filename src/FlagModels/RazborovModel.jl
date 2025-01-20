@@ -132,6 +132,9 @@ function computeUnreducedRazborovBasis(
             )
             # razborovBasis[FBlock] = collect(keys(moebius(FMarked; isAllowed= x -> isAllowed(M.parentModel, x.F)).coeff))
             filter!(x -> isAllowed(M.parentModel, x.F), razborovBasis[FBlock])
+            if length(razborovBasis[FBlock]) == 0
+                delete!(razborovBasis, FBlock)
+            end
         end
     end
     return razborovBasis

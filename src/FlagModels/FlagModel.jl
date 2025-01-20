@@ -46,12 +46,16 @@ function Base.show(io::IO, m::FlagModel{T,N,D}) where {T,N,D}
 end
 
 function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
-    #TODO: If non-induced, forbid all graphs that can be obtained by adding edges, as well.
     Fl = labelCanonically(F)
-    return push!(m.forbiddenFlags, Fl)
-    # for ms in m.subModels
-    #     addForbiddenFlag!(ms, Fl)
-    # end
+    push!(m.forbiddenFlags, Fl)
+end
+
+function addForbiddenFlag!(m::FlagModel{InducedFlag{T},N,D}, F::T) where {T<:Flag,N,D}
+    # If non-induced, forbid all graphs that can be obtained by adding edges, as well.
+    supGraphs = unique(labelCanonically.(collect(keys(zeta(F).coeff))))
+    for G in supGraphs
+        push!(m.forbiddenFlags, InducedFlag{T}(G))
+    end
 end
 
 function computeSDP!(m::FlagModel, reservedVerts::Int)
@@ -59,15 +63,18 @@ function computeSDP!(m::FlagModel, reservedVerts::Int)
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
-    return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{T}) where {T<:Flag,N,D}
-    return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{PartiallyLabeledFlag{T}}) where {T<:Flag,N,D}
-    return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{T}) where {T<:Flag,N,D}

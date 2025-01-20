@@ -395,184 +395,184 @@ end
 
 Generates all Flags of type `F` with up to `maxVertices` vertices and up to `maxPredicates` non-zero predicate values. 'maxPredicates' is a vector, for the case that there are multiple predicates. If a function `withProperty:F->{true, false}` is given, keeps adding edges to flags as long as the property holds.
 """
-function generateAll(
-    ::Type{T},
-    maxVertices::Int,
-    maxPredicates::Vector;
-    withProperty=(F::T) -> true,
-    # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
-    withPropertyMarked=(F) -> true,
-    # withInducedProperty=(F::T) -> true,
-) where {T}
-    generatedGraphs = Vector{T}[Vector([one(T)])]
-    for i in 1:maxVertices
-        @show (i, maxVertices)
-        nextGraphs = T[]
+# function generateAll(
+#     ::Type{T},
+#     maxVertices::Int,
+#     maxPredicates::Vector;
+#     withProperty=(F::T) -> true,
+#     # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
+#     withPropertyMarked=(F) -> true,
+#     # withInducedProperty=(F::T) -> true,
+# ) where {T}
+#     generatedGraphs = Vector{T}[Vector([one(T)])]
+#     for i in 1:maxVertices
+#         @show (i, maxVertices)
+#         nextGraphs = T[]
 
-        pq = PriorityQueue{EdgeMarkedFlag{T,predicateType(T)},Vector{Int}}()
-        # pq = PriorityQueue{EdgeMarkedFlag{T,predicateType(T)},Any}()
+#         pq = PriorityQueue{EdgeMarkedFlag{T,predicateType(T)},Vector{Int}}()
+#         # pq = PriorityQueue{EdgeMarkedFlag{T,predicateType(T)},Any}()
 
-        for f in generatedGraphs[i]
-            newF = permute(f, 1:i)
-            # if newF == nothing 
-            #     continue 
-            # end
+#         for f in generatedGraphs[i]
+#             newF = permute(f, 1:i)
+#             # if newF == nothing 
+#             #     continue 
+#             # end
 
-            # @show newF
-            # @show size(newF)
-            # if withInducedProperty(newF) && 
-            if withProperty(newF)
-                push!(nextGraphs, newF)
-            end
-            currentEdges = countEdges(newF)
-            # @show currentEdges
-            # @show length(currentEdges)
-            # @show currentEdges[length(maxPredicates):end]
-            # @show sum(currentEdges[length(maxPredicates):end])
-            # @show maxPredicates
+#             # @show newF
+#             # @show size(newF)
+#             # if withInducedProperty(newF) && 
+#             if withProperty(newF)
+#                 push!(nextGraphs, newF)
+#             end
+#             currentEdges = countEdges(newF)
+#             # @show currentEdges
+#             # @show length(currentEdges)
+#             # @show currentEdges[length(maxPredicates):end]
+#             # @show sum(currentEdges[length(maxPredicates):end])
+#             # @show maxPredicates
 
-            if length(maxPredicates) < length(currentEdges) && (
-                maxPredicates[end] isa Int &&
-                maxPredicates[end] <= sum(sum.(currentEdges[length(maxPredicates):end]))
-            )
-                continue
-            end
+#             if length(maxPredicates) < length(currentEdges) && (
+#                 maxPredicates[end] isa Int &&
+#                 maxPredicates[end] <= sum(sum.(currentEdges[length(maxPredicates):end]))
+#             )
+#                 continue
+#             end
 
-            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
-            uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(
-                newF, fixed, maxPredicates
-            )
-            # @show uP
-            uP2 = findUnknownGenerationPredicates(newF, fixed, maxPredicates)
-            if uP2 !== nothing
-                uP = vcat(uP, uP2)
-            end
+#             fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
+#             uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(
+#                 newF, fixed, maxPredicates
+#             )
+#             # @show uP
+#             uP2 = findUnknownGenerationPredicates(newF, fixed, maxPredicates)
+#             if uP2 !== nothing
+#                 uP = vcat(uP, uP2)
+#             end
 
-            if length(uP) == 1 && length(uP[1]) == 0
-                continue
-            end
+#             if length(uP) == 1 && length(uP[1]) == 0
+#                 continue
+#             end
 
-            for i in 1:length(maxPredicates)
-                if currentEdges[i] == maxPredicates[i]
-                    empty!(uP[i])
-                end
-            end
-            # @show uP
-            uP = Vector{Vector{predicateType(T)}}(uP)
-            FMarked = EdgeMarkedFlag{T}(newF, uP)
-            for (F, _) in allWaysToAddOneMarked(FMarked)
-                if allowMultiEdges(T)
-                    F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
-                end
-                # @show F
-                cP = countEdges(F)[1:(end - 1)]
-                # @show cP
-                # @assert length(maxPredicates) == length(cP)
-                if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
-                    pq[F] = cP
-                elseif all(
-                        cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]
-                    ) &&
-                    maxPredicates[end] isa Union{Int,Vector{Int}} &&
-                    sum(sum.(cP[length(maxPredicates):end])) <= sum(maxPredicates[end])
-                    pq[F] = cP
-                end
-            end
-        end
+#             for i in 1:length(maxPredicates)
+#                 if currentEdges[i] == maxPredicates[i]
+#                     empty!(uP[i])
+#                 end
+#             end
+#             # @show uP
+#             uP = Vector{Vector{predicateType(T)}}(uP)
+#             FMarked = EdgeMarkedFlag{T}(newF, uP)
+#             for (F, _) in allWaysToAddOneMarked(FMarked)
+#                 if allowMultiEdges(T)
+#                     F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
+#                 end
+#                 # @show F
+#                 cP = countEdges(F)[1:(end - 1)]
+#                 # @show cP
+#                 # @assert length(maxPredicates) == length(cP)
+#                 if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
+#                     pq[F] = cP
+#                 elseif all(
+#                         cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]
+#                     ) &&
+#                     maxPredicates[end] isa Union{Int,Vector{Int}} &&
+#                     sum(sum.(cP[length(maxPredicates):end])) <= sum(maxPredicates[end])
+#                     pq[F] = cP
+#                 end
+#             end
+#         end
 
-        t = time()
+#         t = time()
 
-        while !isempty(pq)
-            if time() - t > 1
-                @show length(pq)
-                t = time()
-            end
-            FMarked = dequeue!(pq)
-            # @show countEdges(FMarked)
-            # @show (length(pq), sum(countEdges(FMarked.F)))
-            # @show FMarked
-            # if withInducedProperty(FMarked.F) && withProperty(FMarked.F)
-            if withProperty(FMarked.F)
-                # continue
-                push!(nextGraphs, FMarked.F)
-            end
-            cP = countEdges(FMarked.F)
-            if length(maxPredicates) == length(cP) && all(cP .== maxPredicates)
-                continue
-            elseif all(cP[1:(length(maxPredicates) - 1)] .== maxPredicates[1:(end - 1)]) &&
-                sum(cP[length(maxPredicates):end]) == maxPredicates[end]
-                continue
-            end
-            # if !all(countEdges(FMarked.F) .== maxPredicates)
-            #TODO: this lets graphs appear many times by adding edges in different orders! Solution (?): when adding a marked edge, delete all "earlier" marked edges
-            for (F, _) in allWaysToAddOneMarked(FMarked; removeEarlierMarked=true)
-                # for (F, _) in allWaysToAddOneMarked(FMarked; removeEarlierMarked = false)
-                if allowMultiEdges(T)
-                    # @show FMarked.marked
-                    # @show F.marked
-                    if T <: ProductFlag
-                        for (i, FT) in enumerate(fieldtypes(fieldtypes(T)[1]))
-                            if allowMultiEdges(FT)
-                                union!(F.marked, [e for e in FMarked.marked if e[1] == i])
-                            end
-                        end
-                    else
-                        F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
-                    end
-                end
-                # @assert sum(countEdges(FMarked.F)) < sum(countEdges(F.F))
-                # if !withProperty(F.F)
-                if !withPropertyMarked(F)
-                    continue
-                end
+#         while !isempty(pq)
+#             if time() - t > 1
+#                 @show length(pq)
+#                 t = time()
+#             end
+#             FMarked = dequeue!(pq)
+#             # @show countEdges(FMarked)
+#             # @show (length(pq), sum(countEdges(FMarked.F)))
+#             # @show FMarked
+#             # if withInducedProperty(FMarked.F) && withProperty(FMarked.F)
+#             if withProperty(FMarked.F)
+#                 # continue
+#                 push!(nextGraphs, FMarked.F)
+#             end
+#             cP = countEdges(FMarked.F)
+#             if length(maxPredicates) == length(cP) && all(cP .== maxPredicates)
+#                 continue
+#             elseif all(cP[1:(length(maxPredicates) - 1)] .== maxPredicates[1:(end - 1)]) &&
+#                 sum(cP[length(maxPredicates):end]) == maxPredicates[end]
+#                 continue
+#             end
+#             # if !all(countEdges(FMarked.F) .== maxPredicates)
+#             #TODO: this lets graphs appear many times by adding edges in different orders! Solution (?): when adding a marked edge, delete all "earlier" marked edges
+#             for (F, _) in allWaysToAddOneMarked(FMarked; removeEarlierMarked=true)
+#                 # for (F, _) in allWaysToAddOneMarked(FMarked; removeEarlierMarked = false)
+#                 if allowMultiEdges(T)
+#                     # @show FMarked.marked
+#                     # @show F.marked
+#                     if T <: ProductFlag
+#                         for (i, FT) in enumerate(fieldtypes(fieldtypes(T)[1]))
+#                             if allowMultiEdges(FT)
+#                                 union!(F.marked, [e for e in FMarked.marked if e[1] == i])
+#                             end
+#                         end
+#                     else
+#                         F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
+#                     end
+#                 end
+#                 # @assert sum(countEdges(FMarked.F)) < sum(countEdges(F.F))
+#                 # if !withProperty(F.F)
+#                 if !withPropertyMarked(F)
+#                     continue
+#                 end
 
-                cP = countEdges(F)[1:(end - 1)]
-                # if all(cP .<= maxPredicates)
-                #     pq[F] = cP
-                # end
-                # @show maxPredicates
-                # @show cP
+#                 cP = countEdges(F)[1:(end - 1)]
+#                 # if all(cP .<= maxPredicates)
+#                 #     pq[F] = cP
+#                 # end
+#                 # @show maxPredicates
+#                 # @show cP
 
-                # F2 = labelCanonically(F) # not worth? ALREADY LABELED 
-                # @assert F2 == F # always... because the new vertex has to be in same position, and others are already canonically labeled. There must be a better way??? Cant be right..., check small graphs
-                # F = F2
+#                 # F2 = labelCanonically(F) # not worth? ALREADY LABELED 
+#                 # @assert F2 == F # always... because the new vertex has to be in same position, and others are already canonically labeled. There must be a better way??? Cant be right..., check small graphs
+#                 # F = F2
 
-                cpOrder = countEdges(F)
-                cpOrder[end] *= -1
+#                 cpOrder = countEdges(F)
+#                 cpOrder[end] *= -1
 
-                if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
-                    # pq[F] = cP
-                    pq[F] = cpOrder
-                elseif maxPredicates[end] isa Int &&
-                    all(cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]) &&
-                    sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
-                    # pq[F] = cP
-                    pq[F] = cpOrder
-                end
-            end
-            # end
-        end
+#                 if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
+#                     # pq[F] = cP
+#                     pq[F] = cpOrder
+#                 elseif maxPredicates[end] isa Int &&
+#                     all(cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]) &&
+#                     sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
+#                     # pq[F] = cP
+#                     pq[F] = cpOrder
+#                 end
+#             end
+#             # end
+#         end
 
-        @show length(nextGraphs)
-        unique!(nextGraphs)
-        @show length(nextGraphs)
-        k = length(nextGraphs)
-        res = T[]
-        t = time()
-        for (i, G) in enumerate(nextGraphs)
-            if time() - t > 1
-                @show i, k
-                t = time()
-            end
-            push!(res, labelCanonically(G))
-        end
-        unique!(res)
+#         @show length(nextGraphs)
+#         unique!(nextGraphs)
+#         @show length(nextGraphs)
+#         k = length(nextGraphs)
+#         res = T[]
+#         t = time()
+#         for (i, G) in enumerate(nextGraphs)
+#             if time() - t > 1
+#                 @show i, k
+#                 t = time()
+#             end
+#             push!(res, labelCanonically(G))
+#         end
+#         unique!(res)
 
-        push!(generatedGraphs, res)
-        # push!(generatedGraphs, unique(labelCanonically.(nextGraphs)))
-    end
-    return unique(vcat(generatedGraphs...))
-end
+#         push!(generatedGraphs, res)
+#         # push!(generatedGraphs, unique(labelCanonically.(nextGraphs)))
+#     end
+#     return unique(vcat(generatedGraphs...))
+# end
 
 function process_edgeMarkedFlags(
     flags,
@@ -732,10 +732,10 @@ function process_edgeMarkedFlags(
         #     continue
         # end
     end
-    @info "thread done"
+    # @info "thread done"
 end
 
-function generateAll_parallel(
+function generateAll(
     ::Type{T},
     maxVertices::Int,
     maxPredicates::Vector;
@@ -848,7 +848,7 @@ function generateAll_parallel(
         # if length(pq) > 0 
         if isready(pq)
             noRunning = Threads.Atomic{Int}(0)
-            @show noRunning[], Base.n_avail(pq), islocked(doneFlags_lock)
+            # @show noRunning[], Base.n_avail(pq), islocked(doneFlags_lock)
             # t = @async process_edgeMarkedFlags(pq, nextGraphs, withProperty, maxPredicates, withPropertyMarked, T, doneFlags, doneFlags_lock, noRunning)
             # push!(tasks, t)
             # sleep(0.01)
@@ -868,16 +868,16 @@ function generateAll_parallel(
                 push!(tasks, t)
             end
             # @show tasks
-
             while isready(pq) || noRunning[] > 0
                 # @show noRunning[]
-                @show noRunning[], Base.n_avail(pq), islocked(doneFlags_lock)
-                sleep(0.1)
+                print("\r$(noRunning[]) active threads, $(Base.n_avail(pq)) models left")
+                sleep(0.05)
             end
-            @show noRunning[]
+            println()
+            # @show noRunning[]
             close(pq)
-            @info "closed"
-            @show noRunning[]
+            # @info "closed"
+            # @show noRunning[]
 
             wait.(tasks)
         end
@@ -890,7 +890,7 @@ function generateAll_parallel(
         #     # end
         # end
 
-        @show length(nextGraphs)
+        # @show length(nextGraphs)
         unique!(nextGraphs)
         @show length(nextGraphs)
         k = length(nextGraphs)

@@ -90,6 +90,56 @@ function isSubFlag(F::T, G::EdgeMarkedFlag{T}; induced=F isa InducedFlag) where 
     return false
 end
 
+# assumes Fs are labelled! Checks if any F in Fs is a subflag of G
+function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::EdgeMarkedFlag{T}; induced=G.F isa InducedFlag) where {T<:Flag}
+    
+    if !induced 
+        return isSubFlag(Fs, G.F)
+    end
+
+    ms = unique(size.(Fs))
+    n = size(G)
+    #FsL = labelCanonically.(Fs)
+    for m in ms
+        for c in combinations(1:n, m)
+            if finalized_subgraph(G, c)
+                Gc = labelCanonically(subFlag(G.F, c))
+                for F in Fs
+                    if size(F) == m && F == Gc #isIsomorphic(F, Gc)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+# assumes Fs are labelled! Checks if any F in Fs is a subflag of G
+function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=G/F/F isa InducedFlag) where {T<:Flag}
+    
+    if !induced 
+        return isSubFlag(Fs, G.F.F)
+    end
+
+    ms = unique(size.(Fs))
+    n = size(G)
+    #FsL = labelCanonically.(Fs)
+    for m in ms
+        for c in combinations(1:n, m)
+            if finalized_subgraph(G, c)
+                Gc = labelCanonically(subFlag(G.F.F, c))
+                for F in Fs
+                    if size(F) == m && F == Gc #isIsomorphic(F, Gc)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 function isSubFlag(
     F::T, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=F isa InducedFlag
 ) where {T<:Flag}
@@ -189,10 +239,10 @@ end
 
 Computes the moebius transform of a flag on the vertices 'verts'
 """
-function moebius(F::T, verts=1:size(F); label=false) where {T<:Flag}
+function moebius(F::T, verts=1:size(F); label=false, isAllowed=(f) -> true) where {T<:Flag}
     @assert verts == 1:size(F) "TODO"
     markedF = EdgeMarkedFlag{T}(F, findUnknownPredicates(F))
-    return moebius(markedF; label=label)
+    return moebius(markedF; label=label, isAllowed = isAllowed)
 end
 
 """
