@@ -116,7 +116,7 @@ function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::EdgeMarkedFlag{T}; induced=G
 end
 
 # assumes Fs are labelled! Checks if any F in Fs is a subflag of G
-function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=G/F/F isa InducedFlag) where {T<:Flag}
+function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::EdgeMarkedFlag{PartiallyLabeledFlag{T}}; induced=G.F.F isa InducedFlag) where {T<:Flag}
     
     if !induced 
         return isSubFlag(Fs, G.F.F)
