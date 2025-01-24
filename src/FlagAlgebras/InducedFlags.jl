@@ -81,7 +81,7 @@ function glue(
     # if U == InducedFlag{T}
 
     if !(fg isa QuantumFlag)
-        fg = 1//1 * FG
+        fg = 1//1 * fg
     end
 
     res = QuantumFlag{InducedFlag{T},Rational{Int}}()

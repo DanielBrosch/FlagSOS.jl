@@ -198,13 +198,15 @@ end
 function vertexColor(F::ProductFlag{FT}, v::Int) where {FT}
     # colorCombinations = sort!(unique([[vertexColor(f, i) for f in F.Fs] for i = 1:size(F)]))
 
-    cs = hash(Int[vertexColor(f, v) for f in F.Fs])
-    colorCombinations = UInt[cs]
-    # colorCombinations = Vector{Int}[cs]
+    # cs = hash(Int[vertexColor(f, v) for f in F.Fs])
+    cs = Int[vertexColor(f, v) for f in F.Fs]
+    # colorCombinations = UInt[cs]
+    colorCombinations = Vector{Int}[cs]
 
     for i = 1:size(F)
         if i != v
-            ct = hash(Int[vertexColor(f, i) for f in F.Fs])
+            # ct = hash(Int[vertexColor(f, i) for f in F.Fs])
+            ct = Int[vertexColor(f, i) for f in F.Fs]
             if !(ct in colorCombinations)
                 push!(colorCombinations, ct)
             end

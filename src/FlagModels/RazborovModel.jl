@@ -383,10 +383,10 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # @show a
                     # @show b
                     # @show mu
-                    println()
-                    @show T1
-                    @show T2
-                    @show p1Fin
+                    # println()
+                    # @show T1
+                    # @show T2
+                    # @show p1Fin
                     t = glueFinite(
                         N,
                         T1,

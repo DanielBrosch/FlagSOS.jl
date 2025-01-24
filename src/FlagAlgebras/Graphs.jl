@@ -69,6 +69,10 @@ function permute(pred::EdgePredicate, p::AbstractVector{Int})
     return EdgePredicate(p[pred.i], p[pred.j])
 end
 
+function finalized_subgraph(P::EdgePredicate, c::Vector{Int})
+    return !issubset([P.i, P.j], c)
+end
+
 function findUnknownPredicates(
     F::Graph, fixed::Vector{U}, predLimits::Vector
 )::Vector{Vector{EdgePredicate}} where {U<:AbstractVector{Int}}
