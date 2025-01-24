@@ -848,6 +848,8 @@ function generateAll(
         # if length(pq) > 0 
         if isready(pq)
             noRunning = Threads.Atomic{Int}(0)
+            noRunningNow = 1
+            maxModels = 0
             # @show noRunning[], Base.n_avail(pq), islocked(doneFlags_lock)
             # t = @async process_edgeMarkedFlags(pq, nextGraphs, withProperty, maxPredicates, withPropertyMarked, T, doneFlags, doneFlags_lock, noRunning)
             # push!(tasks, t)
@@ -868,10 +870,14 @@ function generateAll(
                 push!(tasks, t)
             end
             # @show tasks
-            while isready(pq) || noRunning[] > 0
-                # @show noRunning[]
-                print("\r$(noRunning[]) active threads, $(Base.n_avail(pq)) models left")
-                sleep(0.05)
+            while isready(pq) || noRunningNow > 0
+                noRunningNow = noRunning[]
+                noModels = Base.n_avail(pq)
+                if noModels > maxModels
+                    maxModels = noModels
+                end
+                print("\r$(noRunningNow) active threads, \t$(noModels) models left,\t $maxModels max models\t\t\t")
+                sleep(0.1)
             end
             println()
             # @show noRunning[]
