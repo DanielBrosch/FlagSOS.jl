@@ -26,14 +26,20 @@ function highestColor(F::EdgeColoredGraph)
 end
 
 # In the colorblind setting the colors should always be `1...highestColor(F)` and the non-edge 0. The colors should appear in this order for the first time.
-function sortEntries!(A::Matrix{Int})
+function sortEntries!(
+    A::Matrix{Int};
+    k::Int=maximum(A; init=0),
+    found::BitSet=BitSet(),
+    cs::Vector{Int}=zeros(Int, k),
+    translate::Vector{Int}=zeros(Int, k),
+)
     # cs::Vector{Int} = unique(A)
     # filter!(x -> x != 0, cs)
-    k = maximum(A; init=0)
+    # k = maximum(A; init=0)
     # found = BitVector(false for _ in 1:k)
     # found = zeros(Bool, k)
-    found = BitSet()
-    cs = zeros(Int, k)#
+    # found = BitSet()
+    # cs = zeros(Int, k)#
     # cs = Int[]
     noFound = 0
     for i in eachindex(A)
@@ -54,7 +60,7 @@ function sortEntries!(A::Matrix{Int})
     # translate = Dict{Int,Int}(c => i for (i, c) in enumerate(cs))
     # translate[0] = 0
 
-    translate = zeros(Int, k)
+    # translate = zeros(Int, k)
     for (i, c) in enumerate(cs)
         c == 0 && continue
         translate[c] = i

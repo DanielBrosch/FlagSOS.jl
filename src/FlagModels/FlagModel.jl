@@ -47,7 +47,7 @@ end
 
 function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     Fl = labelCanonically(F)
-    push!(m.forbiddenFlags, Fl)
+    return push!(m.forbiddenFlags, Fl)
 end
 
 function addForbiddenFlag!(m::FlagModel{InducedFlag{T},N,D}, F::T) where {T<:Flag,N,D}
@@ -72,7 +72,9 @@ function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{T}) where {T<:Flag,N,D
     return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
 end
 
-function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{PartiallyLabeledFlag{T}}) where {T<:Flag,N,D}
+function isAllowed(
+    m::FlagModel{T,N,D}, F::EdgeMarkedFlag{PartiallyLabeledFlag{T}}
+) where {T<:Flag,N,D}
     # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
     return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
 end
@@ -206,8 +208,7 @@ function addEquality!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
-    maxVertices=size(g) +
-                (maxEdges - countEdges(g)[2]) * maxPredicateArguments(T),
+    maxVertices=size(g) + (maxEdges - countEdges(g)[2]) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
@@ -239,8 +240,7 @@ function addEquality!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{T,D},
     maxEdges;
-    maxVertices=size(g) +
-                (maxEdges - countEdges(g)[1]) * maxPredicateArguments(T),
+    maxVertices=size(g) + (maxEdges - countEdges(g)[1]) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
@@ -262,6 +262,16 @@ function addEquality!(
     return qM
 end
 
+function add_verts(m::FlagModel, G::T, n::Int) where {T}
+    vert = permute(one(T), 1:1)
+    res = 1 * G
+    for _ in (size(G) + 1):n
+        res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
+        filter!(x -> isAllowed(m, x.first), res.coeff)
+    end
+    return res
+end
+
 function buildJuMPModel(
     m::FlagModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model(), addBoundVars=false
 ) where {T<:Flag,N,D}
@@ -279,6 +289,22 @@ function buildJuMPModel(
         i += 1
     end
 
+    if isInducedFlag(T)
+        @assert allequal(size, keys(variables))
+        n = size(first(keys(variables)))
+        flags = generateAll(
+            T,
+            n,
+            [99999];
+            withProperty=x -> isAllowed(m, x),
+            withPropertyMarked=x -> isAllowed(m, x),
+        )
+        translate = Dict(G => add_verts(m, G, n) for G in flags)
+    else
+        translate = Dict(G => 1 * G for G in keys(variables))
+    end
+    
+    
     if addBoundVars
         @warn "Adding bound variables"
         for F in keys(variables)
@@ -288,12 +314,21 @@ function buildJuMPModel(
             variables[one(F)] += fu
         end
     end
-
+    
+    
+    
     if m.objective !== nothing
+        
+        ∅ = translate[one(T)]
+        
+        t = @variable(jumpModel, base_name="t")
         push!(constraints, Dict())
         objL = labelCanonically(m.objective)
-        for (G, c) in objL.coeff
-            if !iszero(c) && !haskey(variables, G)
+        objective = sum(c*translate[G] for (G,c) in objL.coeff)
+
+
+        for (G, c) in objective.coeff
+            if !iszero(c) && !haskey(variables, G) && isAllowed(m, G)
                 error(
                     "Not all Flags in the objective appear in the model! Add more generators.",
                 )
@@ -301,24 +336,25 @@ function buildJuMPModel(
             end
         end
         for (G, c) in variables
-            if isAllowed(m, G) && (G != T())# || T() in keys(objL.coeff))
+            if isAllowed(m, G) && (G != T())# || T() in keys(objective.coeff))
                 @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
-                # push!(constraints, c == (haskey(objL.coeff, G) ? objL.coeff[G] : 0))  
-                # push!(constraints, c <= (haskey(objL.coeff, G) ? objL.coeff[G] : 0))
-                constraints[end][G] = @constraint(jumpModel, c == get(objL.coeff, G, 0))
-                # constraints[end][G] = @constraint(jumpModel, c <= get(objL.coeff, G, 0))
+                # push!(constraints, c == (haskey(objective.coeff, G) ? objective.coeff[G] : 0))  
+                # push!(constraints, c <= (haskey(objective.coeff, G) ? objective.coeff[G] : 0))
+                constraints[end][G] = @constraint(jumpModel, c == get(objective.coeff, G, 0) + t*get(∅.coeff, G, 0))
+                # constraints[end][G] = @constraint(jumpModel, c <= get(objective.coeff, G, 0))
             end
         end
     end
 
     if m.objective !== nothing
-        if !(one(T) in keys(m.objective.coeff))
-            @objective(jumpModel, Min, variables[one(T)])
-        else
-            # @objective(jumpModel, Min, 0)
-            @objective(jumpModel, Min, variables[one(T)] - m.objective.coeff[one(T)])
-        end
+        # if !(one(T) in keys(m.objective.coeff))
+        #     @objective(jumpModel, Min, variables[one(T)])
+        # else
+        #     # @objective(jumpModel, Min, 0)
+        #     @objective(jumpModel, Min, variables[one(T)] - m.objective.coeff[one(T)])
+        # end
+        @objective(jumpModel, Min, t)
     end
     return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)
 end
@@ -351,7 +387,6 @@ function modelBlockSizes(m::FlagModel)
     return res
 end
 
-
 function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
     #TODO: Quotient when using InducedFlags
     obj = labelCanonically(m.objective)
@@ -382,17 +417,13 @@ function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
 end
 
 function buildClusteredLowRankModel(m::FlagModel{T,N,D}) where {T,N,D}
-
     obj, vars, blocks, blockSizes = buildStandardModel(m)
     o = T()
 
-
     varDicts = Dict(
-        G => Dict{Any, Any}(
-            mu => Matrix(B[G])
-            for (mu, B) in blocks if haskey(B, G) && blockSizes[mu] > 0
-        )
-        for G in vars
+        G => Dict{Any,Any}(
+            mu => Matrix(B[G]) for (mu, B) in blocks if haskey(B, G) && blockSizes[mu] > 0
+        ) for G in vars
     )
 
     # bound variables
@@ -406,13 +437,9 @@ function buildClusteredLowRankModel(m::FlagModel{T,N,D}) where {T,N,D}
 
     freeVarDicts = Dict(
         G => Dict(
-            mu => B[G][1, 1]
-            for (mu, B) in blocks if haskey(B, G) && blockSizes[mu] < 0
-        )
-        for G in vars
+            mu => B[G][1, 1] for (mu, B) in blocks if haskey(B, G) && blockSizes[mu] < 0
+        ) for G in vars
     )
-
-
 
     clObj = Objective(get(obj.coeff, o, 0), get(varDicts, o, Dict()), freeVarDicts[o])
     clCons = Constraint[]

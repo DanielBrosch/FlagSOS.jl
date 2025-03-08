@@ -19,7 +19,7 @@ addForbiddenFlag!(m, triangle)
 
 # ## Choosing a relaxation
 # Now we need to choose a hierarchy. One option is the Lasserre hierarchy, which we can attach to the model using [`addLasserreBlock!`](@ref).
-addLasserreBlock!(m, 4);
+zaddLasserreBlock!(m, 4);
 
 # This results in a semidefinite programming problem with block sizes
 @test modelSize(m).part == Int[5, 4, 4, 2, 2, 1, 1, 1] #src

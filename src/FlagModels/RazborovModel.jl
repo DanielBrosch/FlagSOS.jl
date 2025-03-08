@@ -2,6 +2,18 @@ export RazborovModel, computeRazborovBasis!
 
 using SparseArrays, SDPSymmetryReduction
 
+import SymbolicWedderburn as SW
+import AbstractPermutations as AP
+import PermutationGroups as PG
+
+struct OnInts <: SW.ByPermutations
+    translate::Dict{PG.Perm{UInt16},PG.Perm{UInt16}}
+end
+
+function SW.action(action::OnInts, p::AP.AbstractPermutation, fs::Vector{Int})
+    return [c^action.translate[p] for c in fs]
+end
+
 include("../utils/RegularRepresentation.jl")
 
 """
@@ -208,7 +220,41 @@ function computeRazborovBasis!(
             i += 1
         end
 
-        if true # block-diagonalize numerically using SDPSymmetryReduction
+        if true#true # block-diagonalize symbolically using SymbolicWedderburng
+            if muAut.size > 1
+                translate = Dict{PG.Perm{UInt16},PG.Perm{UInt16}}()
+
+                G_type = generateGroup(AbstractAlgebra.Perm.(muAut.gen), muAut.size)
+                G_flag = generateGroup(AbstractAlgebra.Perm.(newGen), muAut.size)
+
+                # @show G_type, G_flag
+
+                translate = Dict(
+                    PG.Perm(p.d) => PG.Perm(q.d) for (p, q) in zip(G_type, G_flag)
+                )
+                total = length(B)
+
+                action = OnInts(translate)
+                G = PG.PermGroup(collect(keys(translate))...)
+                # @show type, G
+                # display(translate)
+
+                # reductions_complex[type] = SW.symmetry_adapted_basis(G, action, [[i] for i in 1:total])
+                sym_basis = SW.symmetry_adapted_basis(
+                    Float64, G, action, [[i] for i in 1:total]
+                )
+
+                Q = [b.basis' for b in sym_basis]
+                @show length(B), size.(Q)
+
+                M.blockSymmetry[mu] = (
+                    pattern=P, gen=newGen, Q=Q, n=maximum(P), fullPattern=P
+                )
+            else
+                M.blockSymmetry[mu] = (pattern=P, gen=newGen)
+            end
+
+        elseif false#true # block-diagonalize numerically using SDPSymmetryReduction
             # @show P
             # @show SDPSymmetryReduction.Partition{Int}(P)
             part = SDPSymmetryReduction.Partition{Int}(P)
@@ -233,7 +279,7 @@ function computeRazborovBasis!(
                 pattern=P, gen=newGen, Q=Q, n=SDPSymmetryReduction.dim(part), fullPattern=P
             )
 
-        elseif maximum(P) > size(P, 1) # regular representation makes things worse
+        elseif true#maximum(P) > size(P, 1) # regular representation makes things worse
             @info "Regular representation not worth it for block $mu"
             symmetrize = Dict()
             ind = 1
@@ -459,21 +505,21 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
     if isInducedFlag(T)# <: InducedFlag
         # Eliminate linear dependencies 
-        @info "Eliminating linear dependencies"
+        # @info "Eliminating linear dependencies"
 
-        Fs::Vector{T} = sort(collect(keys(m.sdpData)); by=size)
-        n = maximum(size.(keys(m.sdpData)))
-        # union!(Fs, generateAll(T, n, [99999]))
-        union!(
-            Fs,
-            generateAll(
-                T,
-                n,
-                [99999];
-                withProperty=x -> isAllowed(m.parentModel, x),
-                withPropertyMarked=x -> isAllowed(m.parentModel, x),
-            ),
-        )
+        # Fs::Vector{T} = sort(collect(keys(m.sdpData)); by=size)
+        # n = maximum(size.(keys(m.sdpData)))
+        # # union!(Fs, generateAll(T, n, [99999]))
+        # union!(
+        #     Fs,
+        #     generateAll(
+        #         T,
+        #         n,
+        #         [99999];
+        #         withProperty=x -> isAllowed(m.parentModel, x),
+        #         withPropertyMarked=x -> isAllowed(m.parentModel, x),
+        #     ),
+        # )
 
         # expandedFs = T[]
         # for F in Fs
@@ -483,20 +529,20 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         # end
 
         # reduction = quotient(expandedFs, x -> isAllowed(m.parentModel, x))
-        reduction = []#quotient(Fs, x -> isAllowed(m.parentModel, x))
+        # reduction = []#quotient(Fs, x -> isAllowed(m.parentModel, x))
 
-        display(reduction)
+        # display(reduction)
 
-        m.quotient = reduction
+        # m.quotient = reduction
 
-        for (i, F) in enumerate(m.quotient)
-            for (G, c) in F.coeff
-                if !haskey(m.sdpData, G)
-                    m.sdpData[G] = Dict()
-                end
-                m.sdpData[G]["Q$i"] = D[c;;]
-            end
-        end
+        # for (i, F) in enumerate(m.quotient)
+        #     for (G, c) in F.coeff
+        #         if !haskey(m.sdpData, G)
+        #             m.sdpData[G] = Dict()
+        #         end
+        #         m.sdpData[G]["Q$i"] = D[c;;]
+        #     end
+        # end
 
         # for i in size(reduction, 1):-1:1
         #     j = findlast(x -> !iszero(x), reduction[i, :])
