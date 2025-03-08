@@ -289,19 +289,28 @@ function buildJuMPModel(
         i += 1
     end
 
+    translate = Dict()
     if isInducedFlag(T)
         @assert allequal(size, keys(variables))
         n = size(first(keys(variables)))
-        flags = generateAll(
-            T,
-            n,
-            [99999];
-            withProperty=x -> isAllowed(m, x),
-            withPropertyMarked=x -> isAllowed(m, x),
-        )
-        translate = Dict(G => add_verts(m, G, n) for G in flags)
+        # flags = generateAll(
+        #     T,
+        #     n,
+        #     [99999];
+        #     withProperty=x -> isAllowed(m, x),
+        #     withPropertyMarked=x -> isAllowed(m, x),
+        # )
+        # translate = Dict(G => add_verts(m, G, n) for G in flags)
     else
-        translate = Dict(G => 1 * G for G in keys(variables))
+        # translate = Dict(G => 1 * G for G in keys(variables))
+    end
+
+    function get_translate(G)
+        if isInducedFlag(T)
+            return get!(translate, G, add_verts(m, G, n))
+        else 
+            return get!(translate, G, 1*G)
+        end
     end
     
     
@@ -319,12 +328,12 @@ function buildJuMPModel(
     
     if m.objective !== nothing
         
-        ∅ = translate[one(T)]
+        ∅ = get_translate(one(T))
         
         t = @variable(jumpModel, base_name="t")
         push!(constraints, Dict())
         objL = labelCanonically(m.objective)
-        objective = sum(c*translate[G] for (G,c) in objL.coeff)
+        objective = sum(c*get_translate(G) for (G,c) in objL.coeff)
 
 
         for (G, c) in objective.coeff
