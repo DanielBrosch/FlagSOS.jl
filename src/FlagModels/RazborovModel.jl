@@ -165,12 +165,13 @@ function computeRazborovBasis!(
 
     @info "basis reduced"
     @info "determining symmetries"
-    for (mu, B) in reducedBasis
-        @info "determining symmetry pattern for $mu"
+    total_mu = length(reducedBasis)
+    for (muc, (mu, B)) in enumerate(reducedBasis)
         if length(B) == 1
             M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n=1)
             continue
         end
+        @info "determining symmetry pattern for $mu ($muc/$total_mu)"
 
         muAut = aut(mu)
         @show muAut
@@ -245,7 +246,7 @@ function computeRazborovBasis!(
                 )
 
                 Q = [b.basis' for b in sym_basis]
-                @show length(B), size.(Q)
+                println("$(length(B)) => $([size(q,2) for q in Q])")
 
                 M.blockSymmetry[mu] = (
                     pattern=P, gen=newGen, Q=Q, n=maximum(P), fullPattern=P
@@ -459,9 +460,9 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                 # if !haskey(P, :Q)
                 if !haskey(sdpData[F], mu)
                     if haskey(P, :reg)
-                        sdpData[F][mu] = zeros(D, P.n, P.n)
+                        sdpData[F][mu] = spzeros(D, P.n, P.n)
                     else
-                        sdpData[F][mu] = zeros(D, length(B), length(B))
+                        sdpData[F][mu] = spzeros(D, length(B), length(B))
                     end
                 end
                 if haskey(P, :reg)
@@ -491,7 +492,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             P = m.blockSymmetry[mu]
             if haskey(P, :Q)
                 for i in eachindex(P.Q)
-                    BQi = SDPSymmetryReduction.conjugate(B, P.Q[i])
+                    BQi = sparse(SDPSymmetryReduction.conjugate(B, P.Q[i]))
                     blockDiagonalData[F]["($mu, $i)"] = BQi
                 end
             else
