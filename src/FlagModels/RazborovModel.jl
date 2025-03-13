@@ -171,7 +171,7 @@ function computeRazborovBasis!(
             M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n=1)
             continue
         end
-        @info "determining symmetry pattern for $mu ($muc/$total_mu)"
+        @info "determining symmetry pattern for $mu of size $(length(B)) ($muc/$total_mu)"
 
         muAut = aut(mu)
         @show muAut
@@ -224,23 +224,43 @@ function computeRazborovBasis!(
         if true#true # block-diagonalize symbolically using SymbolicWedderburng
             if muAut.size > 1
                 translate = Dict{PG.Perm{UInt16},PG.Perm{UInt16}}()
+                # @show muAut
+                # @show newGen
+                # @show B
 
                 G_type = generateGroup(AbstractAlgebra.Perm.(muAut.gen), muAut.size)
-                G_flag = generateGroup(AbstractAlgebra.Perm.(newGen), muAut.size)
+                # G_flag = generateGroup(AbstractAlgebra.Perm.(newGen), muAut.size)
 
                 # @show G_type, G_flag
 
-                translate = Dict(
-                    PG.Perm(p.d) => PG.Perm(q.d) for (p, q) in zip(G_type, G_flag)
-                )
-                total = length(B)
+                # translate = Dict{PG.Perm{UInt16},PG.Perm{UInt16}}(
+                #     # PG.Perm(p.d) => PG.Perm(q.d) for (p, q) in zip(G_type, G_flag)
+                # )
 
+                for p in G_type
+                    gen = zeros(Int, length(B))
+                    for (i, b) in enumerate(B)
+                        # @assert length(p) == b.n
+                        pb = labelCanonically(
+                            PartiallyLabeledFlag{T}(
+                                permute(b.F, vcat(p.d, (length(p.d) + 1):size(b))), b.n
+                            ),
+                        )
+                        # @show pb
+                        # display.(B)
+                        gen[i] = findfirst(x -> x == pb, B)
+                    end
+                    translate[PG.Perm(p.d)] = PG.Perm(gen)#^(-1)
+                end
+
+                total = length(B)
                 action = OnInts(translate)
                 G = PG.PermGroup(collect(keys(translate))...)
                 # @show type, G
                 # display(translate)
 
                 # reductions_complex[type] = SW.symmetry_adapted_basis(G, action, [[i] for i in 1:total])
+                @info "Starting SymbolicWedderburn"
                 sym_basis = SW.symmetry_adapted_basis(
                     Float64, G, action, [[i] for i in 1:total]
                 )
