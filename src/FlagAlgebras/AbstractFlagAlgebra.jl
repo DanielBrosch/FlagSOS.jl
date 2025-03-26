@@ -107,7 +107,7 @@ The gluing operation of type `T`. Should, for example, glue unlabeled vertices t
 function Base.:*(F::T, G::T; isAllowed=(f) -> true) where {T<:Flag}
     n = size(F)
     m = size(G)
-    return glue(F, G, vcat((m + 1):(m + n), 1:m); isAllowed=isAllowed)
+    return glue(F, G, vcat((m+1):(m+n), 1:m); isAllowed=isAllowed)
 end
 
 """
@@ -185,7 +185,7 @@ function glueFinite(
     N,
     F::T,
     G::T,
-    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
+    p::AbstractVector{Int}=vcat(collect((size(G)+1):(size(G)+size(F))), 1:size(G));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
@@ -230,9 +230,9 @@ function glueFinite_internal(
             return QuantumFlag{T,Rational{Int}}()
         end
         if labelFlags
-            return 1//1 * labelCanonically(tmp)
+            return 1 // 1 * labelCanonically(tmp)
         end
-        return 1//1 * tmp
+        return 1 // 1 * tmp
     end
 
     freePositions = N - k
@@ -242,7 +242,7 @@ function glueFinite_internal(
 
     ovs = overlaps(lambda, mu, freePositions, false, true)
 
-    factor = 1//sum(x for (x, _) in ovs; init=0)
+    factor = 1 // sum(x for (x, _) in ovs; init=0)
 
     res = QuantumFlag{T,Rational{Int}}()
 
@@ -417,8 +417,8 @@ end
 Checks if two flags are isomorphic.
 """
 # @memoize Dict{Tuple{Flag,Flag},Bool} 
-@memoize ThreadSafeDict{Tuple{Flag,Flag, Bool},Bool} function isIsomorphic(
-    F::T, G::T; FLabelled = false
+@memoize ThreadSafeDict{Tuple{Flag,Flag,Bool},Bool} function isIsomorphic(
+    F::T, G::T; FLabelled=false
 ) where {T<:Flag}
     # Can be optimized! Do not need to run the full algorithm.
     countEdges(F) != countEdges(G) && return false
@@ -438,7 +438,7 @@ function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
     FL = labelCanonically(F)
     for c in combinations(1:n, m)
         if induced
-            if isIsomorphic(FL, subFlag(G, c); FLabelled = true)
+            if isIsomorphic(FL, subFlag(G, c); FLabelled=true)
                 return true
             end
         else
@@ -453,26 +453,26 @@ function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
 end
 
 # Checks if ANY flag in Fs is a subflag of G. ASSUMES Fs are labelled!
-function isSubFlag(Fs::Union{Vector{T}, Set{T}}, G::T; induced=G isa InducedFlag) where {T<:Flag}
+function isSubFlag(Fs::Union{Vector{T},Set{T}}, G::T; induced=G isa InducedFlag) where {T<:Flag}
     # Very basic brute force algorithm
-    ms = unique(size.(Fs))
-    n = size(G)
-    #FsL = labelCanonically.(Fs)
-    for m in ms
-        for c in combinations(1:n, m)
-            if induced
+    if induced
+        return any(isSubFlag(F, G; induced=induced) for F in Fs)
+    else
+        ms = unique(size.(Fs))
+        n = size(G)
+        #FsL = labelCanonically.(Fs)
+        for m in ms
+            for c in combinations(1:n, m)
                 Gc = labelCanonically(subFlag(G, c))
                 for F in Fs
                     if size(F) == m && F == Gc #isIsomorphic(F, Gc)
                         return true
                     end
                 end
-            else
-                @error "TODO"
             end
         end
+        return false
     end
-    return false
 end
 
 """

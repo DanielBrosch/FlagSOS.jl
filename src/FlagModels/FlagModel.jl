@@ -3,6 +3,7 @@ export FlagModel,
     addForbiddenFlag!,
     addInequality!,
     addInequality_Lasserre!,
+    addInequality_Razborov!,
     addEquality!,
     buildStandardModel,
     addRazborovBlock!,
@@ -142,6 +143,35 @@ function addInequality!(
     return qM
 end
 
+function addInequality_Razborov!(
+    m::FlagModel{T,N,D}, g::QuantumFlag{T,D}, lvl::Int
+) where {T<:Flag,N,D}
+    gl = labelCanonically(g)
+    k = maximum(size(G) for G in keys(gl.coeff))
+
+    rM = RazborovModel{T,N,D}(m)
+    computeRazborovBasis!(rM, lvl - k)
+
+    qM = QuadraticModule{T}(rM, gl)
+    push!(m.subModels, qM)
+    return qM
+end
+
+function addInequality_Razborov!(
+    m::FlagModel{InducedFlag{T},N,D}, g::QuantumFlag{InducedFlag{T},D}, lvl::Int
+) where {T<:Flag,N,D}
+    gl = labelCanonically(g)
+    @assert allequal(size(G) for G in keys(gl.coeff))
+    k = maximum(size(G) for G in keys(gl.coeff))
+
+    rM = RazborovModel{InducedFlag{T},N,D}(m)
+    computeRazborovBasis!(rM, lvl - k)
+
+    qM = QuadraticModule{T}(rM, gl)
+    push!(m.subModels, qM)
+    return qM
+end
+
 function addInequality_Lasserre!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{T,D},
@@ -154,7 +184,7 @@ function addInequality_Lasserre!(
     genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1]) / 2))
     genMaxVertices = Int(floor((maxVertices - size(gl)) / 2))
 
-    lM = LasserreModel{T,N,D}()
+    lM = LasserreModel{T,N,D}(m)
     Fs = generateAll(T, genMaxVertices, genMaxEdges)
 
     for F in Fs
@@ -180,7 +210,7 @@ function addInequality_Lasserre!(
     genMaxEdges = Int(floor((maxEdges - countEdges(gl)[2]) / 2))
     genMaxVertices = Int(floor((maxVertices - size(gl)) / 2))
 
-    lM = LasserreModel{PartiallyLabeledFlag{T},N,D}()
+    lM = LasserreModel{PartiallyLabeledFlag{T},N,D}(m)
 
     @show genMaxEdges
     @show genMaxVertices
@@ -308,12 +338,11 @@ function buildJuMPModel(
     function get_translate(G)
         if isInducedFlag(T)
             return get!(translate, G, add_verts(m, G, n))
-        else 
-            return get!(translate, G, 1*G)
+        else
+            return get!(translate, G, 1 * G)
         end
     end
-    
-    
+
     if addBoundVars
         @warn "Adding bound variables"
         for F in keys(variables)
@@ -323,18 +352,15 @@ function buildJuMPModel(
             variables[one(F)] += fu
         end
     end
-    
-    
-    
+
     if m.objective !== nothing
-        
         ∅ = get_translate(one(T))
-        
-        t = @variable(jumpModel, base_name="t")
+        @show ∅
+
+        t = @variable(jumpModel, base_name = "t")
         push!(constraints, Dict())
         objL = labelCanonically(m.objective)
-        objective = sum(c*get_translate(G) for (G,c) in objL.coeff)
-
+        objective = sum(c * get_translate(G) for (G, c) in objL.coeff)
 
         for (G, c) in objective.coeff
             if !iszero(c) && !haskey(variables, G) && isAllowed(m, G)
@@ -345,12 +371,15 @@ function buildJuMPModel(
             end
         end
         for (G, c) in variables
-            if isAllowed(m, G) && (G != T())# || T() in keys(objective.coeff))
+            if isAllowed(m, G) #&& (G != T())# || T() in keys(objective.coeff))
                 @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objective.coeff, G) ? objective.coeff[G] : 0))  
                 # push!(constraints, c <= (haskey(objective.coeff, G) ? objective.coeff[G] : 0))
-                constraints[end][G] = @constraint(jumpModel, c == get(objective.coeff, G, 0) + t*get(∅.coeff, G, 0))
+                # constraints[end][G] = @constraint(jumpModel, c == get(objective.coeff, G, 0) + t*get(∅.coeff, G, 0))
+                constraints[end][G] = @constraint(
+                    jumpModel, c == get(objective.coeff, G, 0) + t * get(∅.coeff, G, 0)
+                )
                 # constraints[end][G] = @constraint(jumpModel, c <= get(objective.coeff, G, 0))
             end
         end

@@ -294,7 +294,7 @@ function multiplyPolytabsAndSymmetrize(
 
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
 
-    combinedOverlaps = Dict{Matrix{Int}, D}()
+    combinedOverlaps = Dict{Matrix{Int},D}()
     for (a, b) in newVariant
         # cord = [2:size(a, 1)..., 1]
         # shiftedMat = a[cord, cord]
@@ -328,7 +328,7 @@ function multiplyPolytabsAndSymmetrize(
     end
 
     # reduce using automorphisms
-    combinedOverlapsReduced = Dict{Matrix{Int}, D}()
+    combinedOverlapsReduced = Dict{Matrix{Int},D}()
     if useGroups
         @assert limit "TODO: Fix finite case with group speedup"
         #TODO Current solution does reduce it somewhat, but not fully?
@@ -453,9 +453,9 @@ function multiplyPolytabsAndSymmetrize(
             end
 
             if !haskey(resUnsorted, comb)
-                resUnsorted[comb] = c * combinedOverlapsReduced[B] // fact
+                resUnsorted[comb] = c * combinedOverlapsReduced[B] / D(fact)
             else
-                resUnsorted[comb] += c * combinedOverlapsReduced[B] // fact
+                resUnsorted[comb] += c * combinedOverlapsReduced[B] / D(fact)
                 if resUnsorted[comb] == 0
                     delete!(resUnsorted, comb)
                 end
@@ -607,8 +607,9 @@ function computeSDP!(m::LasserreModel{T,N,D}, reservedVerts::Int) where {T,N,D}#
     close(collectData)
     # @info "Waiting for collection"
 
-    @assert !isInducedFlag(T) "TODO: Reduction for induced flags for Lasserre hierarchy"
-
+    if isInducedFlag(T)
+        @warn "TODO: Reduction for induced flags for Lasserre hierarchy"
+    end
     return wait(doneCollecting)
     # @info "Notified"
 end
@@ -637,7 +638,7 @@ function buildJuMPModel(
     end
 
     graphCoefficients = Dict()
-
+    @show Y
     AT = typeof(sum(collect(values(Y))[1]))
 
     for G in keys(m.sdpData)

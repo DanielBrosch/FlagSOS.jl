@@ -275,7 +275,7 @@ function computeRazborovBasis!(
                 M.blockSymmetry[mu] = (pattern=P, gen=newGen)
             end
 
-        elseif false#true # block-diagonalize numerically using SDPSymmetryReduction
+        elseif true#true # block-diagonalize numerically using SDPSymmetryReduction
             # @show P
             # @show SDPSymmetryReduction.Partition{Int}(P)
             part = SDPSymmetryReduction.Partition{Int}(P)
