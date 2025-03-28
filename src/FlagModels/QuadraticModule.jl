@@ -58,9 +58,12 @@ function computeSDP!(
         else
             tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality))
         end
-        noLabel = removeIsolated(tmp)
-        # noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
-
+        if isInducedFlag(T)
+            noLabel = tmp
+        else
+            noLabel = removeIsolated(tmp)
+            # noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
+        end
         GH = labelCanonically(noLabel)
         for (gh, cgh) in GH.coeff
             if !haskey(m.sdpData, gh)
@@ -177,7 +180,7 @@ function roundResults(
 
     den = round(BigInt, 1 / prec)
     function roundDen(x)
-        return round(BigInt, den * x)//den
+        return round(BigInt, den * x) // den
     end
 
     for (mu, b) in blocks
@@ -284,14 +287,14 @@ function verifySOS(m::EqualityModule, sol::Dict; io::IO=stdout)
     println(io, "Equality module coming from constraint")
     println(io, "$(m.equality)= 0")
     for i in keys(sol)
-        if sol[i] != 0//1
+        if sol[i] != 0 // 1
             println(io, "Times $(sol[i])$(m.basis[i]) :")
             print(
                 io,
                 sum(m.sdpData) do (G, B)
                     sum(B) do (j, c)
                         j != i && return 0 * one(G)
-                        get(sol, j, 0//1) * c * G
+                        get(sol, j, 0 // 1) * c * G
                     end
                 end,
             )
@@ -300,7 +303,7 @@ function verifySOS(m::EqualityModule, sol::Dict; io::IO=stdout)
     end
     res = sum(m.sdpData) do (G, B)
         sum(B) do (i, c)
-            get(sol, i, 0//1) * c * G
+            get(sol, i, 0 // 1) * c * G
         end
     end
     println(io, "Equality module result:")

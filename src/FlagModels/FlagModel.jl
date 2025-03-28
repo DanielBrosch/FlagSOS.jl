@@ -8,7 +8,9 @@ export FlagModel,
     buildStandardModel,
     addRazborovBlock!,
     addBinomialBlock!,
-    buildClusteredLowRankModel
+    buildClusteredLowRankModel,
+    add_verts,
+    homogenize
 
 using ClusteredLowRankSolver
 
@@ -148,10 +150,10 @@ function addInequality_Razborov!(
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
     k = maximum(size(G) for G in keys(gl.coeff))
-
+    
     rM = RazborovModel{T,N,D}(m)
     computeRazborovBasis!(rM, lvl - k)
-
+    
     qM = QuadraticModule{T}(rM, gl)
     push!(m.subModels, qM)
     return qM
@@ -159,15 +161,16 @@ end
 
 function addInequality_Razborov!(
     m::FlagModel{InducedFlag{T},N,D}, g::QuantumFlag{InducedFlag{T},D}, lvl::Int
-) where {T<:Flag,N,D}
+    ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
-    @assert allequal(size(G) for G in keys(gl.coeff))
+    gl = homogenize(m, gl)
+    # @assert allequal(size(G) for G in keys(gl.coeff))
     k = maximum(size(G) for G in keys(gl.coeff))
 
     rM = RazborovModel{InducedFlag{T},N,D}(m)
     computeRazborovBasis!(rM, lvl - k)
 
-    qM = QuadraticModule{T}(rM, gl)
+    qM = QuadraticModule{InducedFlag{T}}(rM, gl)
     push!(m.subModels, qM)
     return qM
 end
@@ -300,6 +303,14 @@ function add_verts(m::FlagModel, G::T, n::Int) where {T}
         filter!(x -> isAllowed(m, x.first), res.coeff)
     end
     return res
+end
+
+function add_verts(m::FlagModel, G::QuantumFlag{F, T}, n::Int = size(G)) where {F<:InducedFlag, T}
+    return sum(c*add_verts(m, g, n) for (g,c) in G.coeff)
+end
+
+function homogenize(m::FlagModel, G::QuantumFlag{F, T}) where {F<:InducedFlag, T}
+    return add_verts(m, G, size(G))
 end
 
 function buildJuMPModel(
