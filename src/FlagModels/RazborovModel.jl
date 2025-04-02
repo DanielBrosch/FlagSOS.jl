@@ -100,7 +100,7 @@ function modelBlockSizes(m::RazborovModel)
 end
 
 function computeUnreducedRazborovBasis(
-    M::RazborovModel{T,N,D}, n, maxLabels=n
+    M::RazborovModel{T,N,D}, n, maxLabels=n; maxGraphs = Inf
 ) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
@@ -112,7 +112,12 @@ function computeUnreducedRazborovBasis(
         [99999];
         withProperty=x -> isAllowed(M.parentModel, x),
         withPropertyMarked=x -> isAllowed(M.parentModel, x),
+        limit = maxGraphs
     )
+    if flags == :limit 
+        @info "Limit reached, stopping generation"
+        return :limit
+    end
     @info "Splitting $(length(flags)) flags..."
 
     filter!(f -> isAllowed(M, f), flags)
@@ -153,9 +158,12 @@ function computeUnreducedRazborovBasis(
 end
 
 function computeRazborovBasis!(
-    M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf
+    M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf, maxGraphs = Inf
 ) where {T<:Flag,N,D}
-    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels)
+    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels; maxGraphs = maxGraphs)
+    if razborovBasis == :limit
+        return :limit
+    end
     reducedBasis = Dict(mu => unique(labelCanonically.(B)) for (mu, B) in razborovBasis)
     if maxBlockSize < Inf
         filter!(x -> length(x[2]) < maxBlockSize, reducedBasis)
@@ -221,7 +229,7 @@ function computeRazborovBasis!(
             i += 1
         end
 
-        if true#true # block-diagonalize symbolically using SymbolicWedderburng
+        if false#true # block-diagonalize symbolically using SymbolicWedderburng
             if muAut.size > 1
                 translate = Dict{PG.Perm{UInt16},PG.Perm{UInt16}}()
                 # @show muAut
@@ -280,7 +288,11 @@ function computeRazborovBasis!(
             # @show SDPSymmetryReduction.Partition{Int}(P)
             part = SDPSymmetryReduction.Partition{Int}(P)
 
-            Q = SDPSymmetryReduction.diagonalize(Float64, part)
+            if aut(mu).size == 1
+                Q = [Matrix{Float64}(I, size(P))]
+            else
+                Q = SDPSymmetryReduction.diagonalize(Float64, part)
+            end
             # basisImage = SDPSymmetryReduction.basis_image_thr(Q, part)
             # symmetrizedRepr = Dict()
             # for i in 1:SDPSymmetryReduction.dim(part)

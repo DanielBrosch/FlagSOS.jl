@@ -597,6 +597,9 @@ function process_edgeMarkedFlags(
     # while isready(flags) || noRunning[] > 0
     # while true
     # @assert noRunning[] > 0
+
+
+
     if noRunning[] == 0 && !isready(flags)
         return nothing
     end
@@ -704,7 +707,10 @@ function process_edgeMarkedFlags(
                     push!(doneFlags, F)
                     addF = true
                 end
-                addF && put!(flags, F)
+                if addF
+                    !isopen(flags) && return nothing 
+                    put!(flags, F)
+                end
                 # put!(flags, F)
             elseif maxPredicates[end] isa Int &&
                 all(cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]) &&
@@ -743,6 +749,7 @@ function generateAll(
     # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
     withPropertyMarked=(F) -> true,
     # withInducedProperty=(F::T) -> true,
+    limit::Int = Inf
 ) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     for i in 1:maxVertices
@@ -875,6 +882,10 @@ function generateAll(
                 noModels = Base.n_avail(pq)
                 if noModels > maxModels
                     maxModels = noModels
+                end
+                if maxModels > limit
+                    close(pq)
+                    return :limit
                 end
                 print("\r$(noRunningNow) active threads, \t$(noModels) models left,\t $maxModels max models\t\t\t")
                 sleep(0.1)

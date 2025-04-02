@@ -121,11 +121,14 @@ function addLasserreBlock!(
 end
 
 function addRazborovBlock!(
-    m::FlagModel{T,N,D}, lvl; maxLabels=lvl, maxBlockSize=Inf
+    m::FlagModel{T,N,D}, lvl; maxLabels=lvl, maxBlockSize=Inf, maxGraphs = Inf
 ) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
-    computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize)
+    res = computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize, maxGraphs = maxGraphs)
+    if res == :limit 
+        return :limit 
+    end
 
     return rM
 end
