@@ -179,6 +179,12 @@ function computeRazborovBasis!(
             M.blockSymmetry[mu] = (pattern=[1;;], gen=Any[[1]], n=1)
             continue
         end
+
+        if length(B) > 20_000
+            @warn "Too large for numerical symmetry reduction!"
+            return :limit 
+        end
+
         @info "determining symmetry pattern for $mu of size $(length(B)) ($muc/$total_mu)"
 
         muAut = aut(mu)
@@ -286,6 +292,9 @@ function computeRazborovBasis!(
         elseif true#true # block-diagonalize numerically using SDPSymmetryReduction
             # @show P
             # @show SDPSymmetryReduction.Partition{Int}(P)
+
+            @info "Running SDPSymmetryReduction"
+
             part = SDPSymmetryReduction.Partition{Int}(P)
 
             if aut(mu).size == 1
