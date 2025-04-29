@@ -121,13 +121,13 @@ function addLasserreBlock!(
 end
 
 function addRazborovBlock!(
-    m::FlagModel{T,N,D}, lvl; maxLabels=lvl, maxBlockSize=Inf, maxGraphs = Inf
+    m::FlagModel{T,N,D}, lvl::Int; maxLabels=lvl, maxBlockSize::Int=100_000, maxGraphs::Int=100_000
 ) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
-    res = computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize, maxGraphs = maxGraphs)
-    if res == :limit 
-        return :limit 
+    res = computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize, maxGraphs=maxGraphs)
+    if res == :limit
+        return :limit
     end
 
     return rM
@@ -153,10 +153,10 @@ function addInequality_Razborov!(
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
     k = maximum(size(G) for G in keys(gl.coeff))
-    
+
     rM = RazborovModel{T,N,D}(m)
     computeRazborovBasis!(rM, lvl - k)
-    
+
     qM = QuadraticModule{T}(rM, gl)
     push!(m.subModels, qM)
     return qM
@@ -164,7 +164,7 @@ end
 
 function addInequality_Razborov!(
     m::FlagModel{InducedFlag{T},N,D}, g::QuantumFlag{InducedFlag{T},D}, lvl::Int
-    ) where {T<:Flag,N,D}
+) where {T<:Flag,N,D}
     gl = labelCanonically(g)
     gl = homogenize(m, gl)
     # @assert allequal(size(G) for G in keys(gl.coeff))
@@ -209,17 +209,19 @@ function addInequality_Lasserre!(
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
     maxVertices=size(g) +
-                floor((maxEdges - countEdges(g)[2]) / 2) * maxPredicateArguments(T),
+                floor(Int, (maxEdges - countTotalEdges(g))) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
-    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[2]) / 2))
-    genMaxVertices = Int(floor((maxVertices - size(gl)) / 2))
+    genMaxEdges = floor(Int, (maxEdges - countTotalEdges(gl)) / 2)
+    genMaxVertices = floor(Int, (maxVertices - size(gl)) / 2)
 
     lM = LasserreModel{PartiallyLabeledFlag{T},N,D}(m)
 
     @show genMaxEdges
+    @show maxVertices
     @show genMaxVertices
+    @show size(g), size(gl)
 
     Fs = generateAll(
         PartiallyLabeledFlag{T},
@@ -244,15 +246,19 @@ function addEquality!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{PartiallyLabeledFlag{T},D},
     maxEdges;
-    maxVertices=size(g) + (maxEdges - countEdges(g)[2]) * maxPredicateArguments(T),
+    # maxVertices=size(g) + (maxEdges - countEdges(g)[2]) * maxPredicateArguments(T),
+    maxVertices=size(g) + (maxEdges - countTotalEdges(g)) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
-    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[2])))
+    # genMaxEdges = Int(floor((maxEdges - countEdges(gl)[2])))
+    genMaxEdges = Int(floor((maxEdges - countTotalEdges(gl))))
     genMaxVertices = Int(floor((maxVertices - size(gl))))
 
-    qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0)#numLabels(gl))
+    qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0) # correct coefficients, removal happens when multiplying partially labeled flags
+    # qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, numLabels(gl))
 
+    @show PartiallyLabeledFlag{T}, genMaxVertices + numLabels(gl), [numLabels(gl), genMaxEdges]
     Fs = generateAll(
         PartiallyLabeledFlag{T},
         genMaxVertices + numLabels(gl),
@@ -276,11 +282,13 @@ function addEquality!(
     m::FlagModel{T,N,D},
     g::QuantumFlag{T,D},
     maxEdges;
-    maxVertices=size(g) + (maxEdges - countEdges(g)[1]) * maxPredicateArguments(T),
+    # maxVertices=size(g) + (maxEdges - countEdges(g)[1]) * maxPredicateArguments(T),
+    maxVertices=size(g) + (maxEdges - countTotalEdges(g)) * maxPredicateArguments(T),
 ) where {T<:Flag,N,D}
     gl = labelCanonically(g)
 
-    genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])))
+    # genMaxEdges = Int(floor((maxEdges - countEdges(gl)[1])))
+    genMaxEdges = Int(floor((maxEdges - countTotalEdges(gl))))
     genMaxVertices = Int(floor((maxVertices - size(gl))))
 
     qM = EqualityModule{T,T,N,D}(gl)
@@ -301,18 +309,18 @@ end
 function add_verts(m::FlagModel, G::T, n::Int) where {T}
     vert = permute(one(T), 1:1)
     res = 1 * G
-    for _ in (size(G) + 1):n
+    for _ in (size(G)+1):n
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         filter!(x -> isAllowed(m, x.first), res.coeff)
     end
     return res
 end
 
-function add_verts(m::FlagModel, G::QuantumFlag{F, T}, n::Int = size(G)) where {F<:InducedFlag, T}
-    return sum(c*add_verts(m, g, n) for (g,c) in G.coeff)
+function add_verts(m::FlagModel, G::QuantumFlag{F,T}, n::Int=size(G)) where {F<:InducedFlag,T}
+    return sum(c * add_verts(m, g, n) for (g, c) in G.coeff)
 end
 
-function homogenize(m::FlagModel, G::QuantumFlag{F, T}) where {F<:InducedFlag, T}
+function homogenize(m::FlagModel, G::QuantumFlag{F,T}) where {F<:InducedFlag,T}
     return add_verts(m, G, size(G))
 end
 
@@ -408,7 +416,7 @@ function buildJuMPModel(
         # end
         @objective(jumpModel, Min, t)
     end
-    return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints)
+    return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints, t = t)
 end
 
 function roundResults(m::FlagModel, jumpModel, variables, blocks, constraints; prec=1e-5)

@@ -638,7 +638,7 @@ function buildJuMPModel(
     end
 
     graphCoefficients = Dict()
-    @show Y
+    # @show Y
     AT = typeof(sum(collect(values(Y))[1]))
 
     for G in keys(m.sdpData)

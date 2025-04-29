@@ -86,7 +86,7 @@ function modelBlockSizes(m::RazborovModel)
     for (mu, b) in m.basis
         if haskey(m.blockSymmetry[mu], :Q)
             for i in eachindex(m.blockSymmetry[mu].Q)
-                res["($mu, $i)"] = size(m.blockSymmetry[mu].Q[i], 2)
+                res[(mu, i)] = size(m.blockSymmetry[mu].Q[i], 2)
             end
         else
             res[mu] = length(b)
@@ -100,7 +100,7 @@ function modelBlockSizes(m::RazborovModel)
 end
 
 function computeUnreducedRazborovBasis(
-    M::RazborovModel{T,N,D}, n, maxLabels=n; maxGraphs = Inf
+    M::RazborovModel{T,N,D}, n, maxLabels=n; maxGraphs::Int=Inf
 ) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
@@ -112,9 +112,9 @@ function computeUnreducedRazborovBasis(
         [99999];
         withProperty=x -> isAllowed(M.parentModel, x),
         withPropertyMarked=x -> isAllowed(M.parentModel, x),
-        limit = maxGraphs
+        limit=maxGraphs
     )
-    if flags == :limit 
+    if flags == :limit
         @info "Limit reached, stopping generation"
         return :limit
     end
@@ -137,7 +137,7 @@ function computeUnreducedRazborovBasis(
             FBlock = label(F; removeIsolated=false)[1]
             @assert size(FBlock) == m
             # @assert FBlock == label(FBlock; removeIsolated=false)[1]
-            FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
+            FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
 
@@ -158,9 +158,9 @@ function computeUnreducedRazborovBasis(
 end
 
 function computeRazborovBasis!(
-    M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf, maxGraphs = Inf
+    M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf, maxGraphs::Int=Inf
 ) where {T<:Flag,N,D}
-    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels; maxGraphs = maxGraphs)
+    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels; maxGraphs=maxGraphs)
     if razborovBasis == :limit
         return :limit
     end
@@ -182,7 +182,7 @@ function computeRazborovBasis!(
 
         if length(B) > 20_000
             @warn "Too large for numerical symmetry reduction!"
-            return :limit 
+            return :limit
         end
 
         @info "determining symmetry pattern for $mu of size $(length(B)) ($muc/$total_mu)"
@@ -197,7 +197,7 @@ function computeRazborovBasis!(
                 @assert length(p) == b.n
                 pb = labelCanonically(
                     PartiallyLabeledFlag{T}(
-                        permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
+                        permute(b.F, vcat(p, (length(p)+1):size(b))), b.n
                     ),
                 )
                 # @show pb
@@ -257,7 +257,7 @@ function computeRazborovBasis!(
                         # @assert length(p) == b.n
                         pb = labelCanonically(
                             PartiallyLabeledFlag{T}(
-                                permute(b.F, vcat(p.d, (length(p.d) + 1):size(b))), b.n
+                                permute(b.F, vcat(p.d, (length(p.d)+1):size(b))), b.n
                             ),
                         )
                         # @show pb
@@ -289,7 +289,7 @@ function computeRazborovBasis!(
                 M.blockSymmetry[mu] = (pattern=P, gen=newGen)
             end
 
-        elseif true#true # block-diagonalize numerically using SDPSymmetryReduction
+        elseif false#true # block-diagonalize numerically using SDPSymmetryReduction
             # @show P
             # @show SDPSymmetryReduction.Partition{Int}(P)
 
@@ -425,7 +425,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
             newSize = k + (n1 - k) + (n2 - k)
             p = collect(1:newSize)
-            p[(k + 1):n1] = (n2 + 1):newSize
+            p[(k+1):n1] = (n2+1):newSize
 
             T1 = a.F
             p1 = p[1:size(a.F)]
@@ -439,7 +439,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             p1Fin = p2Inv[p1]
             p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
 
-            @views sort!(p1Fin[(n1 + 1):end])
+            @views sort!(p1Fin[(n1+1):end])
 
             p1Fin = Int.(p1Fin)
 
@@ -516,7 +516,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
                     sdpData[F][mu] .+= d * P.reg[s]#*factor
                 else
-                    sdpData[F][mu][P.pattern .== s] .= d
+                    sdpData[F][mu][P.pattern.==s] .= d
                 end
                 # else # Symmetry reduction: basis change matrices in P.Q
                 # @show P.Q
@@ -835,7 +835,7 @@ function computeUnreducedRazborovBasis(
 
                     q = collect(1:m)
                     q[c] .= 1:k
-                    q[setdiff(1:m, c)] .= (k + 1):m
+                    q[setdiff(1:m, c)] .= (k+1):m
                     # @show k
                     q[c] .= p.d[tCanLabelPermInv[1:k]]
 
@@ -876,11 +876,12 @@ function roundResults(
 
     den = round(BigInt, 1 / prec)
     function roundDen(x)
-        return round(BigInt, den * x)//den
+        return round(BigInt, den * x) // den
     end
 
     for (mu, b) in blocks
         if mu isa String
+            @show mu, b
             # ex[mu] = rationalize(BigInt, value(b); tol=prec)#; digits = digits)
             ex[mu] = roundDen(value(b))
         else
@@ -891,7 +892,7 @@ function roundResults(
     return ex
 end
 
-function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
+function verifySOS(m::RazborovModel{T, N, D}, sol::Dict; io::IO=stdout) where {T,N,D}
     if io !== nothing
         println(io, "Flagmatic model")
 
@@ -925,7 +926,7 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
                             if haskey(B, mu)
                                 return Rational{BigInt}(B[mu][i, j]) * G
                             else
-                                return BigInt(0)//1 * G
+                                return BigInt(0) // 1 * G
                             end
                         end
                         print(
@@ -969,21 +970,21 @@ function verifySOS(m::RazborovModel, sol::Dict; io::IO=stdout)
     end
 
     res = sum(m.sdpData) do (G, B)
-        if mu isa String
-            return BigInt(0)//1
-        end
+        # if mu isa String
+        #     return BigInt(0)//1
+        # end
         sum(B) do (mu, b)
             if haskey(sol, mu)
                 psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
                 return dot(Rational{BigInt}.(psd), b) * G
             else
-                return BigInt(0)//1 * G
+                return BigInt(0) // 1 * G
             end
         end
     end
 
-    res += sum(enumerate(m.quotient)) do (i, F)
-        Rational{BigInt}(get(sol, "Q$i", 0//1)) * F
+    res += sum(enumerate(m.quotient); init=0 // 1 * one(T)) do (i, F)
+        Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
     end
 
     if io !== nothing

@@ -81,12 +81,12 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
             end
 
             # coloring[coloring .> cell] .+= numNewCells
-            for i in length(alpha):-1:(cell + numNewCells + 1)
-                alpha[i] = alpha[i - numNewCells]
+            for i in length(alpha):-1:(cell+numNewCells+1)
+                alpha[i] = alpha[i-numNewCells]
             end
             # @views alpha[(cell + numNewCells + 1):end] .= alpha[(cell + 1):(end - numNewCells)]
 
-            alpha[(cell + 1):(cell + numNewCells)] .= true
+            alpha[(cell+1):(cell+numNewCells)] .= true
 
             newCellsCol::Vector{Pair{UInt,Int}} = collect(newCells)
             sort!(newCellsCol; by=x -> x[1])
@@ -128,7 +128,7 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
                 end
 
                 # Remove biggest new cell
-                alpha[maxCellInd + cell - 1] = false
+                alpha[maxCellInd+cell-1] = false
             end
 
             cell += length(newCellsCol)
@@ -187,7 +187,7 @@ function investigateNode(
                 # @info "Added onto stabilizer, new order is $(order(autG))"
                 stabilizer!(autG, curBranch)
                 for i in 1:length(curBranch)
-                    H = stabilizer!(autG, curBranch[1:(i - 1)])
+                    H = stabilizer!(autG, curBranch[1:(i-1)])
 
                     @assert H !== nothing
 
@@ -249,15 +249,15 @@ function investigateNode(
         #         length(nodeInv) <= length(nInv1)
 
         @views if prune &&
-            !first &&
-            !(
-                nodeInv[1:min(length(nodeInv), length(nInv1))] ==
-                nInv1[1:min(length(nodeInv), length(nInv1))]
-            ) &&
-            !(
-                nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
-                nInvStar[1:min(length(nodeInv), length(nInvStar))]
-            )
+                  !first &&
+                  !(
+                      nodeInv[1:min(length(nodeInv), length(nInv1))] ==
+                      nInv1[1:min(length(nodeInv), length(nInv1))]
+                  ) &&
+                  !(
+                      nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
+                      nInvStar[1:min(length(nodeInv), length(nInvStar))]
+                  )
             return 0
         end
         firstBigCell = Int[]
@@ -655,8 +655,8 @@ function process_edgeMarkedFlags(
             # noRunning[] -= 1
             Threads.atomic_add!(noRunning, -1)
             continue
-        elseif all(cP[1:(length(maxPredicates) - 1)] .== maxPredicates[1:(end - 1)]) &&
-            sum(cP[length(maxPredicates):end]) == maxPredicates[end]
+        elseif all(cP[1:(length(maxPredicates)-1)] .== maxPredicates[1:(end-1)]) &&
+               sum(cP[length(maxPredicates):end]) == maxPredicates[end]
             # noRunning[] -= 1
 
             Threads.atomic_add!(noRunning, -1)
@@ -671,7 +671,7 @@ function process_edgeMarkedFlags(
                 if T <: ProductFlag
                     for (i, FT) in enumerate(fieldtypes(fieldtypes(T)[1]))
                         if allowMultiEdges(FT)
-                            union!(F.marked, [e for e in FMarked.marked if e[1] == i])
+                            union!(F.marked, [e for e in FMarked.marked if e.i == i])
                         end
                     end
                 else
@@ -684,7 +684,7 @@ function process_edgeMarkedFlags(
                 continue
             end
 
-            cP = countEdges(F)[1:(end - 1)]
+            cP = countEdges(F)[1:(end-1)]
             # if all(cP .<= maxPredicates)
             #     pq[F] = cP
             # end
@@ -695,40 +695,52 @@ function process_edgeMarkedFlags(
             # @assert F2 == F # always... because the new vertex has to be in same position, and others are already canonically labeled. There must be a better way??? Cant be right..., check small graphs
             # F = F2
 
-            cpOrder = countEdges(F)
-            cpOrder[end] *= -1
-
-            if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
-                # pq[F] = cP
-                # pq[F] = cpOrder
-                # @info "putting..."
+            if hasAtMostEdges(F.F, maxPredicates)
                 addF = false
                 @lock doneFlags_lock if !(F in doneFlags)
                     push!(doneFlags, F)
                     addF = true
                 end
                 if addF
-                    !isopen(flags) && return nothing 
+                    !isopen(flags) && return nothing
                     put!(flags, F)
                 end
-                # put!(flags, F)
-            elseif maxPredicates[end] isa Int &&
-                all(cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]) &&
-                sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
-                # pq[F] = cP
-                # pq[F] = cpOrder
-                # @info "putting..."
-                # put!(flags, F)
-                # if !(F in doneFlags)
-                addF = false
-                @lock doneFlags_lock if !(F in doneFlags)
-                    push!(doneFlags, F)
-                    addF = true
-                end
-                addF && put!(flags, F)
-                # put!(flags, F)
-                # end
             end
+
+            # cpOrder = countEdges(F)
+            # cpOrder[end] *= -1
+
+            # if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
+            #     # pq[F] = cP
+            #     # pq[F] = cpOrder
+            #     # @info "putting..."
+            #     addF = false
+            #     @lock doneFlags_lock if !(F in doneFlags)
+            #         push!(doneFlags, F)
+            #         addF = true
+            #     end
+            #     if addF
+            #         !isopen(flags) && return nothing
+            #         put!(flags, F)
+            #     end
+            #     # put!(flags, F)
+            # elseif maxPredicates[end] isa Int &&
+            #        all(cP[1:(length(maxPredicates)-1)] .<= maxPredicates[1:(end-1)]) &&
+            #        sum(sum.(cP[length(maxPredicates):end])) <= maxPredicates[end]
+            #     # pq[F] = cP
+            #     # pq[F] = cpOrder
+            #     # @info "putting..."
+            #     # put!(flags, F)
+            #     # if !(F in doneFlags)
+            #     addF = false
+            #     @lock doneFlags_lock if !(F in doneFlags)
+            #         push!(doneFlags, F)
+            #         addF = true
+            #     end
+            #     addF && put!(flags, F)
+            #     # put!(flags, F)
+            #     # end
+            # end
         end
         # noRunning[] -= 1
 
@@ -749,9 +761,10 @@ function generateAll(
     # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
     withPropertyMarked=(F) -> true,
     # withInducedProperty=(F::T) -> true,
-    limit::Int = Inf
+    limit::Int=100_000
 ) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
+    @show maxPredicates
     for i in 1:maxVertices
         @show (i, maxVertices)
         # nextGraphs = T[]
@@ -791,7 +804,7 @@ function generateAll(
                 continue
             end
 
-            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
+            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i-1))]
             uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(
                 newF, fixed, maxPredicates
             )
@@ -818,31 +831,38 @@ function generateAll(
                     F = EdgeMarkedFlag{T}(F.F, FMarked.marked)
                 end
                 # @show F
-                cP = countEdges(F)[1:(end - 1)]
-                # @show cP
+                # cP = countEdges(F)[1:(end - 1)]
+                # @show cP, maxPredicates
                 # @assert length(maxPredicates) == length(cP)
-                if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
-                    # pq[F] = cP
+                # if length(maxPredicates) == length(cP) && all(cP .<= maxPredicates)
+                #     # pq[F] = cP
+                #     if !(F in doneFlags)
+                #         @lock doneFlags_lock push!(doneFlags, F)
+                #         put!(pq, F)
+                #     end
+                #     # @show "putting $F"
+                # elseif all(
+                #         cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]
+                #     ) &&
+                #     maxPredicates[end] isa Union{Int,Vector{Int}} &&
+                #     sum(sum.(cP[length(maxPredicates):end])) <= sum(maxPredicates[end])
+                #     # pq[F] = cP
+                #     # if !(F in doneFlags)
+                #     if !(F in doneFlags)
+                #         @lock doneFlags_lock push!(doneFlags, F)
+                #         put!(pq, F)
+                #     end
+                #     # put!(pq, F)
+                #     # end
+                #     # @show "putting $F"
+                # end
+                if hasAtMostEdges(F.F, maxPredicates)
                     if !(F in doneFlags)
                         @lock doneFlags_lock push!(doneFlags, F)
                         put!(pq, F)
                     end
-                    # @show "putting $F"
-                elseif all(
-                        cP[1:(length(maxPredicates) - 1)] .<= maxPredicates[1:(end - 1)]
-                    ) &&
-                    maxPredicates[end] isa Union{Int,Vector{Int}} &&
-                    sum(sum.(cP[length(maxPredicates):end])) <= sum(maxPredicates[end])
-                    # pq[F] = cP
-                    # if !(F in doneFlags)
-                    if !(F in doneFlags)
-                        @lock doneFlags_lock push!(doneFlags, F)
-                        put!(pq, F)
-                    end
-                    # put!(pq, F)
-                    # end
-                    # @show "putting $F"
                 end
+
             end
         end
 
@@ -861,7 +881,7 @@ function generateAll(
             # t = @async process_edgeMarkedFlags(pq, nextGraphs, withProperty, maxPredicates, withPropertyMarked, T, doneFlags, doneFlags_lock, noRunning)
             # push!(tasks, t)
             # sleep(0.01)
-            for _ in 1:(Threads.nthreads() - 1)
+            for _ in 1:(Threads.nthreads()-1)
                 t = Threads.@spawn process_edgeMarkedFlags(
                     pq,
                     nextGraphs,

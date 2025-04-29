@@ -11,6 +11,14 @@ struct ProductFlag{FT} <: Flag where {FT<:Tuple{Vararg{Flag}}}
 
     ProductFlag{FT}(Fs::FT) where {FT} = new{FT}(Fs)
     ProductFlag{FT}() where {FT} = new{FT}(Tuple(F() for F in fieldtypes(FT)))
+    ProductFlag{FT}(f::F, i::Int) where {FT,F} = new{FT}(Tuple(k == i ? f : G() for (k, G) in pairs(fieldtypes(FT))))
+    ProductFlag{FT}(fis::Tuple{F,Int}...) where {FT,F} = begin
+        tmp = [G() for G in fieldtypes(FT)]
+        for (f, i) in fis 
+            tmp[i] = f 
+        end
+        new{FT}(Tuple(tmp))
+    end
 end
 
 function Base.show(io::IO, F::ProductFlag)
@@ -21,7 +29,7 @@ function Base.show(io::IO, F::ProductFlag)
             print(io, ",")
         end
         print(io, f)
-        first = false 
+        first = false
     end
     print(io, ")")
 end
@@ -52,35 +60,42 @@ function size(G::ProductFlag)::Int
     return maximum([size(F) for F in G.Fs])
 end
 
-function isAllowed(F::ProductFlag{FT}, p::Tuple{Int,P}) where {FT,P<:Predicate}
-    return isAllowed(F.Fs[p[1]], p[2])
+struct ProductFlagPredicate{P} <: Predicate
+    i::Int # which element of the product
+    p::P # the predicate
+end
+
+function isAllowed(F::ProductFlag{FT}, p::ProductFlagPredicate{P}) where {FT,P<:Predicate}
+    return isAllowed(F.Fs[p.i], p.p)
 end
 
 function predicateType(::Type{ProductFlag{FT}}) where {FT}
-    return Tuple{Int,Union{[predicateType(F) for F in fieldtypes(FT)]...}}
+    return ProductFlagPredicate{Union{[predicateType(F) for F in fieldtypes(FT)]...}}
 end
 
 function findUnknownPredicates(
     F::ProductFlag{FT}, fixed::Vector{U}, predLimits::Vector
-)::Vector{Vector{Tuple{Int,Predicate}}} where {U<:AbstractVector{Int},FT}
-    res = Vector{predicateType(ProductFlag{FT})}[]
+) where {U<:AbstractVector{Int},FT}
+    # ::Vector{Vector{ProductFlagPredicate{Predicate}}} 
+    PT = predicateType(ProductFlag{FT})
+    res = Vector{PT}[]
     for (i, Ft) in enumerate(fieldtypes(FT))
-        tmp = predicateType(ProductFlag{FT})[]
+        tmp = PT[]
         # if length(predLimits) == length(fieldtypes(FT)) && sum(countEdges(F.Fs[i])) >= predLimits[i]
         #     push!(res, tmp)
         #     continue
         # end
 
         if length(predLimits) == length(fieldtypes(FT))
-            FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[i])
+            FIP = findUnknownPredicates(F.Fs[i], fixed, [predLimits[i]])
         else
-            FIP = findUnknownPredicates(F.Fs[i], fixed, predLimits[1])
+            FIP = findUnknownPredicates(F.Fs[i], fixed, [predLimits[1]])
         end
 
         # @assert length(FIP) == 1
         for fips in FIP
             for p in fips
-                push!(tmp, (i, p))
+                push!(tmp, ProductFlagPredicate{typeof(p)}(i, p))
             end
         end
         push!(res, tmp)
@@ -90,7 +105,7 @@ end
 
 function findUnknownGenerationPredicates(
     F::ProductFlag{FT}, fixed::Vector{U}, predLimits::Vector
-)::Vector{Vector{Tuple{Int,Predicate}}} where {U<:AbstractVector{Int},FT}
+)::Vector{Vector{ProductFlagPredicate{Predicate}}} where {U<:AbstractVector{Int},FT}
     res = Vector{predicateType(ProductFlag{FT})}[]
     for (i, Ft) in enumerate(fieldtypes(FT))
         tmp = predicateType(ProductFlag{FT})[]
@@ -99,9 +114,9 @@ function findUnknownGenerationPredicates(
         #     continue
         # end
         if length(predLimits) == length(fieldtypes(FT))
-            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
+            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, [predLimits[i]])
         else
-            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[1])
+            FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, [predLimits[1]])
         end
         # FIP = findUnknownGenerationPredicates(F.Fs[i], fixed, predLimits[i])
         # @assert length(FIP) == 1
@@ -116,10 +131,10 @@ function findUnknownGenerationPredicates(
 end
 
 function addPredicates(
-    G::ProductFlag{FT}, preds::Vector{Tuple{Int,P}}) where {FT,P}
+    G::ProductFlag{FT}, preds::Vector{ProductFlagPredicate{P}}) where {FT,P}
     tmp = []
     for (i, F) in enumerate(G.Fs)
-        newF = addPredicates(F, predicateType(typeof(F))[p[2] for p in preds if p[1] == i])
+        newF = addPredicates(F, predicateType(typeof(F))[p.p for p in preds if p.i == i])
         push!(tmp, newF)
     end
 
@@ -132,7 +147,7 @@ end
 
 # apply p to g1, then glue together
 function glue(
-    g1::ProductFlag{FT}, g2::ProductFlag{FT}, p::AbstractVector{Int}
+    g1::ProductFlag{FT}, g2::ProductFlag{FT}, p::AbstractVector{Int}; isAllowed=(f) -> true
 ) where {FT}
     return ProductFlag{FT}(Tuple(glue(g1.Fs[i], g2.Fs[i], p) for i = 1:length(fieldtypes(FT))))
 end
@@ -158,12 +173,12 @@ function distinguish(F::ProductFlag{FT}, v::Int, W::BitVector)::UInt where {FT}
     return res
 end
 
-function distinguish(pred::Tuple{Int,P}, v::Int, W::BitVector)::UInt where {P<:Predicate}
-    return distinguish(pred[2], v, W)
+function distinguish(pred::ProductFlagPredicate{P}, v::Int, W::BitVector)::UInt where {P<:Predicate}
+    return distinguish(pred.p, v, W)
 end
 
-function permute(pred::Tuple{Int,P}, p::AbstractVector{Int}) where {P<:Predicate}
-    return tuple(pred[1], permute(pred[2], p))
+function permute(pred::ProductFlagPredicate{P}, p::AbstractVector{Int}) where {P<:Predicate}
+    return ProductFlagPredicate{P}(pred.i, permute(pred.p, p))
 end
 
 function permute(
@@ -178,6 +193,10 @@ end
 
 function countEdges(F::ProductFlag)
     return [countEdges(f) for f in F.Fs]
+end
+
+function countTotalEdges(F::ProductFlag)::Int
+    return sum(countTotalEdges(f) for f in F.Fs)
 end
 
 function isolatedVertices(F::ProductFlag{FT})::BitVector where {FT}

@@ -353,6 +353,24 @@ function countEdges(F::T)::Vector{Int} where {T<:Flag}
     return missing
 end
 
+function countTotalEdges(F::T)::Int where {T<:Flag}
+    return sum(countEdges(F))
+end
+
+function hasAtMostEdges(F::T, m::Int) where {T<:Flag}
+    return countTotalEdges(F) <= m
+end
+
+function hasAtMostEdges(F::T, m::Vector) where {T<:Flag}
+    if length(m) == 1
+        return hasAtMostEdges(F, m[1])
+    end
+    c = countEdges(F)
+    @show F, m
+    @assert length(c) == length(m)
+    return all(c .<= m)
+end
+
 """
     isolatedVertices(F::T)::BitVector where{T<:Flag}
 

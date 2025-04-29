@@ -67,6 +67,13 @@ function countEdges(F::QuantumFlag)
     return [maximum([e[i] for e in edgeCounts]) for i in 1:k]
 end
 
+function countTotalEdges(F::QuantumFlag)
+    length(F.coeff) == 0 && return 0
+    
+    return maximum(countTotalEdges(f) for f in keys(F.coeff))
+
+end
+
 """
     :*(F::QuantumFlag{T,R}, G::QuantumFlag{T, R}) where {T <: Flag, R<:Real}
 

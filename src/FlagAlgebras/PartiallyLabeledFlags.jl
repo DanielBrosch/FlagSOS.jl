@@ -12,6 +12,7 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
         @assert size(F) >= n "More labeled vertices than vertices in the Flag."
         return new(F, n)
     end
+    PartiallyLabeledFlag(F::T, n::Int) where {T<:Flag} = new{T}(F, n)
     PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = new{T}(T(opts...), n)
     PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
     PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
@@ -179,7 +180,16 @@ end
 
 function countEdges(F::PartiallyLabeledFlag{T})::Vector where {T<:Flag}
     cP = countEdges(F.F)
-    return [F.n, cP...]
+    # return [F.n, cP]
+    return [[F.n], cP...]
+end
+
+function countTotalEdges(F::PartiallyLabeledFlag{T})::Int where {T<:Flag}
+    return countTotalEdges(F.F)
+end
+
+function hasAtMostEdges(F::PartiallyLabeledFlag{T}, m::Vector) where {T<:Flag}
+    return F.n <= m[1] && hasAtMostEdges(F.F, m[2:end])
 end
 
 function addPredicates(F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:Flag,U}
