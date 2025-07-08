@@ -240,8 +240,9 @@ end
 Computes the moebius transform of a flag on the vertices 'verts'
 """
 function moebius(F::T, verts=1:size(F); label=false, isAllowed=(f) -> true) where {T<:Flag}
-    @assert verts == 1:size(F) "TODO"
-    markedF = EdgeMarkedFlag{T}(F, findUnknownPredicates(F))
+    fixed = setdiff(1:size(F), verts)
+    ps = findUnknownPredicates(F, [fixed], [])
+    markedF = EdgeMarkedFlag{T}(F, ps)
     return moebius(markedF; label=label, isAllowed = isAllowed)
 end
 
@@ -251,8 +252,9 @@ end
 Computes the zeta transform of a flag on the vertices 'verts'
 """
 function zeta(F::T, verts=1:size(F); label=false, isAllowed=(f) -> true) where {T<:Flag}
-    @assert verts == 1:size(F) "TODO"
-    markedF = EdgeMarkedFlag{T}(F, findUnknownPredicates(F))
+    fixed = setdiff(1:size(F), verts)
+    ps = findUnknownPredicates(F, [fixed], [])
+    markedF = EdgeMarkedFlag{T}(F, ps)
     return zeta(markedF; label=label, isAllowed=isAllowed)
 end
 
