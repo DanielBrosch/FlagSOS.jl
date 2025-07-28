@@ -8,7 +8,7 @@ using SparseArrays: SparseMatrixCSC, spzeros, findnz
 struct FlagSymmetries{T<:Flag}
     F::T
     shape::Vector{Vector{Int}}
-    consideredVecs::Vector{Int}
+    consideredVerts::Vector{Int}
     rowAut::Any
 
     function FlagSymmetries(F::T) where {T<:Flag}
@@ -62,6 +62,10 @@ struct FlagSymmetries{T<:Flag}
     end
 end
 
+function Base.show(io::IO, T::FlagSymmetries)
+    return print(io, "Symmetries($(T.F), shape = $(T.shape), verts = $(T.consideredVerts)), aut = $(T.rowAut.gen))")
+end
+
 import Base.==
 function ==(A::FlagSymmetries, B::FlagSymmetries)
     return A.F == B.F
@@ -76,6 +80,10 @@ struct SpechtFlag{T<:Flag}
     F::FlagSymmetries{T}
     T::AbstractAlgebra.Generic.YoungTableau{Int}
     freePos::Int
+end
+
+function Base.show(io::IO, T::SpechtFlag)
+    return print(io, "Spechtflag of type $(T.T) with variable part at pos $(T.freePos) of $(T.F)")
 end
 
 """
@@ -158,15 +166,22 @@ function addFlag!(
     freePos = 1
 
     if graphSize > 0
-        @assert n - graphSize > 0
-        lambda = AbstractAlgebra.Partition(
-            vcat([n - graphSize], [length(p) for p in gS.shape])
-        )
-
-        if n - graphSize < lambda.part[1]
-            # if n-graphSize < length(gS.shape[1])
-            freePos = findfirst(x -> x == n - graphSize, lambda.part)
+        @assert n - graphSize >= 0
+        if n - graphSize > 0
+            lambda = AbstractAlgebra.Partition(
+                vcat([n - graphSize], [length(p) for p in gS.shape])
+            )
+            if n - graphSize < lambda.part[1]
+                # if n-graphSize < length(gS.shape[1])
+                freePos = findfirst(x -> x == n - graphSize, lambda.part)
+            end
+        else
+            lambda = AbstractAlgebra.Partition(
+                [length(p) for p in gS.shape]
+            )
+            freePos = -1
         end
+
     else
         lambda = AbstractAlgebra.Partition([1])
     end
@@ -240,8 +255,8 @@ function multiplyPolytabsAndSymmetrize(
     #     N -= reservedVerts
     # end
 
-    fixVerts1 = setdiff(1:size(sp1.F.F), sp1.F.consideredVecs)
-    fixVerts2 = setdiff(1:size(sp2.F.F), sp2.F.consideredVecs)
+    fixVerts1 = setdiff(1:size(sp1.F.F), sp1.F.consideredVerts)
+    fixVerts2 = setdiff(1:size(sp2.F.F), sp2.F.consideredVerts)
 
     @assert fixVerts1 == fixVerts2
 
@@ -272,6 +287,9 @@ function multiplyPolytabsAndSymmetrize(
 
     n = limit ? sum(sp1.T.part) : (N > -1 ? N - reservedVerts - removedVerts : Polynomials.Polynomial([0, 1]) - removedVerts)
     la = vcat([n - sum(sp1.T.part[2:end])], sp1.T.part[2:end])
+
+    # @show sp1, sp2, N, n
+
     # la = deepcopy(sp1.T.part.part)
     # la[sp1.freePos] += n - sum(sp1.T.part)
     # @show sp1 
@@ -291,8 +309,9 @@ function multiplyPolytabsAndSymmetrize(
     # @show la 
 
 
-
+    # @show la, limit
     (newVariant, fact) = symPolytabloidProduct(sp1.T, sp2.T, la, limit)
+    # @show newVariant
 
     combinedOverlaps = Dict{Matrix{Int},D}()
     for (a, b) in newVariant
@@ -305,15 +324,26 @@ function multiplyPolytabsAndSymmetrize(
         # end
         # cord = [2:size(a, 1)..., 1]
 
-        coord1 = [setdiff(1:size(a, 2), [sp1.freePos])..., sp1.freePos]
-        coord2 = [setdiff(1:size(a, 1), [sp2.freePos])..., sp2.freePos]
-        shiftedMat = a[coord2, coord1]
+
+        if sp1.freePos > -1
+            coord1 = [setdiff(1:size(a, 2), [sp1.freePos])..., sp1.freePos]
+        else
+            coord1 = 1:size(a, 2)
+        end
+        if sp2.freePos > -1
+            coord2 = [setdiff(1:size(a, 1), [sp2.freePos])..., sp2.freePos]
+        else
+            coord2 = 1:size(a, 1)
+        end
+        # shiftedMat = a[coord2, coord1]
 
         # coord1 = [setdiff(1:size(a,1), [sp1.freePos])..., sp1.freePos]
         # coord2 = [setdiff(1:size(a,2), [sp2.freePos])..., sp2.freePos]
-        # shiftedMat = a[coord1, coord2]
+        shiftedMat = a[coord1, coord2]
 
-        shiftedMat[end, end] = 0
+        if sp1.freePos > -1 && sp2.freePos > -1
+            shiftedMat[end, end] = 0
+        end
 
         # naive
         # if maxVert == -1 || sum(shiftedMat) <= maxVert
@@ -393,6 +423,11 @@ function multiplyPolytabsAndSymmetrize(
         for i in fixVerts1
             p[i] = i
         end
+        # varVerts = setdiff(1:sum(B) + length(fixVerts1), fixVerts1)
+
+        # @show B, fixVerts1
+        # @assert sum(B) + length(fixVerts1) == size(sp1.F.F)
+
         vecShape1 = vcat(shape1...)
         if length(vecShape1) < sum(B)#length(p)
             vecShape1 = vcat(vecShape1, setdiff(1:length(p), vecShape1, fixVerts1))
@@ -431,7 +466,23 @@ function multiplyPolytabsAndSymmetrize(
 
         @assert length(p) == length(unique(p))
 
-        combined = glue(sp1.F.F, sp2.F.F, p)
+        #TODO: Double check!
+        # if length(p) < size(sp1.F.F)
+        #     @error "Figure out what is happening here."
+        #     @show sp1, p, fixVerts1
+        #     @assert size(sp1.F.F) - length(p) == length(fixVerts1)
+        #     p = vcat(fixVerts1, p .+ length(fixVerts1))
+        # end
+
+        try
+            combined = glue(sp1.F.F, sp2.F.F, p)
+        catch
+            @show B, vecShape1, vecShape2
+            @show newVariant
+            @show sp1, sp2, fixVerts1
+            @show sp1.F.F, sp2.F.F, p
+            @error "gluing failed!"
+        end
         # combined = glueFinite(N, sp1.F.F, sp2.F.F, p; labelFlags=false)
 
         combined === nothing && continue

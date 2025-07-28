@@ -18,6 +18,10 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
     PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
 end
 
+function Base.show(io::IO, T::PartiallyLabeledFlag)
+    return print(io, "Flag($(T.F), $(T.n))")
+end
+
 function numLabels(F::PartiallyLabeledFlag)
     return F.n
 end
@@ -73,7 +77,7 @@ function Base.:*(
     n = size(F)
     m = size(G)
 
-    return glue(F, G, vcat(1:(F.n), (m + 1):(m + n - F.n)); isAllowed=isAllowed)
+    return glue(F, G, vcat(1:(F.n), (m+1):(m+n-F.n)); isAllowed=isAllowed)
 end
 
 function subFlag(
@@ -102,7 +106,13 @@ function glue(
     F.n > 0 &&
         @assert 1:(F.n) == p[1:(F.n)] "Labeled vertices should be glued to labeled vertices without being permuted."
 
-    FG = glue(F.F, G.F, p)
+    FG = nothing
+    try
+        FG = glue(F.F, G.F, p)
+    catch
+        @show F, G, p, F.F, G.F
+        error()
+    end
     FG === nothing && return nothing
 
     if FG isa QuantumFlag
@@ -117,7 +127,7 @@ function glueFinite(
     N,
     F::PartiallyLabeledFlag{T},
     G::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
@@ -173,7 +183,7 @@ function findUnknownGenerationPredicates(
     end
     return [
         LabelPredicate[
-            LabelPredicate(i) for i in (F.n + 1):size(F) if !(i in vcat(fixed...))
+            LabelPredicate(i) for i in (F.n+1):size(F) if !(i in vcat(fixed...))
         ],
     ]
 end
@@ -212,7 +222,7 @@ function addPredicates(F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:F
 
         newLabels = setdiff!([p.i for p in labelPreds], 1:(F.n))
 
-        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
+        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n+1):size(F), newLabels))
         p = zeros(Int, size(F))
         for i in 1:size(F)
             p[pGoal[i]] = i

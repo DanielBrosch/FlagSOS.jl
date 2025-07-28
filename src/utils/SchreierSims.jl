@@ -38,6 +38,10 @@ mutable struct Group
     end
 end
 
+function Base.show(io::IO, T::Group)
+    return print(io, "Group of order $(T.order) with generators $(T.gen)")
+end
+
 function orbit(G::Group, v::Int)
     O = [v]
     i = 1

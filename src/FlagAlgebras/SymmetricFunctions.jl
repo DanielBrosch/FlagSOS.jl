@@ -64,7 +64,14 @@ end
 function glue(
     F::SymmetricFunction, G::SymmetricFunction, p::AbstractVector{Int}
 )
+    # @show F, G, p
     res = deepcopy(G.exponents)
+    # if length(res) < maximum(p; init = 0)
+    #     old_length = length(res)
+    #     resize!(res, maximum(p))
+    #     res[old_length+1:end] .= 0
+    # end
+        
     for (i, c) in F.exponents
         res[p[i]] = get(res, p[i], 0) + c
     end
