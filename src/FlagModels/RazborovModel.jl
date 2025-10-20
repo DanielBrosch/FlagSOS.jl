@@ -158,7 +158,7 @@ function computeUnreducedRazborovBasis(
 end
 
 function computeRazborovBasis!(
-    M::RazborovModel{T,N,D}, n; maxLabels=n, maxBlockSize=Inf, maxGraphs::Int=Inf
+    M::RazborovModel{T,N,D}, n::Int; maxLabels::Int=n, maxBlockSize::Int=100_000, maxGraphs::Int=100_000
 ) where {T<:Flag,N,D}
     razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels; maxGraphs=maxGraphs)
     if razborovBasis == :limit

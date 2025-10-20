@@ -166,9 +166,6 @@ function distinguish(F::ConstantWeightCode, v::Int, W::BitVector)::UInt
 end
 
 function distinguish(F::HyperEdgePredicate, v::Int, W::BitVector)::UInt
-    # if !(v in F.e)
-    #     return 0
-    # end
     return hash(v in F.e, hash(sum(W[i] for i in F.e)))
 end
 

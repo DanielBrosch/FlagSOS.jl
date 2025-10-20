@@ -212,7 +212,7 @@ function computeSDP!(
             for (GG2, c2) in GG2s.coeff
                 GG2 === nothing && continue
                 if GG2 isa PartiallyLabeledFlag{T}
-                    tmpG = D(c2) * label((GG2).F)[1]
+                    tmpG = D(c2) * labelCanonically((GG2).F)
                 elseif true#GG2 isa T 
                     tmpG = D(c2) * labelCanonically(GG2)#[1]
                 else
