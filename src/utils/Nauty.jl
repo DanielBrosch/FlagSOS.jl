@@ -81,12 +81,12 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
             end
 
             # coloring[coloring .> cell] .+= numNewCells
-            for i in length(alpha):-1:(cell+numNewCells+1)
-                alpha[i] = alpha[i-numNewCells]
+            for i in length(alpha):-1:(cell + numNewCells + 1)
+                alpha[i] = alpha[i - numNewCells]
             end
             # @views alpha[(cell + numNewCells + 1):end] .= alpha[(cell + 1):(end - numNewCells)]
 
-            alpha[(cell+1):(cell+numNewCells)] .= true
+            alpha[(cell + 1):(cell + numNewCells)] .= true
 
             newCellsCol::Vector{Pair{UInt,Int}} = collect(newCells)
             sort!(newCellsCol; by=x -> x[1])
@@ -128,7 +128,7 @@ function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
                 end
 
                 # Remove biggest new cell
-                alpha[maxCellInd+cell-1] = false
+                alpha[maxCellInd + cell - 1] = false
             end
 
             cell += length(newCellsCol)
@@ -187,7 +187,7 @@ function investigateNode(
                 # @info "Added onto stabilizer, new order is $(order(autG))"
                 stabilizer!(autG, curBranch)
                 for i in 1:length(curBranch)
-                    H = stabilizer!(autG, curBranch[1:(i-1)])
+                    H = stabilizer!(autG, curBranch[1:(i - 1)])
 
                     @assert H !== nothing
 
@@ -249,15 +249,15 @@ function investigateNode(
         #         length(nodeInv) <= length(nInv1)
 
         @views if prune &&
-                  !first &&
-                  !(
-                      nodeInv[1:min(length(nodeInv), length(nInv1))] ==
-                      nInv1[1:min(length(nodeInv), length(nInv1))]
-                  ) &&
-                  !(
-                      nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
-                      nInvStar[1:min(length(nodeInv), length(nInvStar))]
-                  )
+            !first &&
+            !(
+                nodeInv[1:min(length(nodeInv), length(nInv1))] ==
+                nInv1[1:min(length(nodeInv), length(nInv1))]
+            ) &&
+            !(
+                nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
+                nInvStar[1:min(length(nodeInv), length(nInvStar))]
+            )
             return 0
         end
         firstBigCell = Int[]
@@ -384,7 +384,10 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
 end
 
 function generateAll(
-    ::Type{F}, maxVertices::Int, maxEdges::Int; withProperty=(F::F) -> true
+    ::Type{F},
+    maxVertices::Int,
+    maxEdges::Int;
+    withProperty=(F::F) -> true,
 ) where {F}
     return generateAll(F, maxVertices, [maxEdges]; withProperty=withProperty)
 end
@@ -598,8 +601,6 @@ function process_edgeMarkedFlags(
     # while true
     # @assert noRunning[] > 0
 
-
-
     if noRunning[] == 0 && !isready(flags)
         return nothing
     end
@@ -655,8 +656,8 @@ function process_edgeMarkedFlags(
             # noRunning[] -= 1
             Threads.atomic_add!(noRunning, -1)
             continue
-        elseif all(cP[1:(length(maxPredicates)-1)] .== maxPredicates[1:(end-1)]) &&
-               sum(cP[length(maxPredicates):end]) == maxPredicates[end]
+        elseif all(cP[1:(length(maxPredicates) - 1)] .== maxPredicates[1:(end - 1)]) &&
+            sum(cP[length(maxPredicates):end]) == maxPredicates[end]
             # noRunning[] -= 1
 
             Threads.atomic_add!(noRunning, -1)
@@ -684,7 +685,7 @@ function process_edgeMarkedFlags(
                 continue
             end
 
-            cP = countEdges(F)[1:(end-1)]
+            cP = countEdges(F)[1:(end - 1)]
             # if all(cP .<= maxPredicates)
             #     pq[F] = cP
             # end
@@ -761,7 +762,7 @@ function generateAll(
     # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
     withPropertyMarked=(F) -> true,
     # withInducedProperty=(F::T) -> true,
-    limit::Int=100_000
+    limit::Int=100_000,
 ) where {T}
     generatedGraphs = Vector{T}[Vector([one(T)])]
     @show maxPredicates
@@ -804,7 +805,7 @@ function generateAll(
                 continue
             end
 
-            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i-1))]
+            fixed = allowMultiEdges(T) ? Vector{Int}[] : [collect(1:(i - 1))]
             uP::Vector{Vector{predicateType(T)}} = findUnknownPredicates(
                 newF, fixed, maxPredicates
             )
@@ -862,7 +863,6 @@ function generateAll(
                         put!(pq, F)
                     end
                 end
-
             end
         end
 
@@ -881,7 +881,7 @@ function generateAll(
             # t = @async process_edgeMarkedFlags(pq, nextGraphs, withProperty, maxPredicates, withPropertyMarked, T, doneFlags, doneFlags_lock, noRunning)
             # push!(tasks, t)
             # sleep(0.01)
-            for _ in 1:(Threads.nthreads()-1)
+            for _ in 1:(Threads.nthreads() - 1)
                 t = Threads.@spawn process_edgeMarkedFlags(
                     pq,
                     nextGraphs,
@@ -907,7 +907,9 @@ function generateAll(
                     close(pq)
                     return :limit
                 end
-                print("\r$(noRunningNow) active threads, \t$(noModels) models left,\t $maxModels max models\t\t\t")
+                print(
+                    "\r$(noRunningNow) active threads, \t$(noModels) models left,\t $maxModels max models\t\t\t",
+                )
                 sleep(0.1)
             end
             println()

@@ -168,12 +168,12 @@ function isSym(F::InducedFlag, v1::Int, v2::Int)::Bool
     return isSym(F.F, v1, v2)
 end
 
-function generateAll(
-    ::Type{InducedFlag{F}}, maxVertices::Int, maxPredicates::Vector{Int}
-) where {F<:Flag}
-    tmp = generateAll(F, maxVertices, maxPredicates)
-    return [InducedFlag{F}(f) for f in tmp]
-end
+# function generateAll(
+#     ::Type{InducedFlag{F}}, maxVertices::Int, maxPredicates::Vector{Int}
+# ) where {F<:Flag}
+#     tmp = generateAll(F, maxVertices, maxPredicates)
+#     return [InducedFlag{F}(f) for f in tmp]
+# end
 
 # Reduction to a basis of induced densities (The quotient of Razborov)
 function eliminateIsolated(F::InducedFlag{T}) where {T<:Flag}
