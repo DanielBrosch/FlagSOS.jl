@@ -13,9 +13,34 @@ struct ConstantWeightCode{W,D} <: Flag
     end
     ConstantWeightCode{W,D}(A::BitMatrix) where {W,D} = begin
         A = sortslices(A; dims=1)
-        new{W,D}(A)
+        res = new{W,D}(A)
+        if isAllowed(res)
+            return res 
+        end
+        return nothing
     end
     ConstantWeightCode{W,D}() where {W,D} = new{W,D}(BitMatrix(undef, 0, 0))
+end
+
+function Base.show(io::IO, G::ConstantWeightCode{W,D}) where {W,D}
+    if size(G.A, 1) == 0
+        print(io, "($(size(G.A,2)), ∅) ")
+    else
+        print(io, "($(size(G.A,2)),")
+        first = true
+        for i in 1:size(G.A, 1)
+            if !first
+                print(io, " ")
+            end
+            for j in 1:size(G.A, 2)
+                if G.A[i,j]
+                    print(io, "$j")
+                end
+            end
+            first = false
+        end
+        print(io, ")")
+    end
 end
 
 const Hypergraph{W} = ConstantWeightCode{W,0}
@@ -105,12 +130,14 @@ function addPredicates(
         end
     end
     res = ConstantWeightCode{W,D}(A)
-    !isAllowed(res) && return nothing
     return res
 end
 
 function glue(
-    g1::ConstantWeightCode{W,D}, g2::ConstantWeightCode{W,D}, p::AbstractVector{Int}; isAllowed=(f) -> true
+    g1::ConstantWeightCode{W,D},
+    g2::ConstantWeightCode{W,D},
+    p::AbstractVector{Int};
+    isAllowed=(f) -> true,
 ) where {W,D}
     n1 = size(g1)
     n2 = size(g2)

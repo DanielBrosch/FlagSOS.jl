@@ -104,7 +104,13 @@ end
 Adds a symmetry reduced Lasserre block of internal flag type 'T' to 'm' and returns it. All flags with up to 'floor(maxEdges/2)' edges (resp. true predicates) with optionally at most 'floor(maxVertices/2)' vertices are added as generators of the block. The resulting hierarchy contains flags with at most 'maxEdges' edges and 'maxVertices' vertices.
 """
 function addLasserreBlock!(
-    m::FlagModel{T,N,D}, maxEdges; maxVertices=N == :limit ? maxEdges * maxPredicateArguments(T) : min(2*N, maxEdges * maxPredicateArguments(T))
+    m::FlagModel{T,N,D},
+    maxEdges;
+    maxVertices=if N == :limit
+        maxEdges * maxPredicateArguments(T)
+    else
+        min(2 * N, maxEdges * maxPredicateArguments(T))
+    end,
 ) where {T<:Flag,N,D}
     lM = LasserreModel{T,N,D}(m)
     push!(m.subModels, lM)
@@ -122,11 +128,17 @@ function addLasserreBlock!(
 end
 
 function addRazborovBlock!(
-    m::FlagModel{T,N,D}, lvl::Int; maxLabels=lvl, maxBlockSize::Int=100_000, maxGraphs::Int=100_000
+    m::FlagModel{T,N,D},
+    lvl::Int;
+    maxLabels=lvl,
+    maxBlockSize::Int=100_000,
+    maxGraphs::Int=100_000,
 ) where {T<:Flag,N,D}
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
-    res = computeRazborovBasis!(rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize, maxGraphs=maxGraphs)
+    res = computeRazborovBasis!(
+        rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize, maxGraphs=maxGraphs
+    )
     if res == :limit
         return :limit
     end
@@ -227,7 +239,8 @@ function addInequality_Lasserre!(
     Fs = generateAll(
         PartiallyLabeledFlag{T},
         numLabels(gl) + genMaxVertices,
-        [numLabels(gl), genMaxEdges],)
+        [numLabels(gl), genMaxEdges],
+    )
 
     display(Fs)
 
@@ -261,7 +274,9 @@ function addEquality!(
     qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0) # correct coefficients, removal happens when multiplying partially labeled flags
     # qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, numLabels(gl))
 
-    @show PartiallyLabeledFlag{T}, genMaxVertices + numLabels(gl), [numLabels(gl), genMaxEdges]
+    @show PartiallyLabeledFlag{T},
+    genMaxVertices + numLabels(gl),
+    [numLabels(gl), genMaxEdges]
     Fs = generateAll(
         PartiallyLabeledFlag{T},
         genMaxVertices + numLabels(gl),
@@ -312,15 +327,17 @@ end
 function add_verts(m::FlagModel, G::T, n::Int) where {T}
     vert = permute(one(T), 1:1)
     res = 1 * G
-    for _ in (size(G)+1):n
+    for _ in (size(G) + 1):n
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         filter!(x -> isAllowed(m, x.first), res.coeff)
     end
     return res
 end
 
-function add_verts(m::FlagModel, G::QuantumFlag{F,T}, n::Int=size(G)) where {F<:InducedFlag,T}
-    return sum(c * add_verts(m, g, n) for (g, c) in G.coeff)
+function add_verts(
+    m::FlagModel, G::QuantumFlag{F,T}, n::Int=size(G)
+) where {F<:InducedFlag,T}
+    return sum(c * add_verts(m, g, n) for (g, c) in G.coeff; init = QuantumFlag{F,T}())
 end
 
 function homogenize(m::FlagModel, G::QuantumFlag{F,T}) where {F<:InducedFlag,T}
@@ -402,9 +419,19 @@ function buildJuMPModel(
                 # push!(constraints, c == (haskey(objective.coeff, G) ? objective.coeff[G] : 0))  
                 # push!(constraints, c <= (haskey(objective.coeff, G) ? objective.coeff[G] : 0))
                 # constraints[end][G] = @constraint(jumpModel, c == get(objective.coeff, G, 0) + t*get(∅.coeff, G, 0))
+
+                # if isInducedFlag(T)
+                #     # because flags sum to one
+                #     constraints[end][G] = @constraint(
+                #         jumpModel,
+                #         c <= get(objective.coeff, G, 0) + t * get(∅.coeff, G, 0)
+                #     )
+                # else
                 constraints[end][G] = @constraint(
-                    jumpModel, c == get(objective.coeff, G, 0) + t * get(∅.coeff, G, 0)
+                    jumpModel, base_name="$G", c <= get(objective.coeff, G, 0) + t * get(∅.coeff, G, 0)
                 )
+                # end
+
                 # constraints[end][G] = @constraint(jumpModel, c <= get(objective.coeff, G, 0))
             end
         end
@@ -419,7 +446,9 @@ function buildJuMPModel(
         # end
         @objective(jumpModel, Min, t)
     end
-    return (model=jumpModel, variables=variables, blocks=blocks, constraints=constraints, t=t)
+    return (
+        model=jumpModel, variables=variables, blocks=blocks, constraints=constraints, t=t
+    )
 end
 
 function roundResults(m::FlagModel, jumpModel, variables, blocks, constraints; prec=1e-5)
@@ -454,6 +483,12 @@ function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
     #TODO: Quotient when using InducedFlags
     obj = labelCanonically(m.objective)
     vars = union([collect(keys(sM.sdpData)) for sM in m.subModels]...)
+
+    if isInducedFlag(T)
+        lvl = size(first(vars))
+        obj = add_verts(m, obj, lvl)
+    end
+
     filter!(F -> isAllowed(m, F), vars)
     blocks = Dict()
     blockSizes = Dict()

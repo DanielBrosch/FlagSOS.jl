@@ -12,6 +12,10 @@ struct InducedFlag{T} <: Flag where {T<:Flag}
     InducedFlag{T}(::Nothing) where {T<:Flag} = nothing
 end
 
+function Base.show(io::IO, F::InducedFlag{T}) where {T}
+    return print(io, "I$(F.F)")
+end
+
 function ==(A::InducedFlag{T}, B::InducedFlag{T}) where {T<:Flag}
     return A.F == B.F
 end
@@ -55,10 +59,7 @@ end
 Glues together the two induced Flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. `p` may be a permutation involving more than `size(F)` vertices. Since these Flags describe induced densities, the result is a linear combination of every possible combination of "unknown" edges between the added vertices from eachothers perspectives (or equivalent). If the common part is different, they are orthogonal to each other and thus return an empty Vector.
 """
 function glue(
-    F::InducedFlag{T},
-    G::InducedFlag{T},
-    p::AbstractVector{Int};
-    isAllowed=(f) -> true,
+    F::InducedFlag{T}, G::InducedFlag{T}, p::AbstractVector{Int}; isAllowed=(f) -> true
 )::QuantumFlag{InducedFlag{T},Rational{Int}} where {T<:Flag}
     n = size(F)
     m = size(G)
@@ -73,7 +74,6 @@ function glue(
     # Regular glue 
     fg = glue(F.F, G.F, p)#; isAllowed = isAllowed)
 
-
     if fg === nothing
         return QuantumFlag{InducedFlag{T},Rational{Int}}()
     end
@@ -86,8 +86,9 @@ function glue(
 
     res = QuantumFlag{InducedFlag{T},Rational{Int}}()
 
-    tmp = QuantumFlag{EdgeMarkedFlag{InducedFlag{T}, predicateType(InducedFlag{T})}, Rational{Int}}()
-
+    tmp = QuantumFlag{
+        EdgeMarkedFlag{InducedFlag{T},predicateType(InducedFlag{T})},Rational{Int}
+    }()
 
     for (FG, c) in fg.coeff
 
@@ -101,7 +102,7 @@ function glue(
         pred = pred[1]
 
         FGMarked = EdgeMarkedFlag{InducedFlag{T}}(InducedFlag{T}(FG), pred)
-        tmp += (c//1)*FGMarked
+        tmp += (c//1) * FGMarked
         # res += sum(c//1 * G for (G, c) in zeta(FGMarked; label=true, isAllowed=isAllowed).coeff)
     end
 
