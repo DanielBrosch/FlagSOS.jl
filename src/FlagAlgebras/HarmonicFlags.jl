@@ -82,6 +82,11 @@ function addPredicates(
     return HarmonicFlag{T}(tmp)
 end
 
+
+function base_nonnegative(::Type{HarmonicFlag})
+    return false
+end
+
 function permute(F::HarmonicFlag{T}, p::HarmonicFlag{Int}) where {T<:Flag}
     return HarmonicFlag{T}(glue(F.F, one(T), p))
 end

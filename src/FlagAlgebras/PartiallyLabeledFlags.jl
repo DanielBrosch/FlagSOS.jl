@@ -1,4 +1,4 @@
-export PartiallyLabeledFlag
+export PartiallyLabeledFlag, type, unlabel
 
 """
     PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
@@ -16,6 +16,28 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
     PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = new{T}(T(opts...), n)
     PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
     PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
+end
+
+function unlabel(F::PartiallyLabeledFlag{T}) where {T<:Flag}
+    return F.F
+end
+
+function unlabel(F::PartiallyLabeledFlag{InducedFlag{T,true}}) where {T<:Flag}
+    return (factorial(size(F) - F.n) // factorial(size(F))) * (aut(F.F).size // aut(F).size) * F.F
+end
+
+function unlabel(F::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,true}},D}) where {T<:Flag,D}
+    return sum(c * unlabel(f) for (f, c) in F.coeff)
+end
+
+function unlabel(F::QuantumFlag)
+    return sum(c * unlabel(f) for (f, c) in F.coeff)
+end
+
+
+
+function type(F::PartiallyLabeledFlag)
+    return subFlag(F.F, 1:F.n)
 end
 
 function Base.show(io::IO, T::PartiallyLabeledFlag)
@@ -77,6 +99,7 @@ function Base.:*(
     n = size(F)
     m = size(G)
 
+    # @show F, G, vcat(1:(F.n), (m+1):(m+n-F.n))
     return glue(F, G, vcat(1:(F.n), (m+1):(m+n-F.n)); isAllowed=isAllowed)
 end
 
@@ -108,7 +131,11 @@ function glue(
 
     FG = nothing
     try
-        FG = glue(F.F, G.F, p)
+        if isInducedFlag(T)
+            FG = glue(F.F, G.F, p; label=false)
+        else
+            FG = glue(F.F, G.F, p)
+        end
     catch
         @show F, G, p, F.F, G.F
         error()
@@ -132,6 +159,10 @@ function glueFinite(
     isAllowed=(f) -> true,
 ) where {T<:Flag}
     return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
+end
+
+function up_to_iso_fact(F::PartiallyLabeledFlag{T}) where {T<:Flag}
+    return aut(F).size // factorial(size(F) - F.n)
 end
 
 function vertexColor(F::PartiallyLabeledFlag{T}, v::Int) where {T<:Flag}
@@ -304,7 +335,7 @@ function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
 end
 
 function labelCanonically(
-    F::PartiallyLabeledFlag{InducedFlag{T}}
-)::PartiallyLabeledFlag{InducedFlag{T}} where {T<:Flag}
+    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
+)::PartiallyLabeledFlag{InducedFlag{T,UpToIso}} where {T<:Flag,UpToIso}
     return label(F; removeIsolated=false)[1]
 end

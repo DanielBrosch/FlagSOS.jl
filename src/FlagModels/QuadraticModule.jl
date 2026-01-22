@@ -57,6 +57,10 @@ function computeSDP!(
             tmp = QuantumFlag{T}(glueFinite(N, G, m.inequality))
         else
             tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality))
+            if m.baseModel isa RazborovModel && isInducedFlag(T)
+                tmp = add_verts(m.baseModel.parentModel, tmp, m.baseModel.lvl + size(m.inequality))
+                @show m.baseModel.lvl + size(m.inequality), tmp
+            end
         end
         if isInducedFlag(T)
             noLabel = tmp

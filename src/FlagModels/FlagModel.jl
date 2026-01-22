@@ -29,14 +29,17 @@ mutable struct FlagModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     subModels::Vector{AbstractFlagModel{T,N,D}}
     forbiddenFlags::Set{T}
     objective::Union{QuantumFlag{T,D},Nothing}
+    onlyFeasibility::Bool
     function FlagModel{T}() where {T<:Flag}
-        return new{T,:limit,Int}(AbstractFlagModel{T,:limit,Int}[], Set{T}(), nothing)
+        return new{T,:limit,Int}(
+            AbstractFlagModel{T,:limit,Int}[], Set{T}(), nothing, false
+        )
     end
     function FlagModel{T,D}() where {T<:Flag,D}
-        return new{T,:limit,D}(AbstractFlagModel{T,:limit,D}[], Set{T}(), nothing)
+        return new{T,:limit,D}(AbstractFlagModel{T,:limit,D}[], Set{T}(), nothing, false)
     end
     function FlagModel{T,N,D}() where {T<:Flag,D,N}
-        return new{T,N,D}(AbstractFlagModel{T,N,D}[], Set{T}(), nothing)
+        return new{T,N,D}(AbstractFlagModel{T,N,D}[], Set{T}(), nothing, false)
     end
 end
 
@@ -176,17 +179,42 @@ function addInequality_Razborov!(
 end
 
 function addInequality_Razborov!(
-    m::FlagModel{InducedFlag{T},N,D}, g::QuantumFlag{InducedFlag{T},D}, lvl::Int
-) where {T<:Flag,N,D}
+    m::FlagModel{InducedFlag{T,UpToIso},N,D},
+    g::QuantumFlag{InducedFlag{T,UpToIso},D},
+    lvl::Int,
+) where {T<:Flag,N,D,UpToIso}
     gl = labelCanonically(g)
+
     gl = homogenize(m, gl)
     # @assert allequal(size(G) for G in keys(gl.coeff))
     k = maximum(size(G) for G in keys(gl.coeff))
 
-    rM = RazborovModel{InducedFlag{T},N,D}(m)
+    rM = RazborovModel{InducedFlag{T,UpToIso},N,D}(m)
     computeRazborovBasis!(rM, lvl - k)
 
-    qM = QuadraticModule{InducedFlag{T}}(rM, gl)
+    qM = QuadraticModule{InducedFlag{T,UpToIso}}(rM, gl)
+    push!(m.subModels, qM)
+    return qM
+end
+
+function addInequality_Razborov!(
+    m::FlagModel{InducedFlag{T,UpToIso},N,D},
+    g::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},D},
+    lvl::Int,
+) where {T<:Flag,N,D,UpToIso}
+    gl = labelCanonically(g)
+    types = type.(keys(g.coeff))
+    @assert allequal(types)
+    t = types[1]
+    @show t
+    gl = homogenize(m, gl)
+    # @assert allequal(size(G) for G in keys(gl.coeff))
+    k = maximum(size(G) for G in keys(gl.coeff))
+
+    rM = RazborovModel{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},N,D}(m)
+    computeRazborovBasis!(rM, lvl - k)
+
+    qM = QuadraticModule{InducedFlag{T,UpToIso},PartiallyLabeledFlag{T}}(rM, gl)
     push!(m.subModels, qM)
     return qM
 end
@@ -334,13 +362,44 @@ function add_verts(m::FlagModel, G::T, n::Int) where {T}
     return res
 end
 
+function add_verts(m::FlagModel, G::PartiallyLabeledFlag{T}, n::Int) where {T<:InducedFlag}
+    t = type(G)
+    vert = PartiallyLabeledFlag{T}(permute(one(T), 1:1), 0)
+
+    @show vert
+    res = 1 * G
+    @show res
+    for _ in (size(G) + 1):n
+        @show *(vert, res; isAllowed=x -> isAllowed(m, x))
+        res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
+        @show res
+        filter!(x -> isAllowed(m, x.first), res.coeff)
+    end
+    return res
+end
+
 function add_verts(
     m::FlagModel, G::QuantumFlag{F,T}, n::Int=size(G)
 ) where {F<:InducedFlag,T}
-    return sum(c * add_verts(m, g, n) for (g, c) in G.coeff; init = QuantumFlag{F,T}())
+    return sum(c * add_verts(m, g, n) for (g, c) in G.coeff; init=QuantumFlag{F,T}())
+end
+
+function add_verts(
+    m::FlagModel, G::QuantumFlag{PartiallyLabeledFlag{F},T}, n::Int=size(G)
+) where {F<:InducedFlag,T}
+    return sum(
+        c * add_verts(m, g, n) for (g, c) in G.coeff;
+        init=QuantumFlag{PartiallyLabeledFlag{F},T}(),
+    )
 end
 
 function homogenize(m::FlagModel, G::QuantumFlag{F,T}) where {F<:InducedFlag,T}
+    return add_verts(m, G, size(G))
+end
+
+function homogenize(
+    m::FlagModel, G::QuantumFlag{PartiallyLabeledFlag{F},T}
+) where {F<:InducedFlag,T}
     return add_verts(m, G, size(G))
 end
 
@@ -399,7 +458,9 @@ function buildJuMPModel(
         ∅ = get_translate(one(T))
         @show ∅
 
-        t = @variable(jumpModel, base_name = "t")
+        if !m.onlyFeasibility
+            t = @variable(jumpModel, base_name = "t")
+        end
         push!(constraints, Dict())
         objL = labelCanonically(m.objective)
         objective = sum(c * get_translate(G) for (G, c) in objL.coeff)
@@ -427,9 +488,25 @@ function buildJuMPModel(
                 #         c <= get(objective.coeff, G, 0) + t * get(∅.coeff, G, 0)
                 #     )
                 # else
-                constraints[end][G] = @constraint(
-                    jumpModel, base_name="$G", c <= get(objective.coeff, G, 0) + t * get(∅.coeff, G, 0)
-                )
+                if m.onlyFeasibility
+                    constraints[end][G] = @constraint(
+                        jumpModel, base_name = "$G", c <= get(objective.coeff, G, 0)
+                    )
+                else
+                    if base_nonnegative(T)
+                        constraints[end][G] = @constraint(
+                            jumpModel,
+                            base_name = "$G",
+                            c <= get(objective.coeff, G, 0) - t * get(∅.coeff, G, 0)
+                        )
+                    else
+                        constraints[end][G] = @constraint(
+                            jumpModel,
+                            base_name = "$G",
+                            c == get(objective.coeff, G, 0) - t * get(∅.coeff, G, 0)
+                        )
+                    end
+                end
                 # end
 
                 # constraints[end][G] = @constraint(jumpModel, c <= get(objective.coeff, G, 0))
@@ -437,17 +514,21 @@ function buildJuMPModel(
         end
     end
 
-    if m.objective !== nothing
+    if m.objective !== nothing && !m.onlyFeasibility
         # if !(one(T) in keys(m.objective.coeff))
         #     @objective(jumpModel, Min, variables[one(T)])
         # else
         #     # @objective(jumpModel, Min, 0)
         #     @objective(jumpModel, Min, variables[one(T)] - m.objective.coeff[one(T)])
         # end
-        @objective(jumpModel, Min, t)
+        @objective(jumpModel, Max, t)
     end
     return (
-        model=jumpModel, variables=variables, blocks=blocks, constraints=constraints, t=t
+        model=jumpModel,
+        variables=variables,
+        blocks=blocks,
+        constraints=constraints,
+        t=m.onlyFeasibility ? nothing : t,
     )
 end
 

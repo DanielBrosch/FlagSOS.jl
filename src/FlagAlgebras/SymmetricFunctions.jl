@@ -19,6 +19,10 @@ function Base.show(io::IO, T::SymmetricFunction)
     print(io, ")")
 end
 
+function base_nonnegative(::Type{SymmetricFunction})
+    return false
+end
+
 function ==(A::SymmetricFunction, B::SymmetricFunction)
     return A.exponents == B.exponents
 end

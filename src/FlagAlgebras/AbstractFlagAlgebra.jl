@@ -531,6 +531,10 @@ function ^(F::T, i::Int) where {T<:Flag}
     return F * F^(i - 1)
 end
 
+function base_nonnegative(::Type{T}) where {T<:Flag}
+    return true
+end
+
 include("InducedFlags.jl")
 include("Graphs.jl")
 include("ConstantWeightCodes.jl")

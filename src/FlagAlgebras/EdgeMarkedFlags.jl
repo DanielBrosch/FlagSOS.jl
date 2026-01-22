@@ -214,7 +214,7 @@ function isolatedVertices(F::EdgeMarkedFlag)::BitVector
     return BitVector([false for i in 1:size(F)])
 end
 
-function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}; removeEarlierMarked = false) where {T<:Flag,P}
+function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}; removeEarlierMarked = false, label=true) where {T<:Flag,P}
     res = Dict{EdgeMarkedFlag{T,P},Int}()
     for (i,e) in enumerate(F.marked)
         newF = addPredicates(F.F, [e])
@@ -226,7 +226,7 @@ function allWaysToAddOneMarked(F::EdgeMarkedFlag{T,P}; removeEarlierMarked = fal
                 markedN = P[p for (j,p) in enumerate(F.marked) if p != e && isAllowed(added, p) && (!removeEarlierMarked || j > i)]
                 # markedN = setdiff(F.marked, [e])#filter!(x -> isAllowed(added, x), setdiff(F.marked, [e]))
                 Fn = EdgeMarkedFlag{T}(added, markedN)
-                Fl = labelCanonically(Fn)
+                Fl = label ? labelCanonically(Fn) : Fn
                 res[Fl] = get(res, Fl, 0) + 1
             end
         end
@@ -287,6 +287,7 @@ function moebius(
         return 1 * F.F
     end
 
+
     tmp = Dict{EdgeMarkedFlag{T,P},Rational{Int}}(F => 1)
     tmp2 = Dict{EdgeMarkedFlag{T,P},Rational{Int}}()
 
@@ -295,7 +296,7 @@ function moebius(
             if isAllowed(F2.F)
                 res += c2 * (-1)^flippedEdges * F2.F
             end
-            for (F3, c3) in allWaysToAddOneMarked(F2)
+            for (F3, c3) in allWaysToAddOneMarked(F2; label=label)
                 !isAllowed(F3) && continue
                 # F3L = label ? labelCanonically(F3) : F3
                 # tmp2[F3L] = get(tmp2, F3L, 0) + c2 * c3
@@ -354,7 +355,7 @@ function moebius(
         for (F2, c2) in tmp
             res += c2 * (-1)^flippedEdges * (label ? labelCanonically(F2.F) : F2.F)
 
-            for (F3, c3) in allWaysToAddOneMarked(F2)
+            for (F3, c3) in allWaysToAddOneMarked(F2; label=label)
                 !isAllowed(F3) && continue
                 # F3L = label ? labelCanonically(F3) : F3
                 # tmp2[F3L] = get(tmp2, F3L, 0) + c2 * c3
