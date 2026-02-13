@@ -139,10 +139,16 @@ function glue(
     res = zeta(tmp; label=label, isAllowed=isAllowed)
     if UpToIso
 
-        in_fact = 1 // (up_to_iso_fact(F) * up_to_iso_fact(G))
+        @show F, G, p
+        k = length(commonPartF)
+        @show k
+        @assert Set(commonPartG) == Set(1:k)
 
-        for F in keys(res.coeff)
-            res.coeff[F] *= in_fact * up_to_iso_fact(F)
+        in_fact = 1 // (up_to_iso_fact(PartiallyLabeledFlag(F, k)) * up_to_iso_fact(PartiallyLabeledFlag(G, k)))
+
+        for f in keys(res.coeff)
+            @show f, in_fact, up_to_iso_fact(PartiallyLabeledFlag(f, k))
+            res.coeff[f] *= in_fact * up_to_iso_fact(PartiallyLabeledFlag(f, k))
         end
     end
 
@@ -333,4 +339,8 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag,UpToIso}
     #     end
     # end
     # A
+end
+
+function sample_coefficients(::Type{InducedFlag{T}}, n::Int, type::T; all_flags::Vector{PartiallyLabeledFlag{T}}=generateAll(PartiallyLabeledFlag{T}, n, [size(type), 10000]; initial_flag=PartiallyLabeledFlag{T}(type, size(type)))) where {T<:Flag}
+    return all_flags
 end

@@ -387,9 +387,9 @@ function generateAll(
     ::Type{F},
     maxVertices::Int,
     maxEdges::Int;
-    withProperty=(F::F) -> true,
+    withProperty=(F::F) -> true, initial_flag = one(T)
 ) where {F}
-    return generateAll(F, maxVertices, [maxEdges]; withProperty=withProperty)
+    return generateAll(F, maxVertices, [maxEdges]; withProperty=withProperty, initial_flag = initial_flag)
 end
 
 #TODO: Quite a bit slower than nauty/traces, how are they doing it?
@@ -763,10 +763,11 @@ function generateAll(
     withPropertyMarked=(F) -> true,
     # withInducedProperty=(F::T) -> true,
     limit::Int=100_000,
+    initial_flag = one(T)
 ) where {T}
-    generatedGraphs = Vector{T}[Vector([one(T)])]
+    generatedGraphs = Vector{T}[Vector([initial_flag])]
     @show maxPredicates
-    for i in 1:maxVertices
+    for i in size(initial_flag)+1:maxVertices
         @show (i, maxVertices)
         # nextGraphs = T[]
         nextGraphs = Channel{T}(Inf)
@@ -779,7 +780,7 @@ function generateAll(
         # doneFlags_lock = ReentrantLock()
         doneFlags_lock = Base.Threads.SpinLock()
 
-        for f in generatedGraphs[i]
+        for f in generatedGraphs[i-size(initial_flag)]
             newF = permute(f, 1:i)
             # if newF == nothing 
             #     continue 
