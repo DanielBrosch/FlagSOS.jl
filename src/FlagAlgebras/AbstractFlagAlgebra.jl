@@ -107,7 +107,7 @@ The gluing operation of type `T`. Should, for example, glue unlabeled vertices t
 function Base.:*(F::T, G::T; isAllowed=(f) -> true) where {T<:Flag}
     n = size(F)
     m = size(G)
-    return glue(F, G, vcat((m+1):(m+n), 1:m); isAllowed=isAllowed)
+    return glue(F, G, vcat((m + 1):(m + n), 1:m); isAllowed=isAllowed)
 end
 
 """
@@ -185,11 +185,57 @@ function glueFinite(
     N,
     F::T,
     G::T,
-    p::AbstractVector{Int}=vcat(collect((size(G)+1):(size(G)+size(F))), 1:size(G));
+    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
     return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
+end
+
+function glueFinite(
+    N,
+    F::InducedFlag{T,UpToIso},
+    G::InducedFlag{T,UpToIso},
+    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag,UpToIso}
+    res = toInduced(
+        glueFinite_internal(N, F.F, G.F, p; labelFlags=labelFlags, isAllowed=isAllowed),
+        UpToIso,
+    )
+    if labelFlags
+        return labelCanonically(res)
+    end
+    return res
+end
+
+function glueFinite(
+    N,
+    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+    G::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag,UpToIso}
+    # @show N, F, G, p
+    # @show glueFinite_internal(N, PartiallyLabeledFlag(F.F.F, F.n), PartiallyLabeledFlag(G.F.F, G.n), p; labelFlags=false, isAllowed=isAllowed)
+    # @show tmp = glueFinite_internal(
+    #         N, toNonInduced(F), toNonInduced(G), p; labelFlags=false, isAllowed=isAllowed
+    #     )
+    # @show tmp = toInduced(tmp)
+    # @show typeof(tmp)
+    # @show labelCanonically(tmp)
+    res = toInduced(
+        glueFinite_internal(
+            N, toNonInduced(F), toNonInduced(G), p; labelFlags=false, isAllowed=isAllowed
+        ),
+        UpToIso,
+    )
+    if labelFlags
+        return labelCanonically(res)
+    end
+    return res
 end
 
 function glueFinite_internal(
@@ -231,9 +277,9 @@ function glueFinite_internal(
             return QuantumFlag{T,Rational{Int}}()
         end
         if labelFlags
-            return 1 // 1 * labelCanonically(tmp)
+            return 1//1 * labelCanonically(tmp)
         end
-        return 1 // 1 * tmp
+        return 1//1 * tmp
     end
 
     freePositions = N - k
@@ -243,7 +289,7 @@ function glueFinite_internal(
 
     ovs = overlaps(lambda, mu, freePositions, false, true)
 
-    factor = 1 // sum(x for (x, _) in ovs; init=0)
+    factor = 1//sum(x for (x, _) in ovs; init=0)
 
     res = QuantumFlag{T,Rational{Int}}()
 
@@ -262,6 +308,15 @@ function glueFinite_internal(
             # @show freeG[j]
             po[freeF[i]] = freeG[j]
         end
+
+        # remove gaps!
+        for i in (size(G) + 1):maximum(po)
+            if !(i in po)
+                inds = po .> i
+                po[inds] .-= 1
+            end
+        end
+
         newG = glue(F, G, po[1:size(F)]; isAllowed=isAllowed)
         if newG !== nothing
             res += c * factor * newG
@@ -274,9 +329,26 @@ function glueFinite_internal(
         return res
     end
 end
+function glueFinite_internal(
+    N, F::QuantumFlag{T, D}, G::QuantumFlag{T, D}, p::AbstractVector{Int}; labelFlags=true, isAllowed=(f) -> true
+) where {T<:Flag, D}
+    return sum(
+        c * d * glueFinite_internal(N, f, g, p; labelFlags=labelFlags, isAllowed=isAllowed) for (g, c) in G.coeff,
+        (f, d) in F.coeff
+    )
+end
 
 function glueFinite(N, F::T, G::QuantumFlag{T,D}; isAllowed=(f) -> true) where {T,D}
     return sum(c * glueFinite(N, F, g; isAllowed=isAllowed) for (g, c) in G.coeff)
+end
+
+function glueFinite(
+    N, F::QuantumFlag{T,D}, G::QuantumFlag{T,D}; isAllowed=(f) -> true
+) where {T,D}
+    return sum(
+        c * d * glueFinite(N, f, g; isAllowed=isAllowed) for (g, c) in G.coeff,
+        (f, d) in F.coeff
+    )
 end
 
 """
@@ -367,7 +439,7 @@ function hasAtMostEdges(F::T, m::Vector) where {T<:Flag}
         return hasAtMostEdges(F, m[1])
     end
     c = countEdges(F)
-    @show F, m
+    # @show F, m
     @assert length(c) == length(m)
     return all(c .<= m)
 end
@@ -472,7 +544,9 @@ function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
 end
 
 # Checks if ANY flag in Fs is a subflag of G. ASSUMES Fs are labelled!
-function isSubFlag(Fs::Union{Vector{T},Set{T}}, G::T; induced=G isa InducedFlag) where {T<:Flag}
+function isSubFlag(
+    Fs::Union{Vector{T},Set{T}}, G::T; induced=G isa InducedFlag
+) where {T<:Flag}
     # Very basic brute force algorithm
     if induced
         return any(isSubFlag(F, G; induced=induced) for F in Fs)
@@ -536,12 +610,12 @@ function base_nonnegative(::Type{T}) where {T<:Flag}
     return true
 end
 
+include("PartiallyLabeledFlags.jl")
 include("InducedFlags.jl")
 include("Graphs.jl")
 include("ConstantWeightCodes.jl")
 include("DirectedGraphs.jl")
 include("EdgeColoredGraphs.jl")
-include("PartiallyLabeledFlags.jl")
 include("BinaryTrees.jl")
 include("EdgeMarkedFlags.jl")
 include("SymmetricFunctions.jl")

@@ -139,15 +139,16 @@ function glue(
     res = zeta(tmp; label=label, isAllowed=isAllowed)
     if UpToIso
 
-        @show F, G, p
+        # @show F, G, p
         k = length(commonPartF)
-        @show k
-        @assert Set(commonPartG) == Set(1:k)
+        # @show k
+        # @assert Set(commonPartG) == Set(1:k)
 
-        in_fact = 1 // (up_to_iso_fact(PartiallyLabeledFlag(F, k)) * up_to_iso_fact(PartiallyLabeledFlag(G, k)))
+        in_fact = 1 // (up_to_iso_fact(PartiallyLabeledFlag(F, k)) * up_to_iso_fact(PartiallyLabeledFlag(G, commonPartG)))
+        # in_fact = 1 // (up_to_iso_fact(PartiallyLabeledFlag(F, k)) * up_to_iso_fact(PartiallyLabeledFlag(G, k)))
 
         for f in keys(res.coeff)
-            @show f, in_fact, up_to_iso_fact(PartiallyLabeledFlag(f, k))
+            # @show f, in_fact, up_to_iso_fact(PartiallyLabeledFlag(f, k))
             res.coeff[f] *= in_fact * up_to_iso_fact(PartiallyLabeledFlag(f, k))
         end
     end
@@ -248,11 +249,12 @@ function eliminateIsolated(Fs::QuantumFlag{InducedFlag{T,UpToIso},D}) where {T<:
 end
 
 # Switching between induced and non-induced
-function toInduced(F::Union{T,QuantumFlag{T}}) where {T<:Flag,UpToIso}
+function toInduced(F::Union{T,QuantumFlag{T}}, UpToIso = true) where {T<:Flag}
     tmp = zeta(F)
     res = QuantumFlag{InducedFlag{T,UpToIso},Int}()
     for (G, c) in tmp.coeff
-        res += c * InducedFlag{T,UpToIso}(G)
+        fact = UpToIso ? up_to_iso_fact(G) : 1
+        res += c * fact * InducedFlag{T,UpToIso}(G)
     end
     return res
 end
@@ -261,7 +263,8 @@ function toNonInduced(F::Union{InducedFlag{T,UpToIso},QuantumFlag{InducedFlag{T,
     tmp = moebius(F)
     res = QuantumFlag{T,Int}()
     for (G, c) in tmp.coeff
-        res += c * G.F
+        fact = UpToIso ? 1//up_to_iso_fact(G) : 1
+        res += fact * c * G.F
     end
     return res
 end
@@ -339,6 +342,18 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag,UpToIso}
     #     end
     # end
     # A
+end
+
+
+function unlabel(F::PartiallyLabeledFlag{InducedFlag{T,true}}) where {T<:Flag}
+    return (factorial(size(F) - F.n) // factorial(size(F))) * (aut(F.F).size // aut(F).size) * F.F
+end
+
+
+function labelCanonically(
+    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
+)::PartiallyLabeledFlag{InducedFlag{T,UpToIso}} where {T<:Flag,UpToIso}
+    return label(F; removeIsolated=false)[1]
 end
 
 function sample_coefficients(::Type{InducedFlag{T}}, n::Int, type::T; all_flags::Vector{PartiallyLabeledFlag{T}}=generateAll(PartiallyLabeledFlag{T}, n, [size(type), 10000]; initial_flag=PartiallyLabeledFlag{T}(type, size(type)))) where {T<:Flag}

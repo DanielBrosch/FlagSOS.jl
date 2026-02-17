@@ -16,28 +16,46 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
     PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = new{T}(T(opts...), n)
     PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
     PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
+
+    function PartiallyLabeledFlag{T}(
+        F::T, labeled_inds::AbstractVector{Int}
+    ) where {T<:Flag}
+        n = length(labeled_inds)
+        p = zeros(Int, size(F))
+        n_labeled = 0
+        n_unlabeled = 0
+        for i in 1:size(F)
+            if i in labeled_inds
+                n_labeled += 1
+                p[i] = n_labeled
+            else
+                n_unlabeled += 1
+                p[i] = n + n_unlabeled
+            end
+        end
+        pF = permute(F, p)
+        return PartiallyLabeledFlag{T}(pF, n)
+    end
+
+    function PartiallyLabeledFlag(F::T, labeled_inds::AbstractVector{Int}) where {T<:Flag}
+        return PartiallyLabeledFlag{T}(F, labeled_inds)
+    end
 end
 
 function unlabel(F::PartiallyLabeledFlag{T}) where {T<:Flag}
     return F.F
 end
 
-function unlabel(F::PartiallyLabeledFlag{InducedFlag{T,true}}) where {T<:Flag}
-    return (factorial(size(F) - F.n) // factorial(size(F))) * (aut(F.F).size // aut(F).size) * F.F
-end
-
-function unlabel(F::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,true}},D}) where {T<:Flag,D}
-    return sum(c * unlabel(f) for (f, c) in F.coeff)
-end
+# function unlabel(F::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,true}},D}) where {T<:Flag,D}
+#     return sum(c * unlabel(f) for (f, c) in F.coeff)
+# end
 
 function unlabel(F::QuantumFlag)
     return sum(c * unlabel(f) for (f, c) in F.coeff)
 end
 
-
-
 function type(F::PartiallyLabeledFlag)
-    return subFlag(F.F, 1:F.n)
+    return subFlag(F.F, 1:(F.n))
 end
 
 function Base.show(io::IO, T::PartiallyLabeledFlag)
@@ -100,7 +118,7 @@ function Base.:*(
     m = size(G)
 
     # @show F, G, vcat(1:(F.n), (m+1):(m+n-F.n))
-    return glue(F, G, vcat(1:(F.n), (m+1):(m+n-F.n)); isAllowed=isAllowed)
+    return glue(F, G, vcat(1:(F.n), (m + 1):(m + n - F.n)); isAllowed=isAllowed)
 end
 
 function subFlag(
@@ -124,7 +142,10 @@ end
 Glues together the two partially labeled Flags `F` and `G`, after applying the permutation `p` to the vertices of `F`. `p` may be a permutation involving more than `size(F)` vertices, but should send the labeled part of `F` to the labeled part of `G`, without permuting indices there.
 """
 function glue(
-    F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}, p::AbstractVector{Int}; isAllowed=(f) -> true
+    F::PartiallyLabeledFlag{T},
+    G::PartiallyLabeledFlag{T},
+    p::AbstractVector{Int};
+    isAllowed=(f) -> true,
 ) where {T<:Flag}
     F.n > 0 &&
         @assert 1:(F.n) == p[1:(F.n)] "Labeled vertices should be glued to labeled vertices without being permuted."
@@ -132,6 +153,7 @@ function glue(
     FG = nothing
     try
         if isInducedFlag(T)
+            @assert F.n == G.n
             FG = glue(F.F, G.F, p; label=false)
         else
             FG = glue(F.F, G.F, p)
@@ -154,7 +176,7 @@ function glueFinite(
     N,
     F::PartiallyLabeledFlag{T},
     G::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
@@ -162,7 +184,7 @@ function glueFinite(
 end
 
 function up_to_iso_fact(F::PartiallyLabeledFlag{T}) where {T<:Flag}
-    return aut(F).size // factorial(size(F) - F.n)
+    return aut(F).size//factorial(size(F) - F.n)
 end
 
 function vertexColor(F::PartiallyLabeledFlag{T}, v::Int) where {T<:Flag}
@@ -214,7 +236,7 @@ function findUnknownGenerationPredicates(
     end
     return [
         LabelPredicate[
-            LabelPredicate(i) for i in (F.n+1):size(F) if !(i in vcat(fixed...))
+            LabelPredicate(i) for i in (F.n + 1):size(F) if !(i in vcat(fixed...))
         ],
     ]
 end
@@ -253,7 +275,7 @@ function addPredicates(F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:F
 
         newLabels = setdiff!([p.i for p in labelPreds], 1:(F.n))
 
-        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n+1):size(F), newLabels))
+        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
         p = zeros(Int, size(F))
         for i in 1:size(F)
             p[pGoal[i]] = i
@@ -316,12 +338,24 @@ function QuantumFlag{T}(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T<:Fla
 end
 
 function toInduced(
-    F::Union{PartiallyLabeledFlag{T},QuantumFlag{PartiallyLabeledFlag{T}}}
+    F::Union{PartiallyLabeledFlag{T},QuantumFlag{PartiallyLabeledFlag{T}}}, UpToIso=true
 ) where {T<:Flag}
     tmp = zeta(F)
-    res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T}},Int}()
+    res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T, UpToIso}},Int}()
     for (G, c) in tmp.coeff
-        res += c * PartiallyLabeledFlag{InducedFlag{T}}(InducedFlag{T}(G.F), G.n)
+        fact = UpToIso ? up_to_iso_fact(G) : 1
+        res += c * fact * PartiallyLabeledFlag{InducedFlag{T, UpToIso}}(InducedFlag{T, UpToIso}(G.F), G.n)
+    end
+    return res
+end
+
+
+function toNonInduced(F::Union{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}}) where {T<:Flag,UpToIso}
+    tmp = moebius(F)
+    res = QuantumFlag{PartiallyLabeledFlag{T},Int}()
+    for (G, c) in tmp.coeff
+        fact = UpToIso ? 1//up_to_iso_fact(G) : 1
+        res += fact * c * PartiallyLabeledFlag(G.F.F, G.n)
     end
     return res
 end
@@ -332,10 +366,4 @@ function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
     else
         return isAllowed(F.F, p)
     end
-end
-
-function labelCanonically(
-    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
-)::PartiallyLabeledFlag{InducedFlag{T,UpToIso}} where {T<:Flag,UpToIso}
-    return label(F; removeIsolated=false)[1]
 end

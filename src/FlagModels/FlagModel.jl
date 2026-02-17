@@ -362,15 +362,39 @@ function add_verts(m::FlagModel, G::T, n::Int) where {T}
     return res
 end
 
-function add_verts(m::FlagModel, G::PartiallyLabeledFlag{T}, n::Int) where {T<:InducedFlag}
-    t = type(G)
+function add_verts(m::FlagModel, G::PartiallyLabeledFlag{T}, n::Int) where {T}
+    # t = type(G)
+
     vert = PartiallyLabeledFlag{T}(permute(one(T), 1:1), 0)
 
     @show vert
     res = 1 * G
     @show res
     for _ in (size(G) + 1):n
-        @show *(vert, res; isAllowed=x -> isAllowed(m, x))
+        # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
+        res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
+        @show res
+        filter!(x -> isAllowed(m, x.first), res.coeff)
+    end
+    return res
+end
+
+function add_verts(
+    m::FlagModel, G::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}, n::Int
+) where {T,UpToIso}
+    t = type(G)
+
+    @info "Hey"
+    @show t
+    vert = toInduced(
+        PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t) + 1)), size(t)), UpToIso
+    )
+
+    @show vert
+    res = 1//1 * G
+    @show res
+    for _ in (size(G) + 1):n
+        # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         @show res
         filter!(x -> isAllowed(m, x.first), res.coeff)
@@ -475,6 +499,7 @@ function buildJuMPModel(
         end
         for (G, c) in variables
             if isAllowed(m, G) #&& (G != T())# || T() in keys(objective.coeff))
+                @show G
                 @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objective.coeff, G) ? objective.coeff[G] : 0))  
