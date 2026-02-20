@@ -127,6 +127,7 @@ function subFlag(
     # sort to make sure labeled vertices are at the front
     if !issorted(vertices)
         sort!(vertices)
+        error()
         @warn("Subflag vertices of a partially labeled Flag have been sorted!")
     end
     subF = subFlag(F.F, vertices)
@@ -158,6 +159,7 @@ function glue(
         else
             FG = glue(F.F, G.F, p)
         end
+        # FG = glue(F.F, G.F, p; label=false)
     catch
         @show F, G, p, F.F, G.F
         error()
@@ -337,28 +339,6 @@ function QuantumFlag{T}(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T<:Fla
     return res
 end
 
-function toInduced(
-    F::Union{PartiallyLabeledFlag{T},QuantumFlag{PartiallyLabeledFlag{T}}}, UpToIso=true
-) where {T<:Flag}
-    tmp = zeta(F)
-    res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T, UpToIso}},Int}()
-    for (G, c) in tmp.coeff
-        fact = UpToIso ? up_to_iso_fact(G) : 1
-        res += c * fact * PartiallyLabeledFlag{InducedFlag{T, UpToIso}}(InducedFlag{T, UpToIso}(G.F), G.n)
-    end
-    return res
-end
-
-
-function toNonInduced(F::Union{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}}) where {T<:Flag,UpToIso}
-    tmp = moebius(F)
-    res = QuantumFlag{PartiallyLabeledFlag{T},Int}()
-    for (G, c) in tmp.coeff
-        fact = UpToIso ? 1//up_to_iso_fact(G) : 1
-        res += fact * c * PartiallyLabeledFlag(G.F.F, G.n)
-    end
-    return res
-end
 
 function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
     if p isa LabelPredicate

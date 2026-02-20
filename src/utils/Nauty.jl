@@ -387,7 +387,7 @@ function generateAll(
     ::Type{F},
     maxVertices::Int,
     maxEdges::Int;
-    withProperty=(F::F) -> true, initial_flag = one(T)
+    withProperty=(F::F) -> true, initial_flag = one(F)
 ) where {F}
     return generateAll(F, maxVertices, [maxEdges]; withProperty=withProperty, initial_flag = initial_flag)
 end

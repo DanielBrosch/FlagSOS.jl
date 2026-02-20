@@ -356,6 +356,7 @@ function add_verts(m::FlagModel, G::T, n::Int) where {T}
     vert = permute(one(T), 1:1)
     res = 1 * G
     for _ in (size(G) + 1):n
+        # res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         filter!(x -> isAllowed(m, x.first), res.coeff)
     end

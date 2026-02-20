@@ -26,12 +26,9 @@ function is_up_to_iso(::Type{T}) where {T<:Flag}
     return false
 end
 
-
 function is_up_to_iso(::Type{InducedFlag{T,true}}) where {T<:Flag}
     return true
 end
-
-
 
 function ==(A::InducedFlag{T,UpToIso}, B::InducedFlag{T,UpToIso}) where {T<:Flag,UpToIso}
     return A.F == B.F
@@ -40,7 +37,9 @@ function hash(A::InducedFlag{T,UpToIso}, h::UInt) where {T<:Flag,UpToIso}
     return hash(A.F, hash(:InducedFlag, h))
 end
 
-function Base.one(::Type{InducedFlag{T,UpToIso}})::InducedFlag{T,UpToIso} where {T<:Flag,UpToIso}
+function Base.one(
+    ::Type{InducedFlag{T,UpToIso}}
+)::InducedFlag{T,UpToIso} where {T<:Flag,UpToIso}
     return InducedFlag{T,UpToIso}(one(T))
 end
 
@@ -50,7 +49,9 @@ end
 
 Base.size(F::InducedFlag)::Int = size(F.F)
 
-function labelCanonically(F::InducedFlag{T,UpToIso})::InducedFlag{T,UpToIso} where {T<:Flag,UpToIso}
+function labelCanonically(
+    F::InducedFlag{T,UpToIso}
+)::InducedFlag{T,UpToIso} where {T<:Flag,UpToIso}
     return InducedFlag{T,UpToIso}(label(F.F; removeIsolated=false)[1])
 end
 
@@ -66,15 +67,15 @@ function predicateType(::Type{InducedFlag{T,UpToIso}}) where {T<:Flag,UpToIso}
     return predicateType(T)
 end
 
-function subFlag(F::InducedFlag{T,UpToIso}, vertices::AbstractVector{Int})::InducedFlag{T,UpToIso} where {T<:Flag,UpToIso}
+function subFlag(
+    F::InducedFlag{T,UpToIso}, vertices::AbstractVector{Int}
+)::InducedFlag{T,UpToIso} where {T<:Flag,UpToIso}
     return InducedFlag{T,UpToIso}(subFlag(F.F, vertices))
 end
 
 function up_to_iso_fact(F::T) where {T<:Flag}
-    return aut(F).size // factorial(size(F))
+    return aut(F).size//factorial(size(F))
 end
-
-
 
 """
     glue(F::InducedFlag{T, UpToIso}, G::InducedFlag{T, UpToIso}, p::Vector{Int})
@@ -86,7 +87,7 @@ function glue(
     G::InducedFlag{T,UpToIso},
     p::AbstractVector{Int};
     isAllowed=(f) -> true,
-    label=true
+    label=true,
 )::QuantumFlag{InducedFlag{T,UpToIso},Rational{Int}} where {T<:Flag,UpToIso}
     n = size(F)
     m = size(G)
@@ -108,13 +109,14 @@ function glue(
     # if U == InducedFlag{T, UpToIso}
 
     if !(fg isa QuantumFlag)
-        fg = 1 // 1 * fg
+        fg = 1//1 * fg
     end
 
     res = QuantumFlag{InducedFlag{T,UpToIso},Rational{Int}}()
 
     tmp = QuantumFlag{
-        EdgeMarkedFlag{InducedFlag{T,UpToIso},predicateType(InducedFlag{T,UpToIso})},Rational{Int}
+        EdgeMarkedFlag{InducedFlag{T,UpToIso},predicateType(InducedFlag{T,UpToIso})},
+        Rational{Int},
     }()
 
     for (FG, c) in fg.coeff
@@ -129,22 +131,30 @@ function glue(
         pred = pred[1]
 
         FGMarked = EdgeMarkedFlag{InducedFlag{T,UpToIso}}(InducedFlag{T,UpToIso}(FG), pred)
-        tmp += (c // 1) * FGMarked
+        tmp += (c//1) * FGMarked
         # res += sum(c//1 * G for (G, c) in zeta(FGMarked; label=true, isAllowed=isAllowed).coeff)
     end
 
+    @show tmp
     if label
         tmp = labelCanonically(tmp)
     end
+    @show tmp
     res = zeta(tmp; label=label, isAllowed=isAllowed)
+    @show res
     if UpToIso
-
+        
         # @show F, G, p
         k = length(commonPartF)
+        @assert !label || k == 0
         # @show k
         # @assert Set(commonPartG) == Set(1:k)
 
-        in_fact = 1 // (up_to_iso_fact(PartiallyLabeledFlag(F, k)) * up_to_iso_fact(PartiallyLabeledFlag(G, commonPartG)))
+        in_fact =
+            1//(
+                up_to_iso_fact(PartiallyLabeledFlag(F, k)) *
+                up_to_iso_fact(PartiallyLabeledFlag(G, commonPartG))
+            )
         # in_fact = 1 // (up_to_iso_fact(PartiallyLabeledFlag(F, k)) * up_to_iso_fact(PartiallyLabeledFlag(G, k)))
 
         for f in keys(res.coeff)
@@ -175,7 +185,59 @@ function glue(
     # end
 end
 
-function distinguish(F::InducedFlag{T,UpToIso}, v::Int, W::BitVector)::UInt where {T<:Flag,UpToIso}
+
+function glueFinite(
+    N,
+    F::InducedFlag{T,UpToIso},
+    G::InducedFlag{T,UpToIso},
+    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag,UpToIso}
+    res = toInduced(
+        glueFinite_internal(N, toNonInduced(F), toNonInduced(G), p; labelFlags=labelFlags, isAllowed=isAllowed),
+        UpToIso,
+    )
+    if labelFlags
+        return labelCanonically(res)
+    end
+    return res
+end
+
+
+function glueFinite(
+    N,
+    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+    G::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag,UpToIso}
+    # @show N, F, G, p
+    # @show glueFinite_internal(N, PartiallyLabeledFlag(F.F.F, F.n), PartiallyLabeledFlag(G.F.F, G.n), p; labelFlags=false, isAllowed=isAllowed)
+    # @show tmp = glueFinite_internal(
+    #         N, toNonInduced(F), toNonInduced(G), p; labelFlags=false, isAllowed=isAllowed
+    #     )
+    # @show tmp = toInduced(tmp)
+    # @show typeof(tmp)
+    # @show labelCanonically(tmp)
+
+    
+    res = toInduced(
+        glueFinite(
+            N, toNonInduced(F), toNonInduced(G), p; labelFlags=false, isAllowed=isAllowed
+        ),
+        UpToIso,
+    )
+    if labelFlags
+        return labelCanonically(res)
+    end
+    return res
+end
+
+function distinguish(
+    F::InducedFlag{T,UpToIso}, v::Int, W::BitVector
+)::UInt where {T<:Flag,UpToIso}
     return distinguish(F.F, v, W)
 end
 
@@ -187,7 +249,9 @@ function isAllowed(F::InducedFlag{T,UpToIso}, e) where {T<:Flag,UpToIso}
     return isAllowed(F.F, e)
 end
 
-function addPredicates(F::InducedFlag{T,UpToIso}, preds::Vector{U}) where {T<:Flag,U<:Predicate,UpToIso}
+function addPredicates(
+    F::InducedFlag{T,UpToIso}, preds::Vector{U}
+) where {T<:Flag,U<:Predicate,UpToIso}
     tmp = addPredicates(F.F, preds)
     if tmp === nothing
         return nothing
@@ -225,7 +289,9 @@ function eliminateIsolated(F::InducedFlag{T,UpToIso}) where {T<:Flag,UpToIso}
     return eliminateIsolated(1 * F)
 end
 
-function eliminateIsolated(Fs::QuantumFlag{InducedFlag{T,UpToIso},D}) where {T<:Flag,D,UpToIso}
+function eliminateIsolated(
+    Fs::QuantumFlag{InducedFlag{T,UpToIso},D}
+) where {T<:Flag,D,UpToIso}
     if length(Fs.coeff) == 0
         return Fs
     end
@@ -249,7 +315,7 @@ function eliminateIsolated(Fs::QuantumFlag{InducedFlag{T,UpToIso},D}) where {T<:
 end
 
 # Switching between induced and non-induced
-function toInduced(F::Union{T,QuantumFlag{T}}, UpToIso = true) where {T<:Flag}
+function toInduced(F::Union{T,QuantumFlag{T}}, UpToIso=true) where {T<:Flag}
     tmp = zeta(F)
     res = QuantumFlag{InducedFlag{T,UpToIso},Int}()
     for (G, c) in tmp.coeff
@@ -259,11 +325,13 @@ function toInduced(F::Union{T,QuantumFlag{T}}, UpToIso = true) where {T<:Flag}
     return res
 end
 
-function toNonInduced(F::Union{InducedFlag{T,UpToIso},QuantumFlag{InducedFlag{T,UpToIso}}}) where {T<:Flag,UpToIso}
+function toNonInduced(
+    F::Union{InducedFlag{T,UpToIso},QuantumFlag{InducedFlag{T,UpToIso}}}
+) where {T<:Flag,UpToIso}
     tmp = moebius(F)
     res = QuantumFlag{T,Int}()
+    fact = UpToIso ? 1//up_to_iso_fact(F) : 1
     for (G, c) in tmp.coeff
-        fact = UpToIso ? 1//up_to_iso_fact(G) : 1
         res += fact * c * G.F
     end
     return res
@@ -291,7 +359,7 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag,UpToIso}
         @error "Better to do vertex by vertex, filter by allowed every time"
         for f in Fs
             size(f) + newVerts > n && continue
-            tmp = labelCanonically(ek * f - 1 // 1 * f)
+            tmp = labelCanonically(ek * f - 1//1 * f)
             # size(f) == n && continue
             # if newVerts == 1
             #     tmp = labelCanonically(oneVert * f - 1//1 * f)
@@ -344,11 +412,40 @@ function quotient(Fs::Vector{T}, isAllowed=(f) -> true) where {T<:Flag,UpToIso}
     # A
 end
 
-
 function unlabel(F::PartiallyLabeledFlag{InducedFlag{T,true}}) where {T<:Flag}
-    return (factorial(size(F) - F.n) // factorial(size(F))) * (aut(F.F).size // aut(F).size) * F.F
+    return (factorial(size(F) - F.n)//factorial(size(F))) *
+           (aut(F.F).size//aut(F).size) *
+           F.F
 end
 
+
+function toInduced(
+    F::Union{PartiallyLabeledFlag{T},QuantumFlag{PartiallyLabeledFlag{T}}}, UpToIso=true
+) where {T<:Flag}
+    tmp = zeta(F)
+    res = QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},Int}()
+    for (G, c) in tmp.coeff
+        GL = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(InducedFlag{T,UpToIso}(G.F), G.n)
+        fact = UpToIso ? up_to_iso_fact(GL) : 1
+        res += c * fact * GL
+    end
+    return res
+end
+
+function toNonInduced(
+    F::Union{
+        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+        QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}},
+    },
+) where {T<:Flag,UpToIso}
+    tmp = moebius(F)
+    res = QuantumFlag{PartiallyLabeledFlag{T},Int}()
+    fact = UpToIso ? 1//up_to_iso_fact(F) : 1
+    for (G, c) in tmp.coeff
+        res += fact * c * PartiallyLabeledFlag(G.F.F, G.n)
+    end
+    return res
+end
 
 function labelCanonically(
     F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
@@ -356,6 +453,84 @@ function labelCanonically(
     return label(F; removeIsolated=false)[1]
 end
 
-function sample_coefficients(::Type{InducedFlag{T}}, n::Int, type::T; all_flags::Vector{PartiallyLabeledFlag{T}}=generateAll(PartiallyLabeledFlag{T}, n, [size(type), 10000]; initial_flag=PartiallyLabeledFlag{T}(type, size(type)))) where {T<:Flag}
-    return all_flags
+function sample_coefficients(
+    ::Type{InducedFlag{T,UpToIso}},
+    n::Int,
+    type::InducedFlag{T,UpToIso};
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
+        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+        n,
+        [size(type), 10000];
+        initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(type, size(type)),
+    ),
+    N=:limit,
+) where {T<:Flag,UpToIso}
+    k = size(type)
+    t = Int((n - size(type)) / 2)
+    idx_flags = filter(x -> size(x) == t + k, all_flags)
+    glue_flags = N == :limit ? filter(x -> size(x) == n, all_flags) : all_flags
+
+    res = Dict()
+
+    for G in glue_flags
+        nG = size(G)
+        n_free = nG - k
+
+        ov = 2 * t - n_free
+        # fact = binomial(t, ov)//(binomial(n_free, t))
+        # fact = 1//(binomial(n_free, t)*binomial(t, ov))
+
+        # Number of ways to place the two sets of free verts
+        fact = if N == :limit
+            1//(binomial(n_free, t))
+        else
+            1//(
+                binomial(n_free, ov) *
+                binomial(n_free - ov, t - ov) *
+                binomial(n_free - t, t - ov)
+            )
+        end
+        # fact2 = N == :limit ? 1//1 : (factorial(nG-k) * binomial(N-k, nG-k))//(factorial(t)^2*binomial(N-k, t)^2)
+
+        # Probability to hit n_free many vertices
+        fact2 = if N == :limit
+            1//1
+        else
+            # (factorial(n_free) * binomial(N - k, n_free))//(factorial(t)^2 * binomial(N - k, t)^2)
+            (
+                binomial(N - k, ov) *
+                binomial(N - k - ov, t - ov) *
+                binomial(N - k - t, t - ov)
+            )//(binomial(N - k, t)^2)
+        end
+        # if ov > 0 
+        #     fact2 *= 2
+        # end
+        for c in combinations((k + 1):nG, t)
+            # @show n, t, c, vcat(1:k, c), G
+            F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
+
+            # zero, unless finite FA
+            other_inds = setdiff((k + 1):nG, c)
+
+            for d in combinations(c, ov)
+                # @show n, nG, t, ov, c, d, other_inds, fact2
+                F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d, other_inds))))
+                # @show F1
+                # @show F2
+                @assert size(F1) == t + k
+                @assert size(F2) == t + k
+                res[(F1, F2)] =
+                    get(
+                        res,
+                        (F1, F2),
+                        QuantumFlag{
+                            PartiallyLabeledFlag{InducedFlag{T,UpToIso}},Rational{Int}
+                        }()# - glueFinite(N, F1, F2),
+                    ) + fact * fact2 * G
+            end
+        end
+    end
+
+    return idx_flags, glue_flags, res
 end

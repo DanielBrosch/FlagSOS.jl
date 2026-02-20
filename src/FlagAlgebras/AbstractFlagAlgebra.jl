@@ -192,62 +192,18 @@ function glueFinite(
     return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
 end
 
-function glueFinite(
-    N,
-    F::InducedFlag{T,UpToIso},
-    G::InducedFlag{T,UpToIso},
-    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
-    labelFlags=true,
-    isAllowed=(f) -> true,
-) where {T<:Flag,UpToIso}
-    res = toInduced(
-        glueFinite_internal(N, F.F, G.F, p; labelFlags=labelFlags, isAllowed=isAllowed),
-        UpToIso,
-    )
-    if labelFlags
-        return labelCanonically(res)
-    end
-    return res
-end
-
-function glueFinite(
-    N,
-    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-    G::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
-    labelFlags=true,
-    isAllowed=(f) -> true,
-) where {T<:Flag,UpToIso}
-    # @show N, F, G, p
-    # @show glueFinite_internal(N, PartiallyLabeledFlag(F.F.F, F.n), PartiallyLabeledFlag(G.F.F, G.n), p; labelFlags=false, isAllowed=isAllowed)
-    # @show tmp = glueFinite_internal(
-    #         N, toNonInduced(F), toNonInduced(G), p; labelFlags=false, isAllowed=isAllowed
-    #     )
-    # @show tmp = toInduced(tmp)
-    # @show typeof(tmp)
-    # @show labelCanonically(tmp)
-    res = toInduced(
-        glueFinite_internal(
-            N, toNonInduced(F), toNonInduced(G), p; labelFlags=false, isAllowed=isAllowed
-        ),
-        UpToIso,
-    )
-    if labelFlags
-        return labelCanonically(res)
-    end
-    return res
-end
-
 function glueFinite_internal(
     N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true, isAllowed=(f) -> true
 ) where {T<:Flag}
     @info "Glue finite with $N, $F, $G, $p"
+
     if N == :limit
         res = glue(F, G, p; isAllowed=isAllowed)
         if res === nothing
             return QuantumFlag{T,Rational{Int64}}()
         end
         if labelFlags
+            error()
             return labelCanonically(res)
         end
         return res
@@ -277,6 +233,7 @@ function glueFinite_internal(
             return QuantumFlag{T,Rational{Int}}()
         end
         if labelFlags
+            # error()
             return 1//1 * labelCanonically(tmp)
         end
         return 1//1 * tmp
@@ -313,7 +270,9 @@ function glueFinite_internal(
         for i in (size(G) + 1):maximum(po)
             if !(i in po)
                 inds = po .> i
-                po[inds] .-= 1
+                if any(inds)
+                    po[inds] .-= minimum(po[po .> i]) - i
+                end
             end
         end
 
@@ -330,24 +289,43 @@ function glueFinite_internal(
     end
 end
 function glueFinite_internal(
-    N, F::QuantumFlag{T, D}, G::QuantumFlag{T, D}, p::AbstractVector{Int}; labelFlags=true, isAllowed=(f) -> true
-) where {T<:Flag, D}
+    N,
+    F::QuantumFlag{T,D},
+    G::QuantumFlag{T,D},
+    p::AbstractVector{Int};
+    labelFlags=true,
+    isAllowed=(f) -> true,
+) where {T<:Flag,D}
     return sum(
-        c * d * glueFinite_internal(N, f, g, p; labelFlags=labelFlags, isAllowed=isAllowed) for (g, c) in G.coeff,
-        (f, d) in F.coeff
+        c * d * glueFinite_internal(N, f, g, p; labelFlags=labelFlags, isAllowed=isAllowed)
+        for (g, c) in G.coeff, (f, d) in F.coeff
     )
 end
 
-function glueFinite(N, F::T, G::QuantumFlag{T,D}; isAllowed=(f) -> true) where {T,D}
-    return sum(c * glueFinite(N, F, g; isAllowed=isAllowed) for (g, c) in G.coeff)
+function glueFinite(
+    N, F::T, G::QuantumFlag{T,D}; isAllowed=(f) -> true, labelFlags=true
+) where {T,D}
+    return sum(
+        c * glueFinite(N, F, g; isAllowed=isAllowed, labelFlags=labelFlags) for
+        (g, c) in G.coeff
+    )
 end
 
 function glueFinite(
-    N, F::QuantumFlag{T,D}, G::QuantumFlag{T,D}; isAllowed=(f) -> true
+    N, F::QuantumFlag{T,D}, G::QuantumFlag{T,D}; isAllowed=(f) -> true, labelFlags=true
 ) where {T,D}
     return sum(
-        c * d * glueFinite(N, f, g; isAllowed=isAllowed) for (g, c) in G.coeff,
-        (f, d) in F.coeff
+        c * d * glueFinite(N, f, g; isAllowed=isAllowed, labelFlags=labelFlags) for
+        (g, c) in G.coeff, (f, d) in F.coeff
+    )
+end
+
+function glueFinite(
+    N, F::QuantumFlag{T,D}, G::QuantumFlag{T,D}, p; isAllowed=(f) -> true, labelFlags=true
+) where {T,D}
+    return sum(
+        c * d * glueFinite(N, f, g, p; isAllowed=isAllowed, labelFlags=labelFlags) for
+        (g, c) in G.coeff, (f, d) in F.coeff
     )
 end
 
