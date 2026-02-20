@@ -195,7 +195,7 @@ end
 function glueFinite_internal(
     N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true, isAllowed=(f) -> true
 ) where {T<:Flag}
-    @info "Glue finite with $N, $F, $G, $p"
+    # @info "Glue finite with $N, $F, $G, $p"
 
     if N == :limit
         res = glue(F, G, p; isAllowed=isAllowed)

@@ -135,13 +135,10 @@ function glue(
         # res += sum(c//1 * G for (G, c) in zeta(FGMarked; label=true, isAllowed=isAllowed).coeff)
     end
 
-    @show tmp
     if label
         tmp = labelCanonically(tmp)
     end
-    @show tmp
     res = zeta(tmp; label=label, isAllowed=isAllowed)
-    @show res
     if UpToIso
         
         # @show F, G, p
