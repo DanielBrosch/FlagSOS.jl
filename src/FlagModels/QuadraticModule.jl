@@ -54,9 +54,9 @@ function computeSDP!(
     m.sdpData = Dict()
     for (G, data) in m.baseModel.sdpData
         if N == :limit
-            tmp = QuantumFlag{T}(glueFinite(N, G, m.inequality))
+            tmp = QuantumFlag{T}(glueFinite(N, G, m.inequality; base_model=m.baseModel.parentModel))
         else
-            tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality))
+            tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality; base_model=m.baseModel.parentModel))
             if m.baseModel isa RazborovModel && isInducedFlag(T)
                 tmp = add_verts(m.baseModel.parentModel, tmp, m.baseModel.lvl + size(m.inequality))
                 @show m.baseModel.lvl + size(m.inequality), tmp

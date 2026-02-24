@@ -30,16 +30,17 @@ mutable struct FlagModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     forbiddenFlags::Set{T}
     objective::Union{QuantumFlag{T,D},Nothing}
     onlyFeasibility::Bool
+    glue_cache::Dict
     function FlagModel{T}() where {T<:Flag}
         return new{T,:limit,Int}(
-            AbstractFlagModel{T,:limit,Int}[], Set{T}(), nothing, false
+            AbstractFlagModel{T,:limit,Int}[], Set{T}(), nothing, false, Dict()
         )
     end
     function FlagModel{T,D}() where {T<:Flag,D}
-        return new{T,:limit,D}(AbstractFlagModel{T,:limit,D}[], Set{T}(), nothing, false)
+        return new{T,:limit,D}(AbstractFlagModel{T,:limit,D}[], Set{T}(), nothing, false, Dict())
     end
     function FlagModel{T,N,D}() where {T<:Flag,D,N}
-        return new{T,N,D}(AbstractFlagModel{T,N,D}[], Set{T}(), nothing, false)
+        return new{T,N,D}(AbstractFlagModel{T,N,D}[], Set{T}(), nothing, false, Dict())
     end
 end
 
@@ -71,6 +72,11 @@ end
 function isAllowed(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
     return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
+end
+
+function isAllowed(::Nothing, F::T) where {T<:Flag}
+    # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    return isAllowed(F)
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::EdgeMarkedFlag{T}) where {T<:Flag,N,D}
@@ -385,19 +391,14 @@ function add_verts(
 ) where {T,UpToIso}
     t = type(G)
 
-    @info "Hey"
-    @show t
     vert = toInduced(
         PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t) + 1)), size(t)), UpToIso
     )
 
-    @show vert
     res = 1//1 * G
-    @show res
     for _ in (size(G) + 1):n
         # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
-        @show res
         filter!(x -> isAllowed(m, x.first), res.coeff)
     end
     return res

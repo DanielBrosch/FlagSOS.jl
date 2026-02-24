@@ -43,15 +43,21 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
 end
 
 function unlabel(F::PartiallyLabeledFlag{T}) where {T<:Flag}
-    return F.F
+    if is_up_to_iso(T)
+        return (factorial(size(F) - F.n) // factorial(size(F))) *
+               (aut(F.F).size // aut(F).size) *
+               F.F
+    else
+        return F.F
+    end
 end
 
 # function unlabel(F::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,true}},D}) where {T<:Flag,D}
 #     return sum(c * unlabel(f) for (f, c) in F.coeff)
 # end
 
-function unlabel(F::QuantumFlag)
-    return sum(c * unlabel(f) for (f, c) in F.coeff)
+function unlabel(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T,D}
+    return sum(c * unlabel(f) for (f, c) in F.coeff; init=0 * one(T))
 end
 
 function type(F::PartiallyLabeledFlag)
@@ -118,7 +124,7 @@ function Base.:*(
     m = size(G)
 
     # @show F, G, vcat(1:(F.n), (m+1):(m+n-F.n))
-    return glue(F, G, vcat(1:(F.n), (m + 1):(m + n - F.n)); isAllowed=isAllowed)
+    return glue(F, G, vcat(1:(F.n), (m+1):(m+n-F.n)); isAllowed=isAllowed)
 end
 
 function subFlag(
@@ -178,15 +184,19 @@ function glueFinite(
     N,
     F::PartiallyLabeledFlag{T},
     G::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
     return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
 end
 
+function is_up_to_iso(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
+    return is_up_to_iso(T)
+end
+
 function up_to_iso_fact(F::PartiallyLabeledFlag{T}) where {T<:Flag}
-    return aut(F).size//factorial(size(F) - F.n)
+    return aut(F).size // factorial(size(F) - F.n)
 end
 
 function vertexColor(F::PartiallyLabeledFlag{T}, v::Int) where {T<:Flag}
@@ -238,7 +248,7 @@ function findUnknownGenerationPredicates(
     end
     return [
         LabelPredicate[
-            LabelPredicate(i) for i in (F.n + 1):size(F) if !(i in vcat(fixed...))
+            LabelPredicate(i) for i in (F.n+1):size(F) if !(i in vcat(fixed...))
         ],
     ]
 end
@@ -277,7 +287,7 @@ function addPredicates(F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:F
 
         newLabels = setdiff!([p.i for p in labelPreds], 1:(F.n))
 
-        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
+        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n+1):size(F), newLabels))
         p = zeros(Int, size(F))
         for i in 1:size(F)
             p[pGoal[i]] = i

@@ -2,7 +2,7 @@
 
 using DocStringExtensions
 using Combinatorics
-using Memoize, ThreadSafeDicts # for isIsomorphic. Replace with more efficient algorithm later?
+using Memoization, ThreadSafeDicts # for isIsomorphic. Replace with more efficient algorithm later?
 
 export Flag, labelCanonically, aut, glue, permute, countEdges
 import Base.zero
@@ -107,7 +107,7 @@ The gluing operation of type `T`. Should, for example, glue unlabeled vertices t
 function Base.:*(F::T, G::T; isAllowed=(f) -> true) where {T<:Flag}
     n = size(F)
     m = size(G)
-    return glue(F, G, vcat((m + 1):(m + n), 1:m); isAllowed=isAllowed)
+    return glue(F, G, vcat((m+1):(m+n), 1:m); isAllowed=isAllowed)
 end
 
 """
@@ -185,7 +185,7 @@ function glueFinite(
     N,
     F::T,
     G::T,
-    p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
+    p::AbstractVector{Int}=vcat(collect((size(G)+1):(size(G)+size(F))), 1:size(G));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
@@ -234,9 +234,9 @@ function glueFinite_internal(
         end
         if labelFlags
             # error()
-            return 1//1 * labelCanonically(tmp)
+            return 1 // 1 * labelCanonically(tmp)
         end
-        return 1//1 * tmp
+        return 1 // 1 * tmp
     end
 
     freePositions = N - k
@@ -246,7 +246,7 @@ function glueFinite_internal(
 
     ovs = overlaps(lambda, mu, freePositions, false, true)
 
-    factor = 1//sum(x for (x, _) in ovs; init=0)
+    factor = 1 // sum(x for (x, _) in ovs; init=0)
 
     res = QuantumFlag{T,Rational{Int}}()
 
@@ -267,11 +267,11 @@ function glueFinite_internal(
         end
 
         # remove gaps!
-        for i in (size(G) + 1):maximum(po)
+        for i in (size(G)+1):maximum(po)
             if !(i in po)
                 inds = po .> i
                 if any(inds)
-                    po[inds] .-= minimum(po[po .> i]) - i
+                    po[inds] .-= minimum(po[po.>i]) - i
                 end
             end
         end
@@ -303,10 +303,17 @@ function glueFinite_internal(
 end
 
 function glueFinite(
-    N, F::T, G::QuantumFlag{T,D}; isAllowed=(f) -> true, labelFlags=true
+    N, F::T, G::QuantumFlag{T,D}; base_model=nothing, labelFlags=true
 ) where {T,D}
+println()
+println()
+println()
+@show N, F, G, base_model, labelFlags
+println()
+println()
+println()
     return sum(
-        c * glueFinite(N, F, g; isAllowed=isAllowed, labelFlags=labelFlags) for
+        c * glueFinite(N, F, g; base_model=base_model, labelFlags=labelFlags) for
         (g, c) in G.coeff
     )
 end
@@ -486,8 +493,9 @@ end
 Checks if two flags are isomorphic.
 """
 # @memoize Dict{Tuple{Flag,Flag},Bool} 
-@memoize ThreadSafeDict{Tuple{Flag,Flag,Bool},Bool} function isIsomorphic(
-    F::T, G::T; FLabelled=false
+@memoize ThreadSafeDict function isIsomorphic(
+    # @memoize ThreadSafeDict{Tuple{Any,Any,Bool},Bool} function isIsomorphic(
+    F::T, G::T, FLabelled=false
 ) where {T<:Flag}
     # Can be optimized! Do not need to run the full algorithm.
     countEdges(F) != countEdges(G) && return false
@@ -507,7 +515,7 @@ function isSubFlag(F::T, G::T; induced=F isa InducedFlag) where {T<:Flag}
     FL = labelCanonically(F)
     for c in combinations(1:n, m)
         if induced
-            if isIsomorphic(FL, subFlag(G, c); FLabelled=true)
+            if isIsomorphic(FL, subFlag(G, c), true)
                 return true
             end
         else

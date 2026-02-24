@@ -140,7 +140,7 @@ function computeUnreducedRazborovBasis(
             FBlock = label(F; removeIsolated=false)[1]
             @assert size(FBlock) == m
             # @assert FBlock == label(FBlock; removeIsolated=false)[1]
-            FExtended = permute(FBlock, 1:(m + k)) # add isolated vertices in unlabeled part
+            FExtended = permute(FBlock, 1:(m+k)) # add isolated vertices in unlabeled part
 
             preds = vcat(findUnknownPredicates(FExtended, [1:m])...)
 
@@ -205,7 +205,7 @@ function computeRazborovBasis!(
                 @assert length(p) == b.n
                 pb = labelCanonically(
                     PartiallyLabeledFlag{T}(
-                        permute(b.F, vcat(p, (length(p) + 1):size(b))), b.n
+                        permute(b.F, vcat(p, (length(p)+1):size(b))), b.n
                     ),
                 )
                 # @show pb
@@ -265,7 +265,7 @@ function computeRazborovBasis!(
                         # @assert length(p) == b.n
                         pb = labelCanonically(
                             PartiallyLabeledFlag{T}(
-                                permute(b.F, vcat(p.d, (length(p.d) + 1):size(b))), b.n
+                                permute(b.F, vcat(p.d, (length(p.d)+1):size(b))), b.n
                             ),
                         )
                         # @show pb
@@ -427,31 +427,30 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
             a = B[i]
             b = B[j]
 
-            n1 = size(a)
-            n2 = size(b)
-            k = a.n
-
-            newSize = k + (n1 - k) + (n2 - k)
-            p = collect(1:newSize)
-            p[(k + 1):n1] = (n2 + 1):newSize
-
-            T1 = a.F
-            p1 = p[1:size(a.F)]
-            p1 = vcat(p1, setdiff(1:newSize, p1))
-
-            T2 = b.F
-            p2 = 1:size(b.F)
-
-            p2Inv = [findfirst(x -> x == i, p2) for i in 1:n2]
-            p2Inv = vcat(p2Inv, setdiff(1:newSize, p2Inv))
-            p1Fin = p2Inv[p1]
-            p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
-
-            @views sort!(p1Fin[(n1 + 1):end])
-
-            p1Fin = Int.(p1Fin)
-
             if !isInducedFlag(T) # Apply Moebius transform on labels
+                n1 = size(a)
+                n2 = size(b)
+                k = a.n
+
+                newSize = k + (n1 - k) + (n2 - k)
+                p = collect(1:newSize)
+                p[(k+1):n1] = (n2+1):newSize
+
+                T1 = a.F
+                p1 = p[1:size(a.F)]
+                p1 = vcat(p1, setdiff(1:newSize, p1))
+
+                T2 = b.F
+                p2 = 1:size(b.F)
+
+                p2Inv = [findfirst(x -> x == i, p2) for i in 1:n2]
+                p2Inv = vcat(p2Inv, setdiff(1:newSize, p2Inv))
+                p1Fin = p2Inv[p1]
+                p1Fin = vcat(p1Fin, setdiff(1:newSize, p1Fin))
+
+                @views sort!(p1Fin[(n1+1):end])
+
+                p1Fin = Int.(p1Fin)
                 if N == :limit
                     t = one(D) * glueFinite(N, T1, T2, p1Fin; labelFlags=false)
                 else
@@ -485,20 +484,26 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # @show p1Fin
                     t = glueFinite(
                         N,
-                        T1,
-                        T2,
-                        p1Fin;
+                        a,
+                        b;
                         labelFlags=true,
                         isAllowed=(f) -> isAllowed(m.parentModel, f),
                     )
                     # @info "done"
                     # @show t
                 else
-                    t = glueFinite(N - reservedVerts, T1, T2, p1Fin; labelFlags=true)
-                    t = add_verts(m.parentModel, t, m.lvl)
+                    t = glueFinite(
+                        N - reservedVerts,
+                        a,
+                        b;
+                        labelFlags=true,
+                        base_model=m.parentModel,
+                    )
+                    # @show t
+                    t = labelCanonically(add_verts(m.parentModel, labelCanonically(unlabel(t)), m.lvl))
                 end
                 if is_up_to_iso(T)
-                    t = (up_to_iso_fact(a)*up_to_iso_fact(b))*t
+                    t = (up_to_iso_fact(a) * up_to_iso_fact(b)) * t
                 end
                 # @show t
                 # t = labelCanonically(t)
@@ -528,7 +533,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     # sdpData[F][mu] .+= (norm(A) / norm(P.reg[s])) * d*P.reg[s]#*factor
                     sdpData[F][mu] .+= d * P.reg[s]#*factor
                 else
-                    sdpData[F][mu][P.pattern .== s] .= d
+                    sdpData[F][mu][P.pattern.==s] .= d
                 end
                 # else # Symmetry reduction: basis change matrices in P.Q
                 # @show P.Q
@@ -847,7 +852,7 @@ function computeUnreducedRazborovBasis(
 
                     q = collect(1:m)
                     q[c] .= 1:k
-                    q[setdiff(1:m, c)] .= (k + 1):m
+                    q[setdiff(1:m, c)] .= (k+1):m
                     # @show k
                     q[c] .= p.d[tCanLabelPermInv[1:k]]
 
@@ -888,7 +893,7 @@ function roundResults(
 
     den = round(BigInt, 1 / prec)
     function roundDen(x)
-        return round(BigInt, den * x)//den
+        return round(BigInt, den * x) // den
     end
 
     for (mu, b) in blocks
@@ -938,7 +943,7 @@ function verifySOS(m::RazborovModel{T,N,D}, sol::Dict; io::IO=stdout) where {T,N
                             if haskey(B, mu)
                                 return Rational{BigInt}(B[mu][i, j]) * G
                             else
-                                return BigInt(0)//1 * G
+                                return BigInt(0) // 1 * G
                             end
                         end
                         print(
@@ -990,13 +995,13 @@ function verifySOS(m::RazborovModel{T,N,D}, sol::Dict; io::IO=stdout) where {T,N
                 psd = sol[mu] isa Matrix ? sol[mu] : sol[mu].psd
                 return dot(Rational{BigInt}.(psd), b) * G
             else
-                return BigInt(0)//1 * G
+                return BigInt(0) // 1 * G
             end
         end
     end
 
-    res += sum(enumerate(m.quotient); init=0//1 * one(T)) do (i, F)
-        Rational{BigInt}(get(sol, "Q$i", 0//1)) * F
+    res += sum(enumerate(m.quotient); init=0 // 1 * one(T)) do (i, F)
+        Rational{BigInt}(get(sol, "Q$i", 0 // 1)) * F
     end
 
     if io !== nothing
