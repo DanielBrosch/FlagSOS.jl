@@ -242,6 +242,28 @@ function glueFinite(
     return get(glueDict, (F, G), 0 * F)
 end
 
+function glueFinite(
+    N,
+    F::PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}},
+    G::PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}};
+    # p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
+    labelFlags=true,
+    base_model=nothing,
+) where {T<:Flag,UpToIso}
+    @assert labelFlags
+
+    inner_n = F.F.n
+    @assert inner_n == G.F.n
+
+    F_no_inner_label = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(F.F.F, F.n)
+    G_no_inner_label = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(G.F.F, G.n)
+
+    FG = glueFinite(N, F_no_inner_label, G_no_inner_label; labelFlags=labelFlags, base_model=base_model)
+
+    return sum(c * PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}(PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(f.F, inner_n), f.n) for (f, c) in FG.coeff)
+
+end
+
 # function glueFinite(
 #     N,
 #     F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
@@ -487,16 +509,14 @@ function sample_coefficients(
     n::Int,
     type::InducedFlag{T,UpToIso};
     base_model=nothing,
-    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=filter(
-        x -> isAllowed(base_model, x)
-    )(
-        generateAll(
-            PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-            n,
-            [size(type), 10000];
-            initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(type, size(type)),
-        ),
-    ),
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=
+    generateAll(
+        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+        n,
+        [size(type), 10000];
+        initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(type, size(type)),
+        withProperty=x -> isAllowed(base_model, x),
+        withPropertyMarked=x -> isAllowed(base_model, x),),
     N=:limit,
     only_balanced=true,
 ) where {T<:Flag,UpToIso}

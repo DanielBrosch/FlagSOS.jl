@@ -91,7 +91,19 @@ function isAllowed(
     return isAllowed(F) && !isSubFlag(m.forbiddenFlags, F)
 end
 
+function isAllowed(
+    m::FlagModel{T,N,D}, F::EdgeMarkedFlag{PartiallyLabeledFlag{S}}
+) where {T<:Flag,S<:Flag,N,D}
+    # return isAllowed(F) && !any(f -> isSubFlag(f, F), m.forbiddenFlags)
+    return isAllowed(F) && isAllowed(m, labelCanonically(F.F))
+end
+
 function isAllowed(m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{T}) where {T<:Flag,N,D}
+    F2 = labelCanonically(F.F)
+    return isAllowed(m, F2)
+end
+
+function isAllowed(m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{S}) where {T<:Flag,S<:Flag,N,D}
     F2 = labelCanonically(F.F)
     return isAllowed(m, F2)
 end
@@ -189,9 +201,9 @@ function addInequality_Razborov!(
     g::QuantumFlag{InducedFlag{T,UpToIso},D},
     lvl::Int,
 ) where {T<:Flag,N,D,UpToIso}
-    gl = labelCanonically(g)
+    gl = labelCanonically(homogenize(g))
 
-    gl = homogenize(m, gl)
+    # gl = homogenize(m, gl)
     # @assert allequal(size(G) for G in keys(gl.coeff))
     k = maximum(size(G) for G in keys(gl.coeff))
 
@@ -208,19 +220,22 @@ function addInequality_Razborov!(
     g::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},D},
     lvl::Int,
 ) where {T<:Flag,N,D,UpToIso}
-    gl = labelCanonically(g)
-    types = type.(keys(g.coeff))
+    gl = labelCanonically(homogenize(m, g))
+
+    types = type.(keys(gl.coeff))
     @assert allequal(types)
     t = types[1]
     @show t
-    gl = homogenize(m, gl)
     # @assert allequal(size(G) for G in keys(gl.coeff))
     k = maximum(size(G) for G in keys(gl.coeff))
 
     rM = RazborovModel{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},N,D}(m)
-    computeRazborovBasis!(rM, lvl - k)
+    @show lvl - (k - size(t))
+    computeRazborovBasis!(rM, lvl - (k - size(t)), t)
 
-    qM = QuadraticModule{InducedFlag{T,UpToIso},PartiallyLabeledFlag{T}}(rM, gl)
+    # global test = rM
+
+    qM = QuadraticModule{InducedFlag{T,UpToIso},PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}(rM, gl)
     push!(m.subModels, qM)
     return qM
 end
@@ -361,7 +376,7 @@ end
 function add_verts(m::FlagModel, G::T, n::Int) where {T}
     vert = permute(one(T), 1:1)
     res = 1 * G
-    for _ in (size(G) + 1):n
+    for _ in (size(G)+1):n
         # res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         filter!(x -> isAllowed(m, x.first), res.coeff)
@@ -377,7 +392,7 @@ function add_verts(m::FlagModel, G::PartiallyLabeledFlag{T}, n::Int) where {T}
     @show vert
     res = 1 * G
     @show res
-    for _ in (size(G) + 1):n
+    for _ in (size(G)+1):n
         # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         @show res
@@ -392,11 +407,11 @@ function add_verts(
     t = type(G)
 
     vert = toInduced(
-        PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t) + 1)), size(t)), UpToIso
+        PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t)+1)), size(t)), UpToIso
     )
 
-    res = 1//1 * G
-    for _ in (size(G) + 1):n
+    res = 1 // 1 * G
+    for _ in (size(G)+1):n
         # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         filter!(x -> isAllowed(m, x.first), res.coeff)

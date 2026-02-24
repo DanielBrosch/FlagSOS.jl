@@ -103,20 +103,30 @@ function modelBlockSizes(m::RazborovModel)
 end
 
 function computeUnreducedRazborovBasis(
-    M::RazborovModel{T,N,D}, n, maxLabels=n; maxGraphs::Int=Inf
+    M::RazborovModel{T,N,D}, n, maxLabels=n, base_type=one(T); maxGraphs::Int=Inf
 ) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
     @info "Generating flags up to isomorphism..."
     # flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
-    flags = generateAll(
-        T,
-        maxLabels,
-        [99999];
-        withProperty=x -> isAllowed(M.parentModel, x),
-        withPropertyMarked=x -> isAllowed(M.parentModel, x),
-        limit=maxGraphs,
-    )
+    flags = if T <: PartiallyLabeledFlag
+        generateAll(
+            T,
+            n,
+            [size(base_type), 10000];
+            initial_flag=T(base_type, size(base_type)), withProperty=x -> isAllowed(M.parentModel, x),
+            withPropertyMarked=x -> isAllowed(M.parentModel, x),
+        )
+    else
+        flags = generateAll(
+            T,
+            maxLabels,
+            [99999];
+            withProperty=x -> isAllowed(M.parentModel, x),
+            withPropertyMarked=x -> isAllowed(M.parentModel, x),
+            limit=maxGraphs,
+        )
+    end
     if flags == :limit
         @info "Limit reached, stopping generation"
         return :limit
@@ -162,13 +172,14 @@ end
 
 function computeRazborovBasis!(
     M::RazborovModel{T,N,D},
-    n::Int;
+    n::Int,
+    base_type=one(T);
     maxLabels::Int=n,
     maxBlockSize::Int=100_000,
     maxGraphs::Int=100_000,
 ) where {T<:Flag,N,D}
     M.lvl = n
-    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels; maxGraphs=maxGraphs)
+    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels, base_type; maxGraphs=maxGraphs)
     if razborovBasis == :limit
         return :limit
     end

@@ -57,9 +57,10 @@ function computeSDP!(
             tmp = QuantumFlag{T}(glueFinite(N, G, m.inequality; base_model=m.baseModel.parentModel))
         else
             tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality; base_model=m.baseModel.parentModel))
+            @show typeof(G), typeof(m.inequality), typeof(tmp)
             if m.baseModel isa RazborovModel && isInducedFlag(T)
-                tmp = add_verts(m.baseModel.parentModel, tmp, m.baseModel.lvl + size(m.inequality))
-                @show m.baseModel.lvl + size(m.inequality), tmp
+                tmp = add_verts(m.baseModel.parentModel, tmp, m.baseModel.lvl + free_verts(m.inequality))
+                @show m.baseModel.lvl + free_verts(m.inequality), tmp
             end
         end
         if isInducedFlag(T)

@@ -10,12 +10,15 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
     n::Int
     function PartiallyLabeledFlag{T}(F::T, n::Int) where {T<:Flag}
         @assert size(F) >= n "More labeled vertices than vertices in the Flag."
+        if F isa PartiallyLabeledFlag
+            @assert F.n <= n "Double labeled flags need to increase labels!"
+        end
         return new(F, n)
     end
-    PartiallyLabeledFlag(F::T, n::Int) where {T<:Flag} = new{T}(F, n)
-    PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = new{T}(T(opts...), n)
-    PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
-    PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = new{T}(F, n)
+    PartiallyLabeledFlag(F::T, n::Int) where {T<:Flag} = PartiallyLabeledFlag{T}(F, n)
+    PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = PartiallyLabeledFlag{T}(T(opts...), n)
+    PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = PartiallyLabeledFlag{T}(F, n)
+    PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = PartiallyLabeledFlag{T}(F, n)
 
     function PartiallyLabeledFlag{T}(
         F::T, labeled_inds::AbstractVector{Int}
@@ -42,9 +45,21 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
     end
 end
 
+function free_verts(F::T) where {T<:Flag}
+    return size(F)
+end
+
+function free_verts(F::QuantumFlag{T,D}) where {T<:Flag,D}
+    return maximum(free_verts(f) for f in keys(F.coeff))
+end
+
+function free_verts(F::PartiallyLabeledFlag{T}) where {T<:Flag}
+    return size(F) - F.n 
+end
+
 function unlabel(F::PartiallyLabeledFlag{T}) where {T<:Flag}
     if is_up_to_iso(T)
-        return (factorial(size(F) - F.n) // factorial(size(F))) *
+        return (factorial(free_verts(F)) // factorial(free_verts(F.F))) *
                (aut(F.F).size // aut(F).size) *
                F.F
     else
@@ -143,6 +158,10 @@ function subFlag(
     return PartiallyLabeledFlag{T}(subF, newLabeledNodes)
 end
 
+function isInducedFlag(::Type{PartiallyLabeledFlag{T}}) where {T}
+    return isInducedFlag(T)
+end
+
 """
     glue(F::PartiallyLabeledFlag{T}, G::PartiallyLabeledFlag{T}, p::Vector{Int})
 
@@ -183,12 +202,13 @@ end
 function glueFinite(
     N,
     F::PartiallyLabeledFlag{T},
-    G::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
+    G::PartiallyLabeledFlag{T};
+    # p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
     labelFlags=true,
     isAllowed=(f) -> true,
 ) where {T<:Flag}
-    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
+    # return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
+    return glueFinite_internal(N, F, G; labelFlags=labelFlags, isAllowed=isAllowed)
 end
 
 function is_up_to_iso(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
@@ -341,12 +361,13 @@ function maxPredicateArguments(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
 end
 
 function QuantumFlag{T}(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T<:Flag,D}
-    res = QuantumFlag{T,D}()
-    for (f, c) in F.coeff
-        f2 = f.F
-        res.coeff[f2] = get(res.coeff, f2, 0) + c
-    end
-    return res
+    # res = QuantumFlag{T,D}()
+    # for (f, c) in F.coeff
+    #     f2 = f.F
+    #     res.coeff[f2] = get(res.coeff, f2, 0) + c
+    # end
+    # return res
+    return unlabel(F)
 end
 
 
