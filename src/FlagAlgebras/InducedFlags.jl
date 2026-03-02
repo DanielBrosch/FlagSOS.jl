@@ -193,9 +193,19 @@ function glueFinite(
     # p::AbstractVector{Int}=vcat(collect((size(G)+1):(size(G)+size(F))), 1:size(G));
     labelFlags=true,
     # isAllowed=(f) -> true,
-    base_model=nothing
+    base_model=nothing,
+    n_outer=size(F) + size(G),
 ) where {T<:Flag,UpToIso}
-    return unlabel(glueFinite(N, PartiallyLabeledFlag(F, 0), PartiallyLabeledFlag(G, 0); labelFlags=labelFlags, base_model=base_model))
+    return unlabel(
+        glueFinite(
+            N,
+            PartiallyLabeledFlag(F, 0),
+            PartiallyLabeledFlag(G, 0);
+            labelFlags=labelFlags,
+            base_model=base_model,
+            n_outer=n_outer,
+        ),
+    )
 end
 
 function glueFinite(
@@ -205,6 +215,7 @@ function glueFinite(
     # p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
     labelFlags=true,
     base_model=nothing,
+    n_outer=size(F) + size(G) - F.n,
 ) where {T<:Flag,UpToIso}
     @assert labelFlags
 
@@ -221,6 +232,7 @@ function glueFinite(
             InducedFlag{T,UpToIso},
             lvl,
             t;
+            n_outer=n_outer,
             N=N,
             only_balanced=size(F) == size(G),
             base_model=base_model,
@@ -232,6 +244,7 @@ function glueFinite(
                 InducedFlag{T,UpToIso},
                 lvl,
                 t;
+                n_outer=n_outer,
                 N=N,
                 only_balanced=size(F) == size(G),
                 base_model=base_model,
@@ -239,7 +252,7 @@ function glueFinite(
         end
     end
 
-    return get(glueDict, (F, G), 0 * F)
+    return get(glueDict, (labelCanonically(F), labelCanonically(G)), 0 * F)
 end
 
 function glueFinite(
@@ -249,6 +262,7 @@ function glueFinite(
     # p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
     labelFlags=true,
     base_model=nothing,
+    n_outer=size(F) + size(G) - F.n
 ) where {T<:Flag,UpToIso}
     @assert labelFlags
 
@@ -258,10 +272,15 @@ function glueFinite(
     F_no_inner_label = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(F.F.F, F.n)
     G_no_inner_label = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(G.F.F, G.n)
 
-    FG = glueFinite(N, F_no_inner_label, G_no_inner_label; labelFlags=labelFlags, base_model=base_model)
+    FG = glueFinite(
+        N, F_no_inner_label, G_no_inner_label; labelFlags=labelFlags, base_model=base_model, n_outer=n_outer
+    )
 
-    return sum(c * PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}(PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(f.F, inner_n), f.n) for (f, c) in FG.coeff)
-
+    return sum(
+        c * PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}(
+            PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(f.F, inner_n), f.n
+        ) for (f, c) in FG.coeff
+    )
 end
 
 # function glueFinite(
@@ -384,7 +403,13 @@ function toInduced(F::Union{T,QuantumFlag{T}}, UpToIso=true) where {T<:Flag}
 end
 
 function toNonInduced(
-    F::Union{InducedFlag{T,UpToIso},QuantumFlag{InducedFlag{T,UpToIso}}}
+    F::QuantumFlag{InducedFlag{T,UpToIso}}
+) where {T<:Flag,UpToIso}
+    return sum(c * toNonInduced(f) for (f, c) in F.coeff)
+end
+
+function toNonInduced(
+    F::InducedFlag{T,UpToIso}
 ) where {T<:Flag,UpToIso}
     tmp = moebius(F)
     res = QuantumFlag{T,Int}()
@@ -484,10 +509,13 @@ function toInduced(
 end
 
 function toNonInduced(
-    F::Union{
-        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-        QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}},
-    },
+    F::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}
+) where {T<:Flag,UpToIso}
+    return sum(c*toNonInduced(f) for (f,c) in F.coeff)
+end
+
+function toNonInduced(
+    F::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
 ) where {T<:Flag,UpToIso}
     tmp = moebius(F)
     res = QuantumFlag{PartiallyLabeledFlag{T},Int}()
@@ -504,19 +532,20 @@ function labelCanonically(
     return label(F; removeIsolated=false)[1]
 end
 
-function sample_coefficients(
+function sample_coefficients_old(
     ::Type{InducedFlag{T,UpToIso}},
     n::Int,
     type::InducedFlag{T,UpToIso};
+    n_outer::Int=n,
     base_model=nothing,
-    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=
-    generateAll(
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
         n,
         [size(type), 10000];
         initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(type, size(type)),
         withProperty=x -> isAllowed(base_model, x),
-        withPropertyMarked=x -> isAllowed(base_model, x),),
+        withPropertyMarked=x -> isAllowed(base_model, x),
+    ),
     N=:limit,
     only_balanced=true,
 ) where {T<:Flag,UpToIso}
@@ -540,41 +569,25 @@ function sample_coefficients(
             nG = size(G)
             n_free = nG - k
 
-            # ov = 2 * t - n_free
             ov = t1 + t2 - n_free
-            # fact = binomial(t, ov)//(binomial(n_free, t))
-            # fact = 1//(binomial(n_free, t)*binomial(t, ov))
 
             @assert n_free == t1 + t2 - ov
 
             # Number of ways to place the two sets of free verts
             fact = if N == :limit
-                # 1 // (binomial(n_free, t))
                 1 // (binomial(n_free, t1))
             else
-                # 1 // (
-                #     binomial(n_free, ov) *
-                #     binomial(n_free - ov, t - ov) *
-                #     binomial(n_free - t, t - ov)
-                # )
                 1 // (
                     binomial(n_free, ov) *
                     binomial(n_free - ov, t1 - ov) *
                     binomial(n_free - t1, t2 - ov)
                 )
             end
-            # fact2 = N == :limit ? 1//1 : (factorial(nG-k) * binomial(N-k, nG-k))//(factorial(t)^2*binomial(N-k, t)^2)
 
             # Probability to hit n_free many vertices
             fact2 = if N == :limit
                 1 // 1
             else
-                # (factorial(n_free) * binomial(N - k, n_free))//(factorial(t)^2 * binomial(N - k, t)^2)
-                # (
-                #     binomial(N - k, ov) *
-                #     binomial(N - k - ov, t - ov) *
-                #     binomial(N - k - t, t - ov)
-                # ) // (binomial(N - k, t)^2)
                 (
                     binomial(N - k, ov) *
                     binomial(N - k - ov, t1 - ov) *
@@ -608,6 +621,149 @@ function sample_coefficients(
                         ) + fact * fact2 * G
                 end
             end
+        end
+    end
+
+    return idx_flags, glue_flags, res
+end
+
+function sample_coefficients(
+    ::Type{InducedFlag{T,UpToIso}},
+    n::Int,
+    type::InducedFlag{T,UpToIso};
+    n_outer::Int=n,
+    base_model=nothing,
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
+        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+        n_outer,
+        [size(type), 10000];
+        initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(type, size(type)),
+        withProperty=x -> isAllowed(base_model, x),
+        withPropertyMarked=x -> isAllowed(base_model, x),
+    ),
+    N=:limit,
+    only_balanced=true,
+) where {T<:Flag,UpToIso}
+    @info "Sampling $T for n=$n@$n_outer of type $type"
+    @assert UpToIso
+    k = size(type)
+
+    only_balanced && @assert iseven(n - k)
+    t = only_balanced ? Int((n - k) / 2) : n
+
+    idx_flags = only_balanced ? filter(x -> size(x) == t + k, all_flags) : all_flags
+    # glue_flags = N == :limit ? filter(x -> size(x) == n_outer, all_flags) : all_flags
+    glue_flags = filter(x -> size(x) == n_outer, all_flags)
+
+    res = Dict()
+
+    @show length(glue_flags)
+
+    n_additional = n_outer - n
+    @assert n_additional >= 0
+
+    for t1 in 0:(n-k)
+        only_balanced && t1 != t && continue
+
+        for G in glue_flags
+            nG = size(G)
+            n_free = nG - k
+
+            for c in combinations((k+1):nG, t1)
+                F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
+
+                other = N == :limit ? setdiff((k+1):nG, c) : ((k+1):nG)
+
+                # k + t1 + t2 <= n
+                # t2 <= n - k - t1
+                for t2 in 0:(n-k-t1)
+                # for t2 in 0:(n-k)
+
+                    only_balanced && t2 != t && continue
+
+                    for d in combinations(other, t2)
+                        F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d))))
+
+                        ov = N == :limit ? 0 : length(intersect(c, d))
+
+                        # Number of ways to place the two sets of free verts
+                        # fact = if N == :limit
+                        #     1 // (binomial(n_free, t1))
+                        # else
+                        # end
+                        fact =
+                            1 // (
+                                binomial(n_free, ov) *
+                                binomial(n_free - ov, t1 - ov) *
+                                binomial(n_free - t1, t2 - ov)
+                                # binomial(n_free+n_additional, n_free)
+                            )
+
+                        # Probability to hit n_free many vertices
+                        fact2 = if N == :limit
+                            1 // 1
+                        else
+                            (
+                                binomial(N - k, ov) *
+                                binomial(N - k - ov, t1 - ov) *
+                                binomial(N - k - t1, t2 - ov)
+                            ) // (binomial(N - k, t1) * binomial(N - k, t2))
+                        end
+
+                        res[(F1, F2)] =
+                            get(
+                                res,
+                                (F1, F2),
+                                QuantumFlag{
+                                    PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+                                    Rational{Int},
+                                }(),# - glueFinite(N, F1, F2),
+                            ) + fact * fact2 * G
+
+                    end
+
+                end
+            end
+
+            # for ov in 0:(N == :limit ? 0 : t1)
+            #     t2 = n - k - t1 + ov
+
+            #     # ov = t1 + t2 - n_free + n_additional
+            #     @assert ov >= 0
+
+            #     @show n_free, t1, t2, ov, n_additional
+            #     @assert n_free == t1 + t2 - ov + n_additional
+
+            #     # if ov > 0 
+            #     #     fact2 *= 2
+            #     # end
+            #     # @show n, t, c, vcat(1:k, c), G
+            #     F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
+
+            #     # zero, unless finite FA
+            #     remaining_inds = setdiff((k+1):nG, c)
+
+            #     for other_inds in combinations(remaining_inds, t2 - ov)
+            #         for d in combinations(c, ov)
+            #             # @show n, nG, t, ov, c, d, other_inds, fact2
+            #             F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d, other_inds))))
+            #             # @show F1
+            #             # @show F2
+            #             @assert size(F1) == t1 + k
+            #             @assert size(F2) == t2 + k
+            #             res[(F1, F2)] =
+            #                 get(
+            #                     res,
+            #                     (F1, F2),
+            #                     QuantumFlag{
+            #                         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+            #                         Rational{Int},
+            #                     }(),# - glueFinite(N, F1, F2),
+            #                 ) + fact * fact2 * G
+            #         end
+
+            #     end
+            # end
         end
     end
 

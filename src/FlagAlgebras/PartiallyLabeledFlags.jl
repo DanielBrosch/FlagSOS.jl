@@ -143,7 +143,7 @@ function Base.:*(
 end
 
 function subFlag(
-    F::PartiallyLabeledFlag{T}, vertices::Vector{Int}
+    F::PartiallyLabeledFlag{T}, vertices::AbstractVector{Int}
 )::PartiallyLabeledFlag{T} where {T<:Flag}
     # sort to make sure labeled vertices are at the front
     if !issorted(vertices)

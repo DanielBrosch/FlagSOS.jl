@@ -37,7 +37,9 @@ mutable struct FlagModel{T<:Flag,N,D} <: AbstractFlagModel{T,N,D}
         )
     end
     function FlagModel{T,D}() where {T<:Flag,D}
-        return new{T,:limit,D}(AbstractFlagModel{T,:limit,D}[], Set{T}(), nothing, false, Dict())
+        return new{T,:limit,D}(
+            AbstractFlagModel{T,:limit,D}[], Set{T}(), nothing, false, Dict()
+        )
     end
     function FlagModel{T,N,D}() where {T<:Flag,D,N}
         return new{T,N,D}(AbstractFlagModel{T,N,D}[], Set{T}(), nothing, false, Dict())
@@ -103,7 +105,9 @@ function isAllowed(m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{T}) where {T<:Fl
     return isAllowed(m, F2)
 end
 
-function isAllowed(m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{S}) where {T<:Flag,S<:Flag,N,D}
+function isAllowed(
+    m::FlagModel{T,N,D}, F::PartiallyLabeledFlag{S}
+) where {T<:Flag,S<:Flag,N,D}
     F2 = labelCanonically(F.F)
     return isAllowed(m, F2)
 end
@@ -235,7 +239,11 @@ function addInequality_Razborov!(
 
     # global test = rM
 
-    qM = QuadraticModule{InducedFlag{T,UpToIso},PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}(rM, gl)
+    qM = QuadraticModule{
+        InducedFlag{T,UpToIso},PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
+    }(
+        rM, gl
+    )
     push!(m.subModels, qM)
     return qM
 end
@@ -384,18 +392,32 @@ function add_verts(m::FlagModel, G::T, n::Int) where {T}
     return res
 end
 
+function add_verts(m::FlagModel, G::InducedFlag{T,UpToIso}, n::Int) where {T,UpToIso}
+    # vert = permute(one(InducedFlag{T, UpToIso}), 1:1)
+    # res = 1 * G
+    # @info "Adding up to $n verts to $G "
+    # for _ in (size(G) + 1):n
+    #     # res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
+    #     # res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
+    #     # filter!(x -> isAllowed(m, x.first), res.coeff)
+    #     @show vert, res
+    #     res = glueFinite(:limit, vert, res; base_model=m)
+    # end
+    return glueFinite(:limit, G, one(G); n_outer=n, base_model=m)
+end
+
 function add_verts(m::FlagModel, G::PartiallyLabeledFlag{T}, n::Int) where {T}
     # t = type(G)
 
     vert = PartiallyLabeledFlag{T}(permute(one(T), 1:1), 0)
 
-    @show vert
+    # @show vert
     res = 1 * G
-    @show res
+    # @show res
     for _ in (size(G)+1):n
         # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
-        @show res
+        # @show res
         filter!(x -> isAllowed(m, x.first), res.coeff)
     end
     return res
@@ -404,19 +426,45 @@ end
 function add_verts(
     m::FlagModel, G::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}, n::Int
 ) where {T,UpToIso}
+
+    if size(G) == n
+        return G
+    end
     t = type(G)
 
-    vert = toInduced(
-        PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t)+1)), size(t)), UpToIso
-    )
 
-    res = 1 // 1 * G
-    for _ in (size(G)+1):n
-        # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
-        res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
-        filter!(x -> isAllowed(m, x.first), res.coeff)
-    end
-    return res
+    # vert = toInduced(
+    #     PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t) + 1)), size(t)), UpToIso
+    # )
+    # @show PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t) + 1)), size(t))
+    # @show G, vert
+    # res = 1//1 * G
+    # for _ in (size(G) + 1):n
+    #     # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
+    #     # res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
+    #     # filter!(x -> isAllowed(m, x.first), res.coeff)
+    #     res = glueFinite(:limit, vert, res; base_model=m)
+    # end
+
+    return glueFinite(:limit, G, PartiallyLabeledFlag(type(G), G.n); n_outer=n, base_model=m)
+end
+
+function add_verts(
+    m::FlagModel,
+    G::PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}},
+    n::Int,
+) where {T,UpToIso}
+    inner_n = G.F.n
+
+    G_no_inner_label = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(G.F.F, G.n)
+
+    G_n = add_verts(m, G_no_inner_label, n)
+
+    return sum(
+        c * PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}(
+            PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(f.F, inner_n), f.n
+        ) for (f, c) in G_n.coeff
+    )
 end
 
 function add_verts(
