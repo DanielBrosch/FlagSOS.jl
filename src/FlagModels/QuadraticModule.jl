@@ -47,7 +47,7 @@ end
 function computeSDP!(
     m::QuadraticModule{T,U,B,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
-    @info "computing ineq module"
+    @info "computing ineq module for $(m.inequality)"
     computeSDP!(m.baseModel, reservedVerts + m.reservedVerts)
 
     # @assert N == :limit "TODO"

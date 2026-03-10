@@ -510,7 +510,6 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                         labelFlags=true,
                         base_model=m.parentModel,
                     )
-                    # @show t
                     t = labelCanonically(add_verts(m.parentModel, labelCanonically(unlabel(t)), m.lvl))
                 end
                 if is_up_to_iso(T)

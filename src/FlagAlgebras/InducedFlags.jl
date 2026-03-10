@@ -227,6 +227,8 @@ function glueFinite(
     # @show N, F, G, p, T, UpToIso
     # global test = N, F, G, p, T, UpToIso
 
+    @assert base_model !== nothing
+
     glueDict = if base_model === nothing
         sample_coefficients(
             InducedFlag{T,UpToIso},
@@ -239,7 +241,7 @@ function glueFinite(
         )[3]
     else
         # @show (InducedFlag{T,UpToIso}, lvl, t, size(F) == size(G))
-        get!(base_model.glue_cache, (InducedFlag{T,UpToIso}, lvl, t, size(F) == size(G))) do
+        get!(base_model.glue_cache, (InducedFlag{T,UpToIso}, lvl, t, size(F) == size(G), n_outer)) do
             sample_coefficients(
                 InducedFlag{T,UpToIso},
                 lvl,
