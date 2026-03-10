@@ -16,7 +16,7 @@ function Base.show(io::IO, T::SymmetricFunction)
         print(io, get(T.exponents, i, 0))
         i < size(T) && print(io, ",")
     end
-    print(io, ")")
+    return print(io, ")")
 end
 
 function base_nonnegative(::Type{SymmetricFunction})
@@ -57,7 +57,7 @@ end
 function subFlag(F::SymmetricFunction, vertices::Vector{Int})::SymmetricFunction
     # @show vertices
 
-    newExp = Dict{Int, Int}()
+    newExp = Dict{Int,Int}()
     for (i, v) in enumerate(vertices)
         newExp[i] = get(F.exponents, v, 0)
     end
@@ -66,7 +66,10 @@ function subFlag(F::SymmetricFunction, vertices::Vector{Int})::SymmetricFunction
 end
 
 function glue(
-    F::SymmetricFunction, G::SymmetricFunction, p::AbstractVector{Int}
+    F::SymmetricFunction,
+    G::SymmetricFunction,
+    p::AbstractVector{Int};
+    isAllowed=(f) -> true,
 )
     # @show F, G, p
     res = deepcopy(G.exponents)
@@ -75,11 +78,11 @@ function glue(
     #     resize!(res, maximum(p))
     #     res[old_length+1:end] .= 0
     # end
-        
+
     for (i, c) in F.exponents
         res[p[i]] = get(res, p[i], 0) + c
     end
-    for i = 1:maximum(p; init = 0)
+    for i in 1:maximum(p; init=0)
         res[i] = get(res, i, 0)
     end
     return SymmetricFunction(res)
@@ -90,7 +93,7 @@ function distinguish(F::SymmetricFunction, v::Int, W::BitVector)::UInt
 end
 
 function isolatedVertices(F::SymmetricFunction)::BitVector
-    return [get(F.exponents,i,0) == 0 for i=1:size(F)]
+    return [get(F.exponents, i, 0) == 0 for i in 1:size(F)]
 end
 
 function predicateType(::Type{SymmetricFunction})
@@ -107,7 +110,7 @@ end
 
 function permute(F::SymmetricFunction, p::AbstractVector{Int})
     res = SymmetricFunction(p[i] => c for (i, c) in F.exponents)
-    for i = 1:maximum(p)
+    for i in 1:maximum(p)
         res.exponents[i] = get(res.exponents, i, 0)
     end
     return res

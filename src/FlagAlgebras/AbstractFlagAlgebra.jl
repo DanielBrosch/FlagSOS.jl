@@ -187,13 +187,14 @@ function glueFinite(
     G::T,
     p::AbstractVector{Int}=vcat(collect((size(G) + 1):(size(G) + size(F))), 1:size(G));
     labelFlags=true,
-    isAllowed=(f) -> true,
+    # isAllowed=(f) -> true,
+    base_model=nothing
 ) where {T<:Flag}
-    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
+    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, base_model=base_model)
 end
 
 function glueFinite_internal(
-    N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true, isAllowed=(f) -> true
+    N, F::T, G::T, p::AbstractVector{Int}; labelFlags=true, base_model=nothing
 ) where {T<:Flag}
     # @info "Glue finite with $N, $F, $G, $p"
 
@@ -276,7 +277,8 @@ function glueFinite_internal(
             end
         end
 
-        newG = glue(F, G, po[1:size(F)]; isAllowed=isAllowed)
+        newG = glue(F, G, po[1:size(F)]; isAllowed=(f)->isAllowed(base_model, f))
+        # newG = glue(F, G, po[1:size(F)]; base_model=base_model)
         if newG !== nothing
             res += c * factor * newG
         end
@@ -294,10 +296,10 @@ function glueFinite_internal(
     G::QuantumFlag{T,D},
     p::AbstractVector{Int};
     labelFlags=true,
-    isAllowed=(f) -> true,
+    base_model=nothing,
 ) where {T<:Flag,D}
     return sum(
-        c * d * glueFinite_internal(N, f, g, p; labelFlags=labelFlags, isAllowed=isAllowed)
+        c * d * glueFinite_internal(N, f, g, p; labelFlags=labelFlags, base_model=base_model)
         for (g, c) in G.coeff, (f, d) in F.coeff
     )
 end
@@ -323,10 +325,10 @@ function glueFinite(
 end
 
 function glueFinite(
-    N, F::QuantumFlag{T,D}, G::QuantumFlag{T,D}, p; isAllowed=(f) -> true, labelFlags=true
+    N, F::QuantumFlag{T,D}, G::QuantumFlag{T,D}, p; base_model=nothing, labelFlags=true
 ) where {T,D}
     return sum(
-        c * d * glueFinite(N, f, g, p; isAllowed=isAllowed, labelFlags=labelFlags) for
+        c * d * glueFinite(N, f, g, p; base_model=base_model, labelFlags=labelFlags) for
         (g, c) in G.coeff, (f, d) in F.coeff
     )
 end

@@ -202,13 +202,14 @@ end
 function glueFinite(
     N,
     F::PartiallyLabeledFlag{T},
-    G::PartiallyLabeledFlag{T};
-    # p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
+    G::PartiallyLabeledFlag{T},
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
     labelFlags=true,
-    isAllowed=(f) -> true,
+    # isAllowed=(f) -> true,
+    base_model=nothing
 ) where {T<:Flag}
     # return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
-    return glueFinite_internal(N, F, G; labelFlags=labelFlags, isAllowed=isAllowed)
+    return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, base_model=base_model)
 end
 
 function is_up_to_iso(::Type{PartiallyLabeledFlag{T}}) where {T<:Flag}
