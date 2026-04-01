@@ -657,7 +657,7 @@ function sample_coefficients(
     # glue_flags = N == :limit ? filter(x -> size(x) == n_outer, all_flags) : all_flags
     glue_flags = filter(x -> size(x) == n_outer, all_flags)
 
-    res = Dict()
+    res = ThreadSafeDict()
 
     @show length(glue_flags)
 
@@ -671,7 +671,7 @@ function sample_coefficients(
             nG = size(G)
             n_free = nG - k
 
-            for c in combinations((k+1):nG, t1)
+            Threads.@threads for c in collect(combinations((k+1):nG, t1))
                 F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
 
                 other = N == :limit ? setdiff((k+1):nG, c) : ((k+1):nG)
