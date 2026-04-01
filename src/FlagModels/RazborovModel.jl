@@ -136,7 +136,8 @@ function computeUnreducedRazborovBasis(
     filter!(f -> isAllowed(M, f), flags)
 
     for Ftmp in flags
-        for m in maxLabels:-2:size(Ftmp)
+        for m in maxLabels-2:-2:size(Ftmp)
+        # for m in maxLabels:-2:size(Ftmp)
             if T <: InducedFlag && size(Ftmp) != m
                 continue
             end
