@@ -667,11 +667,11 @@ function sample_coefficients(
     for t1 in 0:(n-k)
         only_balanced && t1 != t && continue
 
-        for G in glue_flags
+        Threads.@threads for G in glue_flags
             nG = size(G)
             n_free = nG - k
 
-            Threads.@threads for c in collect(combinations((k+1):nG, t1))
+            for c in combinations((k+1):nG, t1)
                 F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
 
                 other = N == :limit ? setdiff((k+1):nG, c) : ((k+1):nG)
