@@ -102,8 +102,9 @@ function modelBlockSizes(m::RazborovModel)
     return res
 end
 
+# needsSlacks = multiply with fully labeled flags. Only needed for quadratic modules?
 function computeUnreducedRazborovBasis(
-    M::RazborovModel{T,N,D}, n, maxLabels=n, base_type=one(T); maxGraphs::Int=Inf
+    M::RazborovModel{T,N,D}, n, maxLabels=n, base_type=one(T); maxGraphs::Int=Inf, needsSlacks = false
 ) where {T<:Flag,N,D}
     razborovBasis = Dict()
 
@@ -135,8 +136,10 @@ function computeUnreducedRazborovBasis(
 
     filter!(f -> isAllowed(M, f), flags)
 
+    maxLabelsSlacks = needsSlacks ? maxLabels : maxLabels - 2
+
     for Ftmp in flags
-        for m in maxLabels-2:-2:size(Ftmp)
+        for m in maxLabelsSlacks:-2:size(Ftmp)
         # for m in maxLabels:-2:size(Ftmp)
             if T <: InducedFlag && size(Ftmp) != m
                 continue
@@ -178,9 +181,10 @@ function computeRazborovBasis!(
     maxLabels::Int=n,
     maxBlockSize::Int=100_000,
     maxGraphs::Int=100_000,
+    needsSlacks = false
 ) where {T<:Flag,N,D}
     M.lvl = n
-    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels, base_type; maxGraphs=maxGraphs)
+    razborovBasis = computeUnreducedRazborovBasis(M, n, maxLabels, base_type; maxGraphs=maxGraphs, needsSlacks = needsSlacks)
     if razborovBasis == :limit
         return :limit
     end

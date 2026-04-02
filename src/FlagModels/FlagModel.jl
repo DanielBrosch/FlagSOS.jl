@@ -162,7 +162,12 @@ function addRazborovBlock!(
     rM = RazborovModel{T,N,D}(m)
     push!(m.subModels, rM)
     res = computeRazborovBasis!(
-        rM, lvl; maxLabels=maxLabels, maxBlockSize=maxBlockSize, maxGraphs=maxGraphs
+        rM,
+        lvl;
+        maxLabels=maxLabels,
+        maxBlockSize=maxBlockSize,
+        maxGraphs=maxGraphs,
+        needsSlacks=false,
     )
     if res == :limit
         return :limit
@@ -193,7 +198,7 @@ function addInequality_Razborov!(
     k = maximum(size(G) for G in keys(gl.coeff))
 
     rM = RazborovModel{T,N,D}(m)
-    computeRazborovBasis!(rM, lvl - k)
+    computeRazborovBasis!(rM, lvl - k; needsSlacks=true)
 
     qM = QuadraticModule{T}(rM, gl)
     push!(m.subModels, qM)
@@ -212,7 +217,7 @@ function addInequality_Razborov!(
     k = maximum(size(G) for G in keys(gl.coeff))
 
     rM = RazborovModel{InducedFlag{T,UpToIso},N,D}(m)
-    computeRazborovBasis!(rM, lvl - k)
+    computeRazborovBasis!(rM, lvl - k; needsSlacks=true)
 
     qM = QuadraticModule{InducedFlag{T,UpToIso}}(rM, gl)
     push!(m.subModels, qM)
@@ -235,7 +240,7 @@ function addInequality_Razborov!(
 
     rM = RazborovModel{PartiallyLabeledFlag{InducedFlag{T,UpToIso}},N,D}(m)
     @show lvl - (k - size(t))
-    computeRazborovBasis!(rM, lvl - (k - size(t)), t)
+    computeRazborovBasis!(rM, lvl - (k - size(t)), t; needsSlacks=true)
 
     # global test = rM
 
@@ -384,7 +389,7 @@ end
 function add_verts(m::FlagModel, G::T, n::Int) where {T}
     vert = permute(one(T), 1:1)
     res = 1 * G
-    for _ in (size(G)+1):n
+    for _ in (size(G) + 1):n
         # res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         filter!(x -> isAllowed(m, x.first), res.coeff)
@@ -414,7 +419,7 @@ function add_verts(m::FlagModel, G::PartiallyLabeledFlag{T}, n::Int) where {T}
     # @show vert
     res = 1 * G
     # @show res
-    for _ in (size(G)+1):n
+    for _ in (size(G) + 1):n
         # @show *(vert, res; isAllowed=x -> isAllowed(m, x))
         res = labelCanonically(*(vert, res; isAllowed=x -> isAllowed(m, x)))
         # @show res
@@ -426,12 +431,10 @@ end
 function add_verts(
     m::FlagModel, G::PartiallyLabeledFlag{InducedFlag{T,UpToIso}}, n::Int
 ) where {T,UpToIso}
-
     if size(G) == n
         return G
     end
     t = type(G)
-
 
     # vert = toInduced(
     #     PartiallyLabeledFlag{T}(permute(t.F, 1:(size(t) + 1)), size(t)), UpToIso
@@ -446,7 +449,9 @@ function add_verts(
     #     res = glueFinite(:limit, vert, res; base_model=m)
     # end
 
-    return glueFinite(:limit, G, PartiallyLabeledFlag(type(G), G.n); n_outer=n, base_model=m)
+    return glueFinite(
+        :limit, G, PartiallyLabeledFlag(type(G), G.n); n_outer=n, base_model=m
+    )
 end
 
 function add_verts(
