@@ -513,7 +513,7 @@ end
 function toNonInduced(
     F::QuantumFlag{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}
 ) where {T<:Flag,UpToIso}
-    return sum(c*toNonInduced(f) for (f,c) in F.coeff)
+    return sum(c * toNonInduced(f) for (f, c) in F.coeff)
 end
 
 function toNonInduced(
@@ -657,7 +657,8 @@ function sample_coefficients(
     # glue_flags = N == :limit ? filter(x -> size(x) == n_outer, all_flags) : all_flags
     glue_flags = filter(x -> size(x) == n_outer, all_flags)
 
-    res = ThreadSafeDict()
+    res = Dict()
+    lck = Threads.SpinLock()
 
     @show length(glue_flags)
 
@@ -679,7 +680,7 @@ function sample_coefficients(
                 # k + t1 + t2 <= n
                 # t2 <= n - k - t1
                 for t2 in 0:(n-k-t1)
-                # for t2 in 0:(n-k)
+                    # for t2 in 0:(n-k)
 
                     only_balanced && t2 != t && continue
 
@@ -712,16 +713,17 @@ function sample_coefficients(
                             ) // (binomial(N - k, t1) * binomial(N - k, t2))
                         end
 
-                        res[(F1, F2)] =
-                            get(
-                                res,
-                                (F1, F2),
-                                QuantumFlag{
-                                    PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-                                    Rational{Int},
-                                }(),# - glueFinite(N, F1, F2),
-                            ) + fact * fact2 * G
-
+                        lock(lck) do
+                            res[(F1, F2)] =
+                                get(
+                                    res,
+                                    (F1, F2),
+                                    QuantumFlag{
+                                        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+                                        Rational{Int},
+                                    }(),# - glueFinite(N, F1, F2),
+                                ) + fact * fact2 * G
+                        end
                     end
 
                 end
