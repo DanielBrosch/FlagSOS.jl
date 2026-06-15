@@ -519,9 +519,11 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                     t = glueFinite(
                         N - reservedVerts, a, b; labelFlags=true, base_model=m.parentModel
                     )
-                    t = labelCanonically(
-                        add_verts(m.parentModel, labelCanonically(unlabel(t)), m.lvl)
-                    )
+                    t = labelCanonically(unlabel(t))
+                    # @assert t == labelCanonically(t)
+                    # t = labelCanonically(
+                    #     add_verts(m.parentModel, labelCanonically(unlabel(t)), m.lvl)
+                    # )
                 end
                 if is_up_to_iso(T)
                     t = (up_to_iso_fact(a) * up_to_iso_fact(b)) * t
