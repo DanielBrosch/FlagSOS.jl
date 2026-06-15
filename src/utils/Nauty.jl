@@ -4,6 +4,7 @@ include("SchreierSims.jl")
 
 using DataStructures
 using Base.Threads
+using Memoization
 
 # function refine!(F::T, coloring::Vector{Int}, alpha)::Vector{UInt} where {T<:Flag}
 #     # Q .= 0
@@ -1002,7 +1003,7 @@ function process_edgeMarkedFlags(
     return newFlags
 end
 
-function generateAll(
+@memoize function generateAll(
     ::Type{T},
     maxVertices::Int,
     maxPredicates::Vector;

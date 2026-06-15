@@ -722,7 +722,8 @@ function sample_coefficients(
                                         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
                                         Rational{Int},
                                     }(),# - glueFinite(N, F1, F2),
-                                ) + fact * fact2 * G
+                                )
+                            res[(F1, F2)].coeff[G] = get(res[(F1, F2)].coeff, G, 0//1) + fact * fact2
                         end
                     end
 
