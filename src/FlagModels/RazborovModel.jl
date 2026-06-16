@@ -220,7 +220,7 @@ function computeRazborovBasis!(
         # @info "determining symmetry pattern for $mu of size $(length(B)) ($muc/$total_mu)"
 
         muAut = aut(mu)
-        @show muAut
+        # @show muAut
 
         newGen = []
         for p in muAut.gen
@@ -418,6 +418,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
     # m.sdpData = Dict()
 
     for (muc, (mu, B)) in enumerate(m.basis)
+        # print("Computing block $muc  / $(length(m.basis))         ")
         # @show muc, maximum(m.blockSymmetry[mu].pattern), length(B), mu
 
         # mu == Hypergraph{3,5}(zeros(Bool, 0,6))
@@ -441,7 +442,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
 
         maxP = maximum(P.pattern)
         for s in 1:maxP
-            print("$s / $maxP      \r")
+            print("Computing block $muc  / $(length(m.basis)) ... $s / $maxP      \r")
             c = findfirst(x -> x == s, P.pattern)
             if P.pattern[c[2], c[1]] < s
                 continue
@@ -691,6 +692,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
         # end
     end
 
+    println()
     @info "Razborov computation done"
 
     return m.sdpData

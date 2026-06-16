@@ -1015,9 +1015,9 @@ end
     initial_flag=one(T),
 ) where {T}
     generatedGraphs = Vector{T}[Vector([initial_flag])]
-    @show maxPredicates
+    # @show maxPredicates
     for i in (size(initial_flag) + 1):maxVertices
-        @show (i, maxVertices)
+        # @show (i, maxVertices)
         nextGraphs = Set{T}()
         nextGraphs_lock = Base.Threads.SpinLock()
 
@@ -1096,7 +1096,7 @@ end
                             # Double-check inside lock to prevent race condition
                             if now - last_print_time[] > 1.0
                                 print(
-                                    "\r$(flags_to_process[]) models left,\t $(maxModels[]) max models        \t\t\t",
+                                    "\rGen flags ($i / $maxVertices) ... $(flags_to_process[]) models left,\t $(maxModels[]) max models        \t\t\t",
                                 )
                                 last_print_time[] = now
                             end
@@ -1136,7 +1136,7 @@ end
 
         # nextGraphs = collect(nextGraphs)
 
-        @show length(nextGraphs)
+        # @show length(nextGraphs)
         k = length(nextGraphs)
         res = T[]
         t = time()

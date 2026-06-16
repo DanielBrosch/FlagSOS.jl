@@ -68,7 +68,10 @@ function addForbiddenFlag!(m::FlagModel{InducedFlag{T},N,D}, F::T) where {T<:Fla
 end
 
 function computeSDP!(m::FlagModel, reservedVerts::Int)
-    return computeSDP!.(m.subModels, reservedVerts)
+    for (i,sm) in enumerate(m.subModels)
+        @info "Computing SDP for submodel $i / $(length(m.subModels)):"
+        computeSDP!(sm, reservedVerts)
+    end
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}

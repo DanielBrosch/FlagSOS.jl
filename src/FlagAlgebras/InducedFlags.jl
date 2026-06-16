@@ -646,7 +646,7 @@ function sample_coefficients(
     N=:limit,
     only_balanced=true,
 ) where {T<:Flag,UpToIso}
-    @info "Sampling $T for n=$n@$n_outer of type $type"
+    # print("Sampling $T for n=$n@$n_outer of type $type            \r")
     @assert UpToIso
     k = size(type)
 
@@ -660,7 +660,7 @@ function sample_coefficients(
     res = Dict()
     lck = Threads.SpinLock()
 
-    @show length(glue_flags)
+    # @show length(glue_flags)
 
     n_additional = n_outer - n
     @assert n_additional >= 0
