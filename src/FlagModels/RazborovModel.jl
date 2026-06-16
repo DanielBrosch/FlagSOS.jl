@@ -111,7 +111,7 @@ function computeUnreducedRazborovBasis(
     maxGraphs::Int=Inf,
     needsSlacks=false,
 ) where {T<:Flag,N,D}
-    razborovBasis = Dict()
+    razborovBasis = ThreadSafeDict()
 
     @info "Generating flags up to isomorphism..."
     # flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
@@ -144,7 +144,7 @@ function computeUnreducedRazborovBasis(
 
     maxLabelsSlacks = needsSlacks ? maxLabels : maxLabels - 2
 
-    for Ftmp in flags
+    Threads.@threads for Ftmp in flags
         for m in maxLabelsSlacks:-2:size(Ftmp)
             # for m in maxLabels:-2:size(Ftmp)
             if T <: InducedFlag && size(Ftmp) != m
