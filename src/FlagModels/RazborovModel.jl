@@ -113,7 +113,7 @@ function computeUnreducedRazborovBasis(
 ) where {T<:Flag,N,D}
     razborovBasis = ThreadSafeDict()
 
-    @info "Generating flags up to isomorphism..."
+    # @info "Generating flags up to isomorphism..."
     # flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
     flags = if T <: PartiallyLabeledFlag
         generateAll(
@@ -138,7 +138,7 @@ function computeUnreducedRazborovBasis(
         @info "Limit reached, stopping generation"
         return :limit
     end
-    @info "Splitting $(length(flags)) flags..."
+    # @info "Splitting $(length(flags)) flags..."
 
     filter!(f -> isAllowed(M, f), flags)
 
@@ -201,10 +201,10 @@ function computeRazborovBasis!(
         filter!(x -> length(x[2]) < maxBlockSize, reducedBasis)
     end
 
-    display(reducedBasis)
+    # display(reducedBasis)
 
-    @info "basis reduced"
-    @info "determining symmetries"
+    # @info "basis reduced"
+    # @info "determining symmetries"
     total_mu = length(reducedBasis)
     for (muc, (mu, B)) in enumerate(reducedBasis)
         if length(B) == 1
@@ -217,7 +217,7 @@ function computeRazborovBasis!(
             return :limit
         end
 
-        @info "determining symmetry pattern for $mu of size $(length(B)) ($muc/$total_mu)"
+        # @info "determining symmetry pattern for $mu of size $(length(B)) ($muc/$total_mu)"
 
         muAut = aut(mu)
         @show muAut
@@ -306,7 +306,7 @@ function computeRazborovBasis!(
                 # display(translate)
 
                 # reductions_complex[type] = SW.symmetry_adapted_basis(G, action, [[i] for i in 1:total])
-                @info "Starting SymbolicWedderburn"
+                # @info "Starting SymbolicWedderburn"
                 sym_basis = SW.symmetry_adapted_basis(
                     Float64, G, action, [[i] for i in 1:total]
                 )
@@ -325,7 +325,7 @@ function computeRazborovBasis!(
             # @show P
             # @show SDPSymmetryReduction.Partition{Int}(P)
 
-            @info "Running SDPSymmetryReduction"
+            # @info "Running SDPSymmetryReduction"
 
             part = SDPSymmetryReduction.Partition{Int}(P)
 
@@ -354,7 +354,7 @@ function computeRazborovBasis!(
             )
 
         elseif true#maximum(P) > size(P, 1) # regular representation makes things worse
-            @info "Regular representation not worth it for block $mu"
+            # @info "Regular representation not worth it for block $mu"
             symmetrize = Dict()
             ind = 1
             for i in 1:maximum(P)
@@ -371,10 +371,10 @@ function computeRazborovBasis!(
             # @info "Cannot reduce $mu from $(size(P,1)) (squared $(size(P,1)^2))to $(maximum(P)) " 
         else # regular representation makes things better
             # reg, factors = regularRepresentation(P)
-            @info "Computing regular representation for block $mu"
+            # @info "Computing regular representation for block $mu"
             reg = regularRepresentation(P)
             # @show factors
-            @info "Symmetrizing regular representation for block $mu"
+            # @info "Symmetrizing regular representation for block $mu"
             symmetrizedReg = Dict()
             # for (i, B) in reg
             #     @show i
@@ -405,7 +405,7 @@ function computeRazborovBasis!(
         end
         # M.blockSymmetry[mu] = (pattern=P, gen=newGen)
     end
-    @info "Block symmetries found"
+    # @info "Block symmetries found"
 
     # @info "Computing regular representation, if advantageous"
 
@@ -418,7 +418,7 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
     # m.sdpData = Dict()
 
     for (muc, (mu, B)) in enumerate(m.basis)
-        @show muc, maximum(m.blockSymmetry[mu].pattern), length(B), mu
+        # @show muc, maximum(m.blockSymmetry[mu].pattern), length(B), mu
 
         # mu == Hypergraph{3,5}(zeros(Bool, 0,6))
 

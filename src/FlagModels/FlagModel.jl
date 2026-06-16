@@ -550,7 +550,7 @@ function buildJuMPModel(
 
     if m.objective !== nothing
         ∅ = get_translate(one(T))
-        @show ∅
+        # @show ∅
 
         if !m.onlyFeasibility
             t = @variable(jumpModel, base_name = "t")
@@ -569,7 +569,7 @@ function buildJuMPModel(
         end
         for (G, c) in variables
             if isAllowed(m, G) #&& (G != T())# || T() in keys(objective.coeff))
-                @show G
+                # @show G
                 @assert G == labelCanonically(G)
                 ## TODO: For some bases, such as induced and non-induced, <= is enough here.
                 # push!(constraints, c == (haskey(objective.coeff, G) ? objective.coeff[G] : 0))  
