@@ -10,6 +10,7 @@ struct ProductFlag{FT} <: Flag where {FT<:Tuple{Vararg{Flag}}}
     Fs::FT
 
     ProductFlag{FT}(Fs::FT) where {FT} = new{FT}(Fs)
+    ProductFlag(Fs::FT) where {FT} = new{FT}(Fs)
     ProductFlag{FT}() where {FT} = new{FT}(Tuple(F() for F in fieldtypes(FT)))
     ProductFlag{FT}(f::F, i::Int) where {FT,F} = new{FT}(Tuple(k == i ? f : G() for (k, G) in pairs(fieldtypes(FT))))
     ProductFlag{FT}(fis::Tuple{F,Int}...) where {FT,F} = begin
