@@ -16,7 +16,9 @@ struct PartiallyLabeledFlag{T} <: Flag where {T<:Flag}
         return new(F, n)
     end
     PartiallyLabeledFlag(F::T, n::Int) where {T<:Flag} = PartiallyLabeledFlag{T}(F, n)
-    PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag} = PartiallyLabeledFlag{T}(T(opts...), n)
+    function PartiallyLabeledFlag{T}(opts::Vararg; n::Int=0) where {T<:Flag}
+        PartiallyLabeledFlag{T}(T(opts...), n)
+    end
     PartiallyLabeledFlag(F::T; n::Int=0) where {T<:Flag} = PartiallyLabeledFlag{T}(F, n)
     PartiallyLabeledFlag{T}(F::T; n::Int=0) where {T<:Flag} = PartiallyLabeledFlag{T}(F, n)
 
@@ -54,14 +56,17 @@ function free_verts(F::QuantumFlag{T,D}) where {T<:Flag,D}
 end
 
 function free_verts(F::PartiallyLabeledFlag{T}) where {T<:Flag}
-    return size(F) - F.n 
+    return size(F) - F.n
+end
+
+function unlabel_fact(F::PartiallyLabeledFlag)
+    return (factorial(free_verts(F)) // factorial(free_verts(F.F))) *
+           (aut(F.F).size // aut(F).size)
 end
 
 function unlabel(F::PartiallyLabeledFlag{T}) where {T<:Flag}
     if is_up_to_iso(T)
-        return (factorial(free_verts(F)) // factorial(free_verts(F.F))) *
-               (aut(F.F).size // aut(F).size) *
-               F.F
+        return unlabel_fact(F) * F.F
     else
         return F.F
     end
@@ -139,7 +144,7 @@ function Base.:*(
     m = size(G)
 
     # @show F, G, vcat(1:(F.n), (m+1):(m+n-F.n))
-    return glue(F, G, vcat(1:(F.n), (m+1):(m+n-F.n)); isAllowed=isAllowed)
+    return glue(F, G, vcat(1:(F.n), (m + 1):(m + n - F.n)); isAllowed=isAllowed)
 end
 
 function subFlag(
@@ -203,10 +208,10 @@ function glueFinite(
     N,
     F::PartiallyLabeledFlag{T},
     G::PartiallyLabeledFlag{T},
-    p::AbstractVector{Int}=vcat(1:(F.n), (size(G)+1):(size(G)+size(F)-F.n));
+    p::AbstractVector{Int}=vcat(1:(F.n), (size(G) + 1):(size(G) + size(F) - F.n));
     labelFlags=true,
     # isAllowed=(f) -> true,
-    base_model=nothing
+    base_model=nothing,
 ) where {T<:Flag}
     # return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, isAllowed=isAllowed)
     return glueFinite_internal(N, F, G, p; labelFlags=labelFlags, base_model=base_model)
@@ -269,7 +274,7 @@ function findUnknownGenerationPredicates(
     end
     return [
         LabelPredicate[
-            LabelPredicate(i) for i in (F.n+1):size(F) if !(i in vcat(fixed...))
+            LabelPredicate(i) for i in (F.n + 1):size(F) if !(i in vcat(fixed...))
         ],
     ]
 end
@@ -308,7 +313,7 @@ function addPredicates(F::PartiallyLabeledFlag{T}, preds::Vector{U}) where {T<:F
 
         newLabels = setdiff!([p.i for p in labelPreds], 1:(F.n))
 
-        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n+1):size(F), newLabels))
+        pGoal = vcat(1:(F.n), newLabels, setdiff((F.n + 1):size(F), newLabels))
         p = zeros(Int, size(F))
         for i in 1:size(F)
             p[pGoal[i]] = i
@@ -370,7 +375,6 @@ function QuantumFlag{T}(F::QuantumFlag{PartiallyLabeledFlag{T},D}) where {T<:Fla
     # return res
     return unlabel(F)
 end
-
 
 function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
     if p isa LabelPredicate
