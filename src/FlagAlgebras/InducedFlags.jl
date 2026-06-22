@@ -774,3 +774,111 @@ function sample_coefficients(
 
     return idx_flags, glue_flags, res
 end
+
+# Computes all products of flags which result, after partial downwards operator, in a quantum flag of type unlabeled_type. If labeled_type !== nothing, only computes products of flags of type labeled_type, otherwise all.
+function sample_coefficients_downwards(
+    ::Type{InducedFlag{T,UpToIso}},
+    n::Int,
+    unlabeled_type::InducedFlag{T,UpToIso} = one(InducedFlag{T, UpToIso});
+    labeled_type = nothing,
+    n_outer::Int=n,
+    base_model=nothing,
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
+        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+        n_outer,
+        [size(unlabeled_type), 10000];
+        initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(unlabeled_type, size(type)),
+        withProperty=x -> isAllowed(base_model, x),
+        withPropertyMarked=x -> isAllowed(base_model, x),
+    ),
+    N=:limit,
+    only_balanced=true,
+) where {T<:Flag,UpToIso}
+    # print("Sampling $T for n=$n@$n_outer of type $type            \r")
+    @assert UpToIso
+    k = size(unlabeled_type)
+
+    only_balanced && @assert iseven(n - k)
+    t = only_balanced ? Int((n - k) / 2) : n
+
+    idx_flags = only_balanced ? filter(x -> size(x) == t + k, all_flags) : all_flags
+    # glue_flags = N == :limit ? filter(x -> size(x) == n_outer, all_flags) : all_flags
+    glue_flags = filter(x -> size(x) == n_outer, all_flags)
+
+    res = Dict()
+    lck = Threads.SpinLock()
+
+    # @show length(glue_flags)
+
+    n_additional = n_outer - n
+    @assert n_additional >= 0
+
+    for t1 in 0:(n-k)
+        only_balanced && t1 != t && continue
+
+        Threads.@threads for G in glue_flags
+            nG = size(G)
+            n_free = nG - k
+
+            for c in combinations((k+1):nG, t1)
+                F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
+
+                other = N == :limit ? setdiff((k+1):nG, c) : ((k+1):nG)
+
+                # k + t1 + t2 <= n
+                # t2 <= n - k - t1
+                for t2 in 0:(n-k-t1)
+                    # for t2 in 0:(n-k)
+
+                    only_balanced && t2 != t && continue
+
+                    for d in combinations(other, t2)
+                        F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d))))
+
+                        ov = N == :limit ? 0 : length(intersect(c, d))
+
+                        # Number of ways to place the two sets of free verts
+                        # fact = if N == :limit
+                        #     1 // (binomial(n_free, t1))
+                        # else
+                        # end
+                        fact =
+                            1 // (
+                                binomial(n_free, ov) *
+                                binomial(n_free - ov, t1 - ov) *
+                                binomial(n_free - t1, t2 - ov)
+                                # binomial(n_free+n_additional, n_free)
+                            )
+
+                        # Probability to hit n_free many vertices
+                        fact2 = if N == :limit
+                            1 // 1
+                        else
+                            (
+                                binomial(N - k, ov) *
+                                binomial(N - k - ov, t1 - ov) *
+                                binomial(N - k - t1, t2 - ov)
+                            ) // (binomial(N - k, t1) * binomial(N - k, t2))
+                        end
+
+                        lock(lck) do
+                            res[(F1, F2)] =
+                                get(
+                                    res,
+                                    (F1, F2),
+                                    QuantumFlag{
+                                        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
+                                        Rational{Int},
+                                    }(),# - glueFinite(N, F1, F2),
+                                )
+                            res[(F1, F2)].coeff[G] = get(res[(F1, F2)].coeff, G, 0//1) + fact * fact2
+                        end
+                    end
+
+                end
+            end
+        end
+    end
+
+    return idx_flags, glue_flags, res
+end
