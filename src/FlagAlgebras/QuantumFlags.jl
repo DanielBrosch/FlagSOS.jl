@@ -285,3 +285,15 @@ import Base.convert
 function Base.convert(::Type{QuantumFlag{T,D}}, F::QuantumFlag{T,D2}) where {T<:Flag,D,D2}
     return QuantumFlag{T,D}(F.coeff)
 end
+
+function to_bernard(F::QuantumFlag{T,D}) where {T,D}
+    res = ""
+    first = true
+    for (F,c) in F.coeff 
+        if !first
+            res *= " + "
+        end
+        res *= to_bernard(F)
+        first = false
+    end
+end

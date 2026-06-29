@@ -383,3 +383,9 @@ function isAllowed(F::PartiallyLabeledFlag{T}, p) where {T}
         return isAllowed(F.F, p)
     end
 end
+
+function to_bernard(F::PartiallyLabeledFlag)
+    res = "$(size(F)) $(F.n) "
+    res *= to_bernard(F.F)
+    return res
+end

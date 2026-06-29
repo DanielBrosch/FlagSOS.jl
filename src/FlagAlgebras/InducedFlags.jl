@@ -321,7 +321,8 @@ function distinguish(
 end
 
 function isolatedVertices(F::InducedFlag{T,UpToIso})::BitVector where {T<:Flag,UpToIso}
-    return isolatedVertices(F.F)
+    # return isolatedVertices(F.F)
+    return BitVector((false for _ in 1:size(F)))
 end
 
 function isAllowed(F::InducedFlag{T,UpToIso}, e) where {T<:Flag,UpToIso}
@@ -881,4 +882,8 @@ function sample_coefficients_downwards(
     end
 
     return idx_flags, glue_flags, res
+end
+
+function to_bernard(F::InducedFlag)
+    return to_bernard(F.F)
 end

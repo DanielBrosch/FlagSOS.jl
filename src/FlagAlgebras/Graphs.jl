@@ -267,3 +267,14 @@ function connectedComponents(G::Graph)::Vector{Graph}
     end
     return [subFlag(G, findall(x->x==u, components)) for u in unique(components)]
 end
+
+function to_bernard(F::Graph)
+    n = size(F)
+    res = ""
+    for i = 1:n 
+        for j = i+1:n 
+            res *= "$(F.A[i,j] + 1) "
+        end
+    end
+    return res
+end

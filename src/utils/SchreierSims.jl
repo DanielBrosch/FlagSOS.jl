@@ -39,7 +39,16 @@ mutable struct Group
 end
 
 function Base.show(io::IO, T::Group)
-    return print(io, "Group of order $(T.order) with generators $(T.gen)")
+    return print(io, "Group of order $(order(T)) with generators $(T.gen)")
+end
+
+function inv_perm(v::Vector{Int})
+    n = length(v)
+    res = zeros(Int, n)
+    for i in 1:n
+        res[v[i]] = i
+    end
+    return res
 end
 
 function orbit(G::Group, v::Int)
@@ -208,9 +217,9 @@ function schreier_sims!(G0::Union{Group,Nothing})
     end
 end
 
-function sift(G::Union{Group, Nothing}, p::Vector{Int})
-    if G === nothing 
-        return p 
+function sift(G::Union{Group,Nothing}, p::Vector{Int})
+    if G === nothing
+        return p
     end
     if length(G.gen) == 0 || issorted(p)# == 1:length(p)
         return p
@@ -232,9 +241,9 @@ end
 # sift(::Nothing, p::Vector{Int}) = p
 
 # adds p to G, returns true if changed
-function addGen!(G::Union{Group, Nothing}, p::Vector{Int})
-    if G === nothing 
-        return false 
+function addGen!(G::Union{Group,Nothing}, p::Vector{Int})
+    if G === nothing
+        return false
     end
     q = sift(G, p)
     # if !isone(q)
@@ -275,6 +284,59 @@ function order(G::Group)
     return length(G.O) * order(G.subGroup)
 end
 
+function compose(p::Vector{Int}, q::Vector{Int})
+    @assert length(p) == length(q)
+    r = similar(p)
+    @inbounds for i in 1:length(p)
+        r[i] = p[q[i]]
+    end
+    return r
+end
+
+Base.eltype(::Type{Group}) = Vector{Int}
+Base.length(G::Group) = order(G)
+
+function Base.iterate(G::Group)
+    if G.b == -1
+        return (collect(1:G.n), nothing)
+    end
+    cosets = [findInvRepr(G, i) for i in G.O]
+    if G.subGroup === nothing || G.subGroup.b == -1
+        return (cosets[1], (cosets, 1, nothing))
+    end
+    sub_iter = iterate(G.subGroup)
+    if sub_iter === nothing
+        return (cosets[1], (cosets, 1, nothing))
+    end
+    h, substate = sub_iter
+    return (compose(cosets[1], h), (cosets, 1, substate))
+end
+
+function Base.iterate(G::Group, state)
+    state === nothing && return nothing
+    cosets, coset_index, substate = state
+    if substate !== nothing
+        sub_iter = iterate(G.subGroup, substate)
+        if sub_iter !== nothing
+            h, substate_new = sub_iter
+            return (compose(cosets[coset_index], h), (cosets, coset_index, substate_new))
+        end
+    end
+    coset_index += 1
+    if coset_index > length(cosets)
+        return nothing
+    end
+    if G.subGroup === nothing || G.subGroup.b == -1
+        return (cosets[coset_index], (cosets, coset_index, nothing))
+    end
+    sub_iter = iterate(G.subGroup)
+    if sub_iter === nothing
+        return (cosets[coset_index], (cosets, coset_index, nothing))
+    end
+    h, substate_new = sub_iter
+    return (compose(cosets[coset_index], h), (cosets, coset_index, substate_new))
+end
+
 function Base.in(p::Vector{Int}, G::Group)
     # isone(sift(G, p))
     return sift(G, p) == 1:(G.n)
@@ -294,15 +356,15 @@ function stabilizer(G::Group, S::Vector{Int})
 end
 
 # returns same group as stabilizer(G, S), but modifies stabilizer chain of G in the process
-function stabilizer!(G::Union{Group, Nothing}, S::Vector{Int}, keepOrder=false)
+function stabilizer!(G::Union{Group,Nothing}, S::Vector{Int}, keepOrder=false)
     if G === nothing
-        return G 
+        return G
     end
     if keepOrder
         # order = vcat(S, setdiff(1:(G.n), S))
         # G.order = order
         G.order[1:length(S)] .= S
-        G.order[length(S)+1:end] .= setdiff(1:(G.n), S)
+        G.order[(length(S) + 1):end] .= setdiff(1:(G.n), S)
         schreier_sims!(G)
         while G.b in S
             G = G.subGroup
@@ -316,16 +378,16 @@ function stabilizer!(G::Union{Group, Nothing}, S::Vector{Int}, keepOrder=false)
             push!(covered, G2.b)
             G2 = G2.subGroup
         end
-        if G2 === nothing 
-            return G2 
+        if G2 === nothing
+            return G2
         end
         # order = vcat(covered, setdiff(S, covered), setdiff(1:(G2.n), S))
         # G2.order = order
         G2.n > 0 && resize!(G2.order, G2.n)
-        G2.order[1:length(covered)] .= covered 
+        G2.order[1:length(covered)] .= covered
         SnC = setdiff(S, covered)
-        G2.order[length(covered)+1:length(covered)+length(SnC)] .= SnC
-        @views G2.order[length(covered)+length(SnC)+1:end] .= setdiff(1:(G2.n), S)
+        G2.order[(length(covered) + 1):(length(covered) + length(SnC))] .= SnC
+        @views G2.order[(length(covered) + length(SnC) + 1):end] .= setdiff(1:(G2.n), S)
         schreier_sims!(G2)
         while G2.b in S
             G2 = G2.subGroup
@@ -362,5 +424,6 @@ function permute!(gr::Union{Group,Nothing}, per::Vector{Int})
     if length(gr.subGroup.gen) > 0
         permute!(gr.subGroup, per)
     end
+    schreier_sims!(gr)
     return gr
 end
