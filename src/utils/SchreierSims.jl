@@ -27,6 +27,13 @@ mutable struct Group
             schreier_sims!(G)
         end
         return G
+        # n = length(gens[1])
+        # G = Group(n)
+        # G.order .= order 
+        # for gen in gens 
+        #     addGen!(G, gen)
+        # end
+        # return G
     end
 
     function Group(gen::Vector{Int}, order=1:length(gen))
@@ -309,7 +316,8 @@ function Base.iterate(G::Group)
         return (cosets[1], (cosets, 1, nothing))
     end
     h, substate = sub_iter
-    return (compose(cosets[1], h), (cosets, 1, substate))
+    # return (compose(cosets[1], h), (cosets, 1, substate))
+    return (compose(h, cosets[1]), (cosets, 1, substate))
 end
 
 function Base.iterate(G::Group, state)
@@ -319,7 +327,8 @@ function Base.iterate(G::Group, state)
         sub_iter = iterate(G.subGroup, substate)
         if sub_iter !== nothing
             h, substate_new = sub_iter
-            return (compose(cosets[coset_index], h), (cosets, coset_index, substate_new))
+            # return (compose(cosets[coset_index], h), (cosets, coset_index, substate_new))
+            return (compose(h, cosets[coset_index]), (cosets, coset_index, substate_new))
         end
     end
     coset_index += 1
@@ -334,7 +343,8 @@ function Base.iterate(G::Group, state)
         return (cosets[coset_index], (cosets, coset_index, nothing))
     end
     h, substate_new = sub_iter
-    return (compose(cosets[coset_index], h), (cosets, coset_index, substate_new))
+    # return (compose(cosets[coset_index], h), (cosets, coset_index, substate_new))
+    return (compose(h, cosets[coset_index]), (cosets, coset_index, substate_new))
 end
 
 function Base.in(p::Vector{Int}, G::Group)
