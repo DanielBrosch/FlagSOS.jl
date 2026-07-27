@@ -358,7 +358,11 @@ function stabilizer(G::Group, S::Vector{Int})
     while H.b in S
         H = H.subGroup
     end
-    H = Group(H.gen, order)
+    if length(H.gen) == 0
+        H = Group(G.n)
+    else
+        H = Group(H.gen, order)
+    end
     while H.b in S
         H = H.subGroup
     end
@@ -374,7 +378,7 @@ function stabilizer!(G::Union{Group,Nothing}, S::Vector{Int}, keepOrder=false)
         # order = vcat(S, setdiff(1:(G.n), S))
         # G.order = order
         G.order[1:length(S)] .= S
-        G.order[(length(S) + 1):end] .= setdiff(1:(G.n), S)
+        G.order[(length(S)+1):end] .= setdiff(1:(G.n), S)
         schreier_sims!(G)
         while G.b in S
             G = G.subGroup
@@ -396,8 +400,8 @@ function stabilizer!(G::Union{Group,Nothing}, S::Vector{Int}, keepOrder=false)
         G2.n > 0 && resize!(G2.order, G2.n)
         G2.order[1:length(covered)] .= covered
         SnC = setdiff(S, covered)
-        G2.order[(length(covered) + 1):(length(covered) + length(SnC))] .= SnC
-        @views G2.order[(length(covered) + length(SnC) + 1):end] .= setdiff(1:(G2.n), S)
+        G2.order[(length(covered)+1):(length(covered)+length(SnC))] .= SnC
+        @views G2.order[(length(covered)+length(SnC)+1):end] .= setdiff(1:(G2.n), S)
         schreier_sims!(G2)
         while G2.b in S
             G2 = G2.subGroup
