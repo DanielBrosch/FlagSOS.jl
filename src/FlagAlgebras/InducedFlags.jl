@@ -746,7 +746,7 @@ end
 """
     sample_coefficients_downwards(InducedFlag{T,UpToIso}, n,
                                   unlabeled_type=one(InducedFlag{T,UpToIso});
-                                  labeled_type=nothing, n_outer=n, N=:limit,
+                                  labeled_type=nothing, max_type_size=n, n_outer=n, N=:limit,
                                   only_balanced=true, ...)
 
 Sample products for extension types containing the fixed base `unlabeled_type`,
@@ -762,13 +762,16 @@ If `labeled_type` is supplied, restrict to that exact extension type, preserving
 its vertex labels. Otherwise canonicalize extension types while fixing the base
 vertices pointwise. Balanced products have total degree `n`; unbalanced sampling
 includes every pair of total degree at most `n`. Finite `N` includes overlapping
-petals. `all_flags`, when supplied, must consist of flags of the base type.
+petals. `max_type_size` limits the number of labels in the extension types without
+changing the product degree. `all_flags`, when supplied, must consist of flags of
+the base type.
 """
 function sample_coefficients_downwards(
     ::Type{InducedFlag{T,UpToIso}},
     n::Int,
     unlabeled_type::InducedFlag{T,UpToIso}=one(InducedFlag{T,UpToIso});
     labeled_type::Union{Nothing,InducedFlag{T,UpToIso}}=nothing,
+    max_type_size::Int=n,
     n_outer::Int=n,
     base_model=nothing,
     all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
@@ -785,14 +788,16 @@ function sample_coefficients_downwards(
     @assert UpToIso
     k = size(unlabeled_type)
     @assert k <= n <= n_outer
+    @assert k <= max_type_size <= n
 
     target_type = nothing
     target_perm_inv = Int[]
     type_sizes = if labeled_type === nothing
-        only_balanced ? (n:-2:k) : (n:-1:k)
+        largest_type = only_balanced ? max_type_size - mod(n-max_type_size, 2) : max_type_size
+        only_balanced ? (largest_type:-2:k) : (largest_type:-1:k)
     else
         s = size(labeled_type)
-        @assert k <= s <= n
+        @assert k <= s <= max_type_size
         @assert subFlag(labeled_type, 1:k) == unlabeled_type
         only_balanced && @assert iseven(n - s)
         target_type, _, target_perm = _label_sampling_type(labeled_type, k)

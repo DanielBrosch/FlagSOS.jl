@@ -413,11 +413,65 @@ function computeRazborovBasis!(
     return reducedBasis#, blockSizes
 end
 
-function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
+# Sampling removes the extension labels, so a simultaneous permutation of those
+# labels in both factors does not change the result. Match the sampler's type
+# convention and flatten any nested label wrapper before looking up products.
+function _canonical_sampling_basis(basis, base_type)
+    _, _, p = _label_sampling_type(type(first(basis)), size(base_type))
+    flags = [
+        labelCanonically(PartiallyLabeledFlag(
+            permute(F.F, vcat(p, (F.n+1):size(F))), F.n,
+        )) for F in basis
+    ]
+    return (base_type=base_type, flags=flags)
+end
+
+_razborov_sampling_basis(basis) = nothing
+
+function _razborov_sampling_basis(
+    basis::Vector{PartiallyLabeledFlag{InducedFlag{T,true}}}
+) where {T}
+    isempty(basis) && return nothing
+    return _canonical_sampling_basis(basis, one(InducedFlag{T,true}))
+end
+
+function _razborov_sampling_basis(
+    basis::Vector{PartiallyLabeledFlag{PartiallyLabeledFlag{InducedFlag{T,true}}}}
+) where {T}
+    isempty(basis) && return nothing
+    base_type = type(first(basis).F)
+    flat_basis = [PartiallyLabeledFlag(F.F.F, F.n) for F in basis]
+    return _canonical_sampling_basis(flat_basis, base_type)
+end
+
+"""
+    computeSDP!(m::RazborovModel, reservedVerts; use_downwards=true)
+
+Compute SDP coefficients. Induced flags up to isomorphism share a downwards
+sampling pass across extension types, including bases with retained labels.
+Set `use_downwards=false` to use fixed-type sampling for comparison.
+"""
+function computeSDP!(
+    m::RazborovModel{T,N,D}, reservedVerts::Int; use_downwards=true
+) where {T,N,D}
     sdpData = Dict()
     # m.sdpData = Dict()
+    sampling_cache = m.parentModel isa FlagModel ? m.parentModel.glue_cache : Dict()
+    population = N == :limit ? N : N - reservedVerts
+    sampling_bases = Dict()
+    max_type_sizes = Dict()
+    if use_downwards
+        for (mu, B) in m.basis
+            sampled = _razborov_sampling_basis(B)
+            sampled === nothing && continue
+            sampling_bases[mu] = sampled
+            base = sampled.base_type
+            max_type_sizes[base] = max(get(max_type_sizes, base, 0), maximum(F.n for F in B))
+        end
+    end
 
     for (muc, (mu, B)) in enumerate(m.basis)
+        sampling_basis = get(sampling_bases, mu, nothing)
         # print("Computing block $muc  / $(length(m.basis))         ")
         # @show muc, maximum(m.blockSymmetry[mu].pattern), length(B), mu
 
@@ -499,32 +553,31 @@ function computeSDP!(m::RazborovModel{T,N,D}, reservedVerts::Int) where {T,N,D}
                 # t = labelCanonically(t)
 
             else
-                if N == :limit
-                    # @show a
-                    # @show b
-                    # @show mu
-                    # println()
-                    # @show T1
-                    # @show T2
-                    # @show p1Fin
+                if sampling_basis === nothing
                     t = glueFinite(
-                        N,
-                        a,
-                        b;
-                        labelFlags=true,
-                        isAllowed=(f) -> isAllowed(m.parentModel, f),
-                    )
-                    # @info "done"
-                    # @show t
-                else
-                    t = glueFinite(
-                        N - reservedVerts, a, b; labelFlags=true, base_model=m.parentModel
+                        population, a, b; labelFlags=true, base_model=m.parentModel
                     )
                     t = labelCanonically(unlabel(t))
-                    # @assert t == labelCanonically(t)
-                    # t = labelCanonically(
-                    #     add_verts(m.parentModel, labelCanonically(unlabel(t)), m.lvl)
-                    # )
+                else
+                    base_type = sampling_basis.base_type
+                    degree = size(a) + size(b) - a.n
+                    balanced = size(a) == size(b)
+                    max_type_size = min(degree, max_type_sizes[base_type])
+                    cache_key = (
+                        :sample_coefficients_downwards, typeof(base_type), degree,
+                        base_type, population, balanced, max_type_size,
+                    )
+                    products = get!(sampling_cache, cache_key) do
+                        sample_coefficients_downwards(
+                            typeof(base_type), degree, base_type;
+                            N=population, only_balanced=balanced, base_model=m.parentModel,
+                            max_type_size=max_type_size,
+                        )[3]
+                    end
+                    pair = (sampling_basis.flags[i], sampling_basis.flags[j])
+                    product = get(products, pair, nothing)
+                    t = product === nothing ? QuantumFlag{T,Rational{Int}}() :
+                        labelCanonically(QuantumFlag{T}(product))
                 end
                 if is_up_to_iso(T)
                     t = (up_to_iso_fact(a) * up_to_iso_fact(b)) * t

@@ -46,7 +46,7 @@ function reference_sample(n, type; n_outer=n, N=:limit, only_balanced=true,
 end
 
 function reference_downwards(n, base; n_outer=n, N=:limit, only_balanced=true,
-                             labeled_type=nothing, base_model=nothing)
+                             labeled_type=nothing, max_type_size=n, base_model=nothing)
     k = size(base)
     types = if labeled_type === nothing
         extensions = generateAll(
@@ -56,7 +56,7 @@ function reference_downwards(n, base; n_outer=n, N=:limit, only_balanced=true,
         )
         unique(IG[
             iszero(k) ? labelCanonically(F.F) : F.F for F in extensions
-            if !only_balanced || iseven(n-size(F))
+            if size(F) <= max_type_size && (!only_balanced || iseven(n-size(F)))
         ])
     else
         [labeled_type]
@@ -128,6 +128,10 @@ end
         for base in (empty_type, vertex), N in (:limit, 7)
             check_downwards(3, base; N=N, only_balanced=false)
         end
+        for max_type_size in (2, 3), N in (:limit, 20)
+            check_downwards(4, empty_type; N=N, max_type_size=max_type_size)
+        end
+        check_downwards(3, vertex; N=7, only_balanced=false, max_type_size=2)
     end
 
     @testset "Requested extension labels" begin
