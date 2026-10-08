@@ -48,4 +48,8 @@ end
     @testset "Harmonic Flags" begin 
         _include_sandbox("src/HarmonicFlags.jl")
     end
+
+    @testset "Coefficient Sampling" begin
+        _include_sandbox("src/CoefficientSampling.jl")
+    end
 end

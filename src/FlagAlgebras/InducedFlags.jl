@@ -630,6 +630,85 @@ function sample_coefficients_old(
     return idx_flags, glue_flags, res
 end
 
+# Label extension types relative to their fixed base labels. With an empty base,
+# use the underlying flag, matching InducedFlag's canonical labeling convention.
+function _label_sampling_type(F::InducedFlag, k::Int)
+    input = iszero(k) ? F.F : PartiallyLabeledFlag(F, k)
+    canonical, type_aut, _, p = label(input; removeIsolated=false)
+    canonical_type = iszero(k) ? typeof(F)(canonical) : canonical.F
+    return canonical_type, type_aut, convert(Vector{Int}, p)
+end
+
+# Entry ov + 1 is the sampling weight for two petals with overlap ov.
+function _petal_sampling_weights(N, n_outer::Int, type_size::Int, a::Int, b::Int)
+    n_free = n_outer - type_size
+    if N == :limit
+        return [1 // (binomial(n_free, a) * binomial(n_free - a, b))]
+    end
+
+    population_free = N - type_size
+    pair_count = binomial(population_free, a) * binomial(population_free, b)
+    # The ratio of pair counts for a fixed overlap equals the ratio of union counts.
+    return [
+        (binomial(population_free, a + b - ov) // binomial(n_free, a + b - ov)) /
+        pair_count for ov in 0:min(a, b)
+    ]
+end
+
+function _sample_flag_products!(
+    res,
+    G::FT,
+    output_flag::FT,
+    n::Int,
+    N,
+    only_balanced::Bool,
+    sampling_weights,
+    unlabel_factor::Rational{Int},
+) where {FT<:PartiallyLabeledFlag}
+    type_size = G.n
+    n_outer = size(G)
+    non_type_verts = (type_size+1):n_outer
+    max_petal_size = n - type_size
+    half_size = div(max_petal_size, 2)
+    first_sizes = only_balanced ? (half_size:half_size) : (0:max_petal_size)
+
+    for a in first_sizes
+        second_sizes = only_balanced ? (a:a) : (0:(max_petal_size-a))
+        for S1 in combinations(non_type_verts, a)
+            F1 = labelCanonically(subFlag(G, vcat(1:type_size, S1)))
+            other_vertices = N == :limit ? setdiff(non_type_verts, S1) : non_type_verts
+
+            for b in second_sizes
+                weights = get!(sampling_weights, (type_size, a, b)) do
+                    _petal_sampling_weights(N, n_outer, type_size, a, b)
+                end
+                for S2 in combinations(other_vertices, b)
+                    ov = N == :limit ? 0 : length(intersect(S1, S2))
+                    F2 = labelCanonically(subFlag(G, vcat(1:type_size, S2)))
+                    product = get!(res, (F1, F2)) do
+                        QuantumFlag{FT,Rational{Int}}()
+                    end
+                    product.coeff[output_flag] =
+                        get(product.coeff, output_flag, 0 // 1) + weights[ov+1] * unlabel_factor
+                end
+            end
+        end
+    end
+    return res
+end
+
+"""
+    sample_coefficients(InducedFlag{T,UpToIso}, n, type;
+                        n_outer=n, N=:limit, only_balanced=true, ...)
+
+Sample products of flags with the given fixed `type`. Return
+`(idx_flags, glue_flags, coefficients)`, where `coefficients[(F, G)]` is a
+quantum flag on `n_outer` vertices retaining all labels of `type`.
+
+Balanced products have `size(F) == size(G) == (n + size(type)) / 2`.
+Otherwise include all pairs with `size(F) + size(G) - size(type) <= n`.
+Finite `N` includes overlaps between the free vertices of the two factors.
+"""
 function sample_coefficients(
     ::Type{InducedFlag{T,UpToIso}},
     n::Int,
@@ -640,247 +719,127 @@ function sample_coefficients(
         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
         n_outer,
         [size(type), 10000];
-        initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(type, size(type)),
+        initial_flag=PartiallyLabeledFlag(type, size(type)),
         withProperty=x -> isAllowed(base_model, x),
         withPropertyMarked=x -> isAllowed(base_model, x),
     ),
     N=:limit,
     only_balanced=true,
 ) where {T<:Flag,UpToIso}
-    # print("Sampling $T for n=$n@$n_outer of type $type            \r")
     @assert UpToIso
     k = size(type)
-
+    @assert k <= n <= n_outer
     only_balanced && @assert iseven(n - k)
-    t = only_balanced ? Int((n - k) / 2) : n
 
-    idx_flags = only_balanced ? filter(x -> size(x) == t + k, all_flags) : all_flags
-    # glue_flags = N == :limit ? filter(x -> size(x) == n_outer, all_flags) : all_flags
-    glue_flags = filter(x -> size(x) == n_outer, all_flags)
+    idx_flags = only_balanced ? filter(F -> size(F) == k + div(n - k, 2), all_flags) : all_flags
+    glue_flags = filter(F -> size(F) == n_outer, all_flags)
+    FT = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
+    res = Dict{Tuple{FT,FT},QuantumFlag{FT,Rational{Int}}}()
+    sampling_weights = Dict{NTuple{3,Int},Vector{Rational{Int}}}()
 
-    res = Dict()
-    lck = Threads.SpinLock()
-
-    # @show length(glue_flags)
-
-    n_additional = n_outer - n
-    @assert n_additional >= 0
-
-    for t1 in 0:(n-k)
-        only_balanced && t1 != t && continue
-
-        Threads.@threads for G in glue_flags
-            nG = size(G)
-            n_free = nG - k
-
-            for c in combinations((k+1):nG, t1)
-                F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
-
-                other = N == :limit ? setdiff((k+1):nG, c) : ((k+1):nG)
-
-                # k + t1 + t2 <= n
-                # t2 <= n - k - t1
-                for t2 in 0:(n-k-t1)
-                    # for t2 in 0:(n-k)
-
-                    only_balanced && t2 != t && continue
-
-                    for d in combinations(other, t2)
-                        F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d))))
-
-                        ov = N == :limit ? 0 : length(intersect(c, d))
-
-                        # Number of ways to place the two sets of free verts
-                        # fact = if N == :limit
-                        #     1 // (binomial(n_free, t1))
-                        # else
-                        # end
-                        fact =
-                            1 // (
-                                binomial(n_free, ov) *
-                                binomial(n_free - ov, t1 - ov) *
-                                binomial(n_free - t1, t2 - ov)
-                                # binomial(n_free+n_additional, n_free)
-                            )
-
-                        # Probability to hit n_free many vertices
-                        fact2 = if N == :limit
-                            1 // 1
-                        else
-                            (
-                                binomial(N - k, ov) *
-                                binomial(N - k - ov, t1 - ov) *
-                                binomial(N - k - t1, t2 - ov)
-                            ) // (binomial(N - k, t1) * binomial(N - k, t2))
-                        end
-
-                        lock(lck) do
-                            res[(F1, F2)] =
-                                get(
-                                    res,
-                                    (F1, F2),
-                                    QuantumFlag{
-                                        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-                                        Rational{Int},
-                                    }(),# - glueFinite(N, F1, F2),
-                                )
-                            res[(F1, F2)].coeff[G] = get(res[(F1, F2)].coeff, G, 0//1) + fact * fact2
-                        end
-                    end
-
-                end
-            end
-
-            # for ov in 0:(N == :limit ? 0 : t1)
-            #     t2 = n - k - t1 + ov
-
-            #     # ov = t1 + t2 - n_free + n_additional
-            #     @assert ov >= 0
-
-            #     @show n_free, t1, t2, ov, n_additional
-            #     @assert n_free == t1 + t2 - ov + n_additional
-
-            #     # if ov > 0 
-            #     #     fact2 *= 2
-            #     # end
-            #     # @show n, t, c, vcat(1:k, c), G
-            #     F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
-
-            #     # zero, unless finite FA
-            #     remaining_inds = setdiff((k+1):nG, c)
-
-            #     for other_inds in combinations(remaining_inds, t2 - ov)
-            #         for d in combinations(c, ov)
-            #             # @show n, nG, t, ov, c, d, other_inds, fact2
-            #             F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d, other_inds))))
-            #             # @show F1
-            #             # @show F2
-            #             @assert size(F1) == t1 + k
-            #             @assert size(F2) == t2 + k
-            #             res[(F1, F2)] =
-            #                 get(
-            #                     res,
-            #                     (F1, F2),
-            #                     QuantumFlag{
-            #                         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-            #                         Rational{Int},
-            #                     }(),# - glueFinite(N, F1, F2),
-            #                 ) + fact * fact2 * G
-            #         end
-
-            #     end
-            # end
-        end
+    for G in glue_flags
+        _sample_flag_products!(res, G, G, n, N, only_balanced, sampling_weights, 1 // 1)
     end
-
     return idx_flags, glue_flags, res
 end
 
-# Computes all products of flags which result, after partial downwards operator, in a quantum flag of type unlabeled_type. If labeled_type !== nothing, only computes products of flags of type labeled_type, otherwise all.
+"""
+    sample_coefficients_downwards(InducedFlag{T,UpToIso}, n,
+                                  unlabeled_type=one(InducedFlag{T,UpToIso});
+                                  labeled_type=nothing, n_outer=n, N=:limit,
+                                  only_balanced=true, ...)
+
+Sample products for extension types containing the fixed base `unlabeled_type`,
+then remove only the labels outside that base. Generate outer flags once for the
+base and reuse them across all extension types.
+
+Return `(idx_flags, glue_flags, coefficients)`. The first entry contains the
+distinct factors appearing in the products; the second contains the outer flags
+with the base labels. Keys of `coefficients` are pairs `(F, G)` of canonically
+labeled factors, and values retain exactly the base labels.
+
+If `labeled_type` is supplied, restrict to that exact extension type, preserving
+its vertex labels. Otherwise canonicalize extension types while fixing the base
+vertices pointwise. Balanced products have total degree `n`; unbalanced sampling
+includes every pair of total degree at most `n`. Finite `N` includes overlapping
+petals. `all_flags`, when supplied, must consist of flags of the base type.
+"""
 function sample_coefficients_downwards(
     ::Type{InducedFlag{T,UpToIso}},
     n::Int,
-    unlabeled_type::InducedFlag{T,UpToIso} = one(InducedFlag{T, UpToIso});
-    labeled_type = nothing,
+    unlabeled_type::InducedFlag{T,UpToIso}=one(InducedFlag{T,UpToIso});
+    labeled_type::Union{Nothing,InducedFlag{T,UpToIso}}=nothing,
     n_outer::Int=n,
     base_model=nothing,
     all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
         n_outer,
         [size(unlabeled_type), 10000];
-        initial_flag=PartiallyLabeledFlag{InducedFlag{T,UpToIso}}(unlabeled_type, size(type)),
+        initial_flag=PartiallyLabeledFlag(unlabeled_type, size(unlabeled_type)),
         withProperty=x -> isAllowed(base_model, x),
         withPropertyMarked=x -> isAllowed(base_model, x),
     ),
     N=:limit,
     only_balanced=true,
 ) where {T<:Flag,UpToIso}
-    # print("Sampling $T for n=$n@$n_outer of type $type            \r")
     @assert UpToIso
     k = size(unlabeled_type)
+    @assert k <= n <= n_outer
 
-    only_balanced && @assert iseven(n - k)
-    t = only_balanced ? Int((n - k) / 2) : n
+    target_type = nothing
+    target_perm_inv = Int[]
+    type_sizes = if labeled_type === nothing
+        only_balanced ? (n:-2:k) : (n:-1:k)
+    else
+        s = size(labeled_type)
+        @assert k <= s <= n
+        @assert subFlag(labeled_type, 1:k) == unlabeled_type
+        only_balanced && @assert iseven(n - s)
+        target_type, _, target_perm = _label_sampling_type(labeled_type, k)
+        target_perm_inv = inv_perm(target_perm)
+        s:s
+    end
 
-    idx_flags = only_balanced ? filter(x -> size(x) == t + k, all_flags) : all_flags
-    # glue_flags = N == :limit ? filter(x -> size(x) == n_outer, all_flags) : all_flags
-    glue_flags = filter(x -> size(x) == n_outer, all_flags)
+    FT = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
+    glue_flags = filter(F -> size(F) == n_outer, all_flags)
+    res = Dict{Tuple{FT,FT},QuantumFlag{FT,Rational{Int}}}()
+    sampling_weights = Dict{NTuple{3,Int},Vector{Rational{Int}}}()
 
-    res = Dict()
-    lck = Threads.SpinLock()
+    for G in glue_flags
+        covered_flags = Set{FT}()
+        base_ul_fact = unlabel_fact(G)
 
-    # @show length(glue_flags)
+        for type_size in type_sizes
+            non_type_verts = (type_size+1):n_outer
+            for extra_type_pos in combinations((k+1):n_outer, type_size - k)
+                type_pos = vcat(1:k, extra_type_pos)
+                extension_type, type_aut, type_perm =
+                    _label_sampling_type(subFlag(G.F, type_pos), k)
+                target_type !== nothing && extension_type != target_type && continue
 
-    n_additional = n_outer - n
-    @assert n_additional >= 0
+                vertex_order = vcat(type_pos[inv_perm(type_perm)], setdiff(1:n_outer, type_pos))
+                G_base = permute(G.F, inv_perm(vertex_order))
 
-    for t1 in 0:(n-k)
-        only_balanced && t1 != t && continue
+                for type_p in type_aut
+                    # Map a canonical extension back to the requested labels, if any.
+                    p = target_type === nothing ? type_p : target_perm_inv[type_p]
+                    G_flag = labelCanonically(PartiallyLabeledFlag(
+                        permute(G_base, vcat(p, non_type_verts)), type_size,
+                    ))
+                    G_flag in covered_flags && continue
+                    push!(covered_flags, G_flag)
 
-        Threads.@threads for G in glue_flags
-            nG = size(G)
-            n_free = nG - k
-
-            for c in combinations((k+1):nG, t1)
-                F1 = labelCanonically(subFlag(G, vcat(1:k, c)))
-
-                other = N == :limit ? setdiff((k+1):nG, c) : ((k+1):nG)
-
-                # k + t1 + t2 <= n
-                # t2 <= n - k - t1
-                for t2 in 0:(n-k-t1)
-                    # for t2 in 0:(n-k)
-
-                    only_balanced && t2 != t && continue
-
-                    for d in combinations(other, t2)
-                        F2 = labelCanonically(subFlag(G, sort!(vcat(1:k, d))))
-
-                        ov = N == :limit ? 0 : length(intersect(c, d))
-
-                        # Number of ways to place the two sets of free verts
-                        # fact = if N == :limit
-                        #     1 // (binomial(n_free, t1))
-                        # else
-                        # end
-                        fact =
-                            1 // (
-                                binomial(n_free, ov) *
-                                binomial(n_free - ov, t1 - ov) *
-                                binomial(n_free - t1, t2 - ov)
-                                # binomial(n_free+n_additional, n_free)
-                            )
-
-                        # Probability to hit n_free many vertices
-                        fact2 = if N == :limit
-                            1 // 1
-                        else
-                            (
-                                binomial(N - k, ov) *
-                                binomial(N - k - ov, t1 - ov) *
-                                binomial(N - k - t1, t2 - ov)
-                            ) // (binomial(N - k, t1) * binomial(N - k, t2))
-                        end
-
-                        lock(lck) do
-                            res[(F1, F2)] =
-                                get(
-                                    res,
-                                    (F1, F2),
-                                    QuantumFlag{
-                                        PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
-                                        Rational{Int},
-                                    }(),# - glueFinite(N, F1, F2),
-                                )
-                            res[(F1, F2)].coeff[G] = get(res[(F1, F2)].coeff, G, 0//1) + fact * fact2
-                        end
-                    end
-
+                    # Divide full downward factors to retain the base labels.
+                    unlabel_factor = unlabel_fact(G_flag) / base_ul_fact
+                    _sample_flag_products!(
+                        res, G_flag, G, n, N, only_balanced, sampling_weights, unlabel_factor
+                    )
                 end
             end
         end
     end
 
+    idx_flags = unique!(FT[F for pair in keys(res) for F in pair])
     return idx_flags, glue_flags, res
 end
 
