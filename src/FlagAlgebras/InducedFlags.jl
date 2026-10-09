@@ -663,6 +663,7 @@ function _sample_flag_products!(
     N,
     only_balanced::Bool,
     sampling_weights,
+    petal_labels,
     unlabel_factor::Rational{Int},
 ) where {FT<:PartiallyLabeledFlag}
     type_size = G.n
@@ -670,26 +671,63 @@ function _sample_flag_products!(
     non_type_verts = (type_size+1):n_outer
     max_petal_size = n - type_size
     half_size = div(max_petal_size, 2)
-    first_sizes = only_balanced ? (half_size:half_size) : (0:max_petal_size)
+    petal_sizes = only_balanced ? (half_size:half_size) : (0:max_petal_size)
 
+    # Classify each subset once, independently of its partner. Pair counting
+    # below needs only these class indices and the size of the intersection.
+    flags = FT[]
+    flag_indices = Dict{FT,Int}()
+    petals = Dict{Int,Vector{Tuple{Vector{Int},Int}}}()
+    subset_indices = Dict{Vector{Int},Int}()
+    for a in petal_sizes
+        subsets = Tuple{Vector{Int},Int}[]
+        for S in combinations(non_type_verts, a)
+            raw = subFlag(G, vcat(1:type_size, S))
+            F = get!(petal_labels, raw) do
+                labelCanonically(raw)
+            end
+            index = get!(flag_indices, F) do
+                push!(flags, F)
+                length(flags)
+            end
+            push!(subsets, (S, index))
+            N == :limit && (subset_indices[S] = length(subsets))
+        end
+        petals[a] = subsets
+    end
+
+    first_sizes = only_balanced ? (half_size:half_size) : (0:half_size)
     for a in first_sizes
-        second_sizes = only_balanced ? (a:a) : (0:(max_petal_size-a))
-        for S1 in combinations(non_type_verts, a)
-            F1 = labelCanonically(subFlag(G, vcat(1:type_size, S1)))
-            other_vertices = N == :limit ? setdiff(non_type_verts, S1) : non_type_verts
-
-            for b in second_sizes
-                weights = get!(sampling_weights, (type_size, a, b)) do
-                    _petal_sampling_weights(N, n_outer, type_size, a, b)
+        second_sizes = only_balanced ? (a:a) : (a:(max_petal_size-a))
+        for b in second_sizes
+            counts = Dict{NTuple{3,Int},Int}()
+            for (i, (S1, f1)) in enumerate(petals[a])
+                # Commutativity lets us count unordered pairs of equal sizes.
+                # At the limit, enumerate only disjoint partners, not all pairs.
+                partners = N == :limit ?
+                    (subset_indices[S2] for S2 in combinations(setdiff(non_type_verts, S1), b)) :
+                    ((a == b ? i : 1):length(petals[b]))
+                for j in partners
+                    a == b && j < i && continue
+                    S2, f2 = petals[b][j]
+                    ov = N == :limit ? 0 : count(in(S1), S2)
+                    key = (min(f1, f2), max(f1, f2), ov)
+                    multiplicity = a == b && i != j && f1 == f2 ? 2 : 1
+                    counts[key] = get(counts, key, 0) + multiplicity
                 end
-                for S2 in combinations(other_vertices, b)
-                    ov = N == :limit ? 0 : length(intersect(S1, S2))
-                    F2 = labelCanonically(subFlag(G, vcat(1:type_size, S2)))
-                    product = get!(res, (F1, F2)) do
+            end
+            weights = get!(sampling_weights, (type_size, a, b)) do
+                _petal_sampling_weights(N, n_outer, type_size, a, b)
+            end
+            for ((f1, f2, ov), multiplicity) in counts
+                coefficient = multiplicity * weights[ov+1] * unlabel_factor
+                pairs = f1 == f2 ? ((f1, f2),) : ((f1, f2), (f2, f1))
+                for (i, j) in pairs
+                    product = get!(res, (flags[i], flags[j])) do
                         QuantumFlag{FT,Rational{Int}}()
                     end
                     product.coeff[output_flag] =
-                        get(product.coeff, output_flag, 0 // 1) + weights[ov+1] * unlabel_factor
+                        get(product.coeff, output_flag, 0 // 1) + coefficient
                 end
             end
         end
@@ -736,9 +774,10 @@ function sample_coefficients(
     FT = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
     res = Dict{Tuple{FT,FT},QuantumFlag{FT,Rational{Int}}}()
     sampling_weights = Dict{NTuple{3,Int},Vector{Rational{Int}}}()
+    petal_labels = Dict{FT,FT}()
 
     for G in glue_flags
-        _sample_flag_products!(res, G, G, n, N, only_balanced, sampling_weights, 1 // 1)
+        _sample_flag_products!(res, G, G, n, N, only_balanced, sampling_weights, petal_labels, 1 // 1)
     end
     return idx_flags, glue_flags, res
 end
@@ -809,10 +848,11 @@ function sample_coefficients_downwards(
     glue_flags = filter(F -> size(F) == n_outer, all_flags)
     res = Dict{Tuple{FT,FT},QuantumFlag{FT,Rational{Int}}}()
     sampling_weights = Dict{NTuple{3,Int},Vector{Rational{Int}}}()
+    petal_labels = Dict{FT,FT}()
 
     for G in glue_flags
         covered_flags = Set{FT}()
-        base_ul_fact = unlabel_fact(G)
+        base_aut_size = aut(G).size
 
         for type_size in type_sizes
             non_type_verts = (type_size+1):n_outer
@@ -828,16 +868,19 @@ function sample_coefficients_downwards(
                 for type_p in type_aut
                     # Map a canonical extension back to the requested labels, if any.
                     p = target_type === nothing ? type_p : target_perm_inv[type_p]
-                    G_flag = labelCanonically(PartiallyLabeledFlag(
+                    G_flag, flag_aut, _, _ = label(PartiallyLabeledFlag(
                         permute(G_base, vcat(p, non_type_verts)), type_size,
-                    ))
+                    ); removeIsolated=false)
                     G_flag in covered_flags && continue
                     push!(covered_flags, G_flag)
 
-                    # Divide full downward factors to retain the base labels.
-                    unlabel_factor = unlabel_fact(G_flag) / base_ul_fact
+                    # Orbit-stabilizer gives the partial downward factor. The
+                    # automorphism group of the underlying unlabeled flag cancels
+                    # from unlabel_fact(G_flag) / unlabel_fact(G).
+                    unlabel_factor = (factorial(n_outer-type_size) // factorial(n_outer-k)) *
+                                     (base_aut_size // order(flag_aut))
                     _sample_flag_products!(
-                        res, G_flag, G, n, N, only_balanced, sampling_weights, unlabel_factor
+                        res, G_flag, G, n, N, only_balanced, sampling_weights, petal_labels, unlabel_factor
                     )
                 end
             end

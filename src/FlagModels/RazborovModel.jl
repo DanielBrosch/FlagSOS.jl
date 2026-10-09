@@ -444,6 +444,22 @@ function _razborov_sampling_basis(
     return _canonical_sampling_basis(flat_basis, base_type)
 end
 
+# Each sampled outer flag occurs in many products. Convert its downward image
+# once; in particular, avoid repeating canonical labeling and unlabel factors.
+function _convert_sampling_product(product::QuantumFlag, ::Type{T}, output_cache) where {T}
+    result = QuantumFlag{T,Rational{Int}}()
+    for (F, c) in product.coeff
+        image = get!(output_cache, F) do
+            labelCanonically(QuantumFlag{T}(1 // 1 * F))
+        end
+        for (G, d) in image.coeff
+            result.coeff[G] = get(result.coeff, G, 0 // 1) + c * d
+        end
+    end
+    filter!(p -> !iszero(p.second), result.coeff)
+    return result
+end
+
 """
     computeSDP!(m::RazborovModel, reservedVerts; use_downwards=true)
 
@@ -460,6 +476,8 @@ function computeSDP!(
     population = N == :limit ? N : N - reservedVerts
     sampling_bases = Dict()
     max_type_sizes = Dict()
+    sampling_outputs = Dict{PartiallyLabeledFlag,QuantumFlag{T,Rational{Int}}}()
+    allowed_flags = Dict{T,Bool}()
     if use_downwards
         for (mu, B) in m.basis
             sampled = _razborov_sampling_basis(B)
@@ -472,6 +490,7 @@ function computeSDP!(
 
     for (muc, (mu, B)) in enumerate(m.basis)
         sampling_basis = get(sampling_bases, mu, nothing)
+        basis_factors = isInducedFlag(T) && is_up_to_iso(T) ? up_to_iso_fact.(B) : nothing
         # print("Computing block $muc  / $(length(m.basis))         ")
         # @show muc, maximum(m.blockSymmetry[mu].pattern), length(B), mu
 
@@ -577,10 +596,10 @@ function computeSDP!(
                     pair = (sampling_basis.flags[i], sampling_basis.flags[j])
                     product = get(products, pair, nothing)
                     t = product === nothing ? QuantumFlag{T,Rational{Int}}() :
-                        labelCanonically(QuantumFlag{T}(product))
+                        _convert_sampling_product(product, T, sampling_outputs)
                 end
                 if is_up_to_iso(T)
-                    t = (up_to_iso_fact(a) * up_to_iso_fact(b)) * t
+                    t = (basis_factors[i] * basis_factors[j]) * t
                 end
                 # @show t
                 # t = labelCanonically(t)
@@ -588,7 +607,10 @@ function computeSDP!(
             end
 
             for (F, d) in t.coeff
-                !isAllowed(m.parentModel, F) && continue
+                allowed = get!(allowed_flags, F) do
+                    isAllowed(m.parentModel, F)
+                end
+                allowed || continue
                 if !haskey(sdpData, F)
                     sdpData[F] = Dict()
                 end

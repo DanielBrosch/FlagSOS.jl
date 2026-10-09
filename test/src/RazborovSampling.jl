@@ -47,7 +47,8 @@ is_downwards_key(key) = first(key) === :sample_coefficients_downwards
 
 @testset "Razborov downwards sampling" begin
     @testset "Main blocks and forbidden flags" begin
-        for N in (20, :limit), restricted in (false, true)
+        # N below the outer degree also exercises vanishing overlap weights.
+        for N in (3, 20, :limit), restricted in (false, true)
             model = FlagModel{IG,N,Rat}()
             if restricted
                 addForbiddenFlag!(model, IG(Graph(Bool[0 1 1; 1 0 1; 1 1 0])))
