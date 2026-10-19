@@ -115,6 +115,17 @@ function isAllowed(
     return isAllowed(m, F2)
 end
 
+function _generate_model_flags(
+    ::Type{PartiallyLabeledFlag{T}}, n, bounds, model::FlagModel{T};
+    initial_flag=one(PartiallyLabeledFlag{T}), kwargs...,
+) where {T<:InducedFlag}
+    property = _GenerationForbidden(deepcopy(model.forbiddenFlags))
+    return generateAll(
+        PartiallyLabeledFlag{T}, n, bounds; initial_flag,
+        withProperty=property, withPropertyMarked=property, kwargs...,
+    )
+end
+
 """
    addLasserreBlock!(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
 

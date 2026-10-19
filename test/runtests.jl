@@ -56,6 +56,7 @@ end
     @testset "Generation" begin
         _include_sandbox("src/Generation.jl")
         _include_sandbox("src/ParallelGeneration.jl")
+        _include_sandbox("src/ModelGeneration.jl")
     end
 
     @testset "Razborov Sampling" begin

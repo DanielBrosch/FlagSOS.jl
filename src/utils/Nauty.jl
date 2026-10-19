@@ -389,6 +389,8 @@ end
 
 _generation_accept_all(F) = true
 _can_generate_unlabeled(::Type, initial_flag, maxPredicates) = false
+_generation_unlabeled_callbacks(::Type, property, marked) =
+    property === _generation_accept_all && marked === _generation_accept_all
 
 function generateAll(
     ::Type{F},
@@ -1021,6 +1023,10 @@ ordered labelings compatible with the seed. `maxPredicates` is then
 `[maxLabels, maxEdges]`. Existing seed labels stay fixed, and only vertices
 outside the seed can acquire additional labels.
 
+The coefficient samplers also use this path for induced models whose forbidden
+flags do not depend on the labels: restrictions are checked on the underlying
+objects before expanding their labelings.
+
 Set `use_unlabeled=false` to use the original incremental generator. Custom
 `withProperty` or `withPropertyMarked` callbacks and unsupported flag types
 always use that generator, since pruning can depend on intermediate states.
@@ -1049,10 +1055,12 @@ modifying the returned vector.
     use_unlabeled::Bool=true,
     parallel::Bool=true,
 ) where {T}
-    if use_unlabeled && withProperty === _generation_accept_all &&
-        withPropertyMarked === _generation_accept_all &&
+    if use_unlabeled && _generation_unlabeled_callbacks(T, withProperty, withPropertyMarked) &&
         _can_generate_unlabeled(T, initial_flag, maxPredicates)
-        return _generate_partially_labeled(T, maxVertices, maxPredicates, initial_flag, limit, parallel)
+        return _generate_partially_labeled(
+            T, maxVertices, maxPredicates, initial_flag, limit, parallel;
+            withProperty, withPropertyMarked,
+        )
     end
     generatedGraphs = Vector{T}[[initial_flag]]
     for i in (size(initial_flag) + 1):maxVertices

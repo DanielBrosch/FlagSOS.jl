@@ -15,6 +15,98 @@ function _can_generate_unlabeled(
            hasAtMostEdges(initial_flag, maxPredicates)
 end
 
+# Unlike arbitrary callbacks, these model restrictions are invariant under
+# forgetting labels. Store a snapshot of the forbidden set, not the mutable
+# model: equal restrictions can share cached generations, and adding a forbidden
+# flag must not reuse a result generated under the old restrictions.
+struct _GenerationForbidden{T<:InducedFlag}
+    flags::Set{T}
+end
+
+Base.:(==)(a::_GenerationForbidden, b::_GenerationForbidden) = a.flags == b.flags
+Base.isequal(a::_GenerationForbidden, b::_GenerationForbidden) = isequal(a.flags, b.flags)
+Base.hash(p::_GenerationForbidden, h::UInt) = hash(p.flags, hash(:_GenerationForbidden, h))
+
+_generation_forbidden_match(forbidden, F) = isSubFlag(forbidden, F)
+
+function _generation_forbidden_match(
+    forbidden::T, F::Union{T,EdgeMarkedFlag{T},EdgeMarkedFlag{PartiallyLabeledFlag{T}}},
+) where {T<:InducedFlag{Graph}}
+    m = size(forbidden)
+    m > size(F) && return false
+    A = forbidden.F.A
+    edge = m > 1 && A[1, 2]
+    # Cliques and independent sets need no isomorphism test. These dominate
+    # Ramsey models, where canonicalizing every candidate subset is expensive.
+    for v in 1:m
+        A[v, v] && return isSubFlag(forbidden, F)
+        for u in 1:(v - 1)
+            A[u, v] == edge || return isSubFlag(forbidden, F)
+        end
+    end
+    raw = F isa EdgeMarkedFlag ? F.F : F
+    raw = raw isa PartiallyLabeledFlag ? raw.F : raw
+    B = raw.F.A
+    for vertices in combinations(1:size(F), m)
+        # In an induced flag, a missing edge is final only when it is no longer
+        # marked. Pruning an unfinished independent set would lose extensions.
+        F isa EdgeMarkedFlag && !finalized_subgraph(F, vertices) && continue
+        matches = true
+        for (i, v) in enumerate(vertices)
+            if B[v, v]
+                matches = false
+                break
+            end
+            for j in 1:(i - 1)
+                if B[vertices[j], v] != edge
+                    matches = false
+                    break
+                end
+            end
+            matches || break
+        end
+        matches && return true
+    end
+    return false
+end
+
+function (p::_GenerationForbidden{T})(F::T) where {T}
+    return isAllowed(F) && !any(forbidden -> _generation_forbidden_match(forbidden, F), p.flags)
+end
+
+function (p::_GenerationForbidden{T})(
+    F::Union{EdgeMarkedFlag{T},EdgeMarkedFlag{PartiallyLabeledFlag{T}}},
+) where {T}
+    # The collection matcher canonicalizes every finalized subflag. The
+    # pairwise matcher first checks predicate counts and reuses isIsomorphic's
+    # cache, which is much cheaper for sparse forbidden sets (e.g. Ramsey types).
+    isAllowed(F) || return false
+    # For large forbidden sets, share the subset traversal across patterns.
+    length(p.flags) > 4 && return !isSubFlag(p.flags, F)
+    return !any(forbidden -> _generation_forbidden_match(forbidden, F), p.flags)
+end
+
+function (p::_GenerationForbidden{T})(F::PartiallyLabeledFlag{T}) where {T}
+    return p(labelCanonically(F.F))
+end
+
+function _generation_unlabeled_callbacks(
+    ::Type{PartiallyLabeledFlag{T}}, property::_GenerationForbidden{T},
+    marked::_GenerationForbidden{T},
+) where {T}
+    return property == marked
+end
+
+# Models with other kinds of restrictions retain the existing pruning semantics.
+# FlagModel supplies the specialization for supported induced flag algebras.
+function _generate_model_flags(T, n, bounds, model; initial_flag=one(T), kwargs...)
+    return generateAll(
+        T, n, bounds; initial_flag,
+        withProperty=F -> isAllowed(model, F),
+        withPropertyMarked=F -> isAllowed(model, F), kwargs...,
+    )
+end
+
 # Unlike canonicalization for non-induced flags, the temporary induced wrapper
 # retains isolated vertices: some of them may receive labels later.
 _generation_preserve_vertices(F::InducedFlag) = F
@@ -93,16 +185,20 @@ function _generation_seed_labelings!(result, G, labels, group, seed, maxLabels)
 end
 
 function _generate_partially_labeled(
-    ::Type{PartiallyLabeledFlag{T}}, maxVertices, maxPredicates, initial_flag, limit, parallel
+    ::Type{PartiallyLabeledFlag{T}}, maxVertices, maxPredicates, initial_flag, limit, parallel;
+    withProperty=_generation_accept_all, withPropertyMarked=_generation_accept_all,
 ) where {T}
     result = PartiallyLabeledFlag{T}[initial_flag]
     maxVertices <= size(initial_flag) && return result
 
     seed = label(initial_flag; removeIsolated=false)[1]
-    underlying_seed = _generation_preserve_vertices(initial_flag.F)
+    # Different ordered types can have isomorphic underlying seeds. Share the
+    # expensive underlying generation; the original seed labels are matched below.
+    underlying_seed = labelCanonically(_generation_preserve_vertices(initial_flag.F))
     underlying = generateAll(
         typeof(underlying_seed), maxVertices, maxPredicates[2:end];
         initial_flag=underlying_seed, limit=limit, use_unlabeled=false, parallel=parallel,
+        withProperty, withPropertyMarked,
     )
     extensions = filter(G -> size(G) > size(initial_flag), underlying)
     labeled = Vector{Vector{PartiallyLabeledFlag{T}}}(undef, length(extensions))
@@ -124,5 +220,11 @@ function _generate_partially_labeled(
         append!(result, flags)
     end
     # Preserve the seed as the first entry and the underlying vertex layers.
-    return unique!(result)
+    unique!(result)
+    # Model samplers expose these vectors as well as coefficient dictionaries.
+    # Match the incremental generator's ordering, independently of scheduling.
+    if withProperty isa _GenerationForbidden
+        sort!(@view(result[2:end]); by=F -> (size(F), hash(F)))
+    end
+    return result
 end

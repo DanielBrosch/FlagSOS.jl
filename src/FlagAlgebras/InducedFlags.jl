@@ -753,13 +753,11 @@ function sample_coefficients(
     type::InducedFlag{T,UpToIso};
     n_outer::Int=n,
     base_model=nothing,
-    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=_generate_model_flags(
         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
         n_outer,
-        [size(type), 10000];
+        [size(type), 10000], base_model;
         initial_flag=PartiallyLabeledFlag(type, size(type)),
-        withProperty=x -> isAllowed(base_model, x),
-        withPropertyMarked=x -> isAllowed(base_model, x),
     ),
     N=:limit,
     only_balanced=true,
@@ -813,13 +811,11 @@ function sample_coefficients_downwards(
     max_type_size::Int=n,
     n_outer::Int=n,
     base_model=nothing,
-    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=generateAll(
+    all_flags::Vector{PartiallyLabeledFlag{InducedFlag{T,UpToIso}}}=_generate_model_flags(
         PartiallyLabeledFlag{InducedFlag{T,UpToIso}},
         n_outer,
-        [size(unlabeled_type), 10000];
+        [size(unlabeled_type), 10000], base_model;
         initial_flag=PartiallyLabeledFlag(unlabeled_type, size(unlabeled_type)),
-        withProperty=x -> isAllowed(base_model, x),
-        withPropertyMarked=x -> isAllowed(base_model, x),
     ),
     N=:limit,
     only_balanced=true,

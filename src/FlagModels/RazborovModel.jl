@@ -116,13 +116,11 @@ function computeUnreducedRazborovBasis(
     # @info "Generating flags up to isomorphism..."
     # flags = generateAll(T, maxLabels, [99999]; withInducedProperty = x->isAllowed(M.parentModel, x))
     flags = if T <: PartiallyLabeledFlag
-        generateAll(
+        _generate_model_flags(
             T,
             n,
-            [size(base_type), 10000];
+            [size(base_type), 10000], M.parentModel;
             initial_flag=T(base_type, size(base_type)),
-            withProperty=x -> isAllowed(M.parentModel, x),
-            withPropertyMarked=x -> isAllowed(M.parentModel, x),
         )
     else
         flags = generateAll(
