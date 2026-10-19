@@ -59,7 +59,7 @@ function addForbiddenFlag!(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
     return push!(m.forbiddenFlags, Fl)
 end
 
-function addForbiddenFlag!(m::FlagModel{InducedFlag{T},N,D}, F::T) where {T<:Flag,N,D}
+function addForbiddenFlag!(m::FlagModel{InducedFlag{T, U},N,D}, F::T) where {T<:Flag,N,D, U}
     # If non-induced, forbid all graphs that can be obtained by adding edges, as well.
     supGraphs = unique(labelCanonically.(collect(keys(zeta(F).coeff))))
     for G in supGraphs
@@ -213,7 +213,7 @@ function addInequality_Razborov!(
     g::QuantumFlag{InducedFlag{T,UpToIso},D},
     lvl::Int,
 ) where {T<:Flag,N,D,UpToIso}
-    gl = labelCanonically(homogenize(g))
+    gl = labelCanonically(homogenize(m, g))
 
     # gl = homogenize(m, gl)
     # @assert allequal(size(G) for G in keys(gl.coeff))
@@ -552,7 +552,7 @@ function buildJuMPModel(
     end
 
     if m.objective !== nothing
-        ∅ = get_translate(one(T))
+        ∅ = labelCanonically(get_translate(one(T)))
         # @show ∅
 
         if !m.onlyFeasibility
@@ -560,10 +560,13 @@ function buildJuMPModel(
         end
         push!(constraints, Dict())
         objL = labelCanonically(m.objective)
-        objective = sum(c * get_translate(G) for (G, c) in objL.coeff)
+        @assert objL == labelCanonically(objL)
+        objective = labelCanonically(sum(c * get_translate(G) for (G, c) in objL.coeff))
 
         for (G, c) in objective.coeff
             if !iszero(c) && !haskey(variables, G) && isAllowed(m, G)
+                @show G, c
+                @show labelCanonically(G)
                 error(
                     "Not all Flags in the objective appear in the model! Add more generators.",
                 )
