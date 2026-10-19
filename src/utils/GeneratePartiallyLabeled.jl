@@ -93,7 +93,7 @@ function _generation_seed_labelings!(result, G, labels, group, seed, maxLabels)
 end
 
 function _generate_partially_labeled(
-    ::Type{PartiallyLabeledFlag{T}}, maxVertices, maxPredicates, initial_flag, limit
+    ::Type{PartiallyLabeledFlag{T}}, maxVertices, maxPredicates, initial_flag, limit, parallel
 ) where {T}
     result = PartiallyLabeledFlag{T}[initial_flag]
     maxVertices <= size(initial_flag) && return result
@@ -102,19 +102,26 @@ function _generate_partially_labeled(
     underlying_seed = _generation_preserve_vertices(initial_flag.F)
     underlying = generateAll(
         typeof(underlying_seed), maxVertices, maxPredicates[2:end];
-        initial_flag=underlying_seed, limit=limit, use_unlabeled=false,
+        initial_flag=underlying_seed, limit=limit, use_unlabeled=false, parallel=parallel,
     )
-    for G in underlying
-        size(G) <= size(initial_flag) && continue
+    extensions = filter(G -> size(G) > size(initial_flag), underlying)
+    labeled = Vector{Vector{PartiallyLabeledFlag{T}}}(undef, length(extensions))
+    _generation_foreach(length(extensions), parallel) do _, j
+        G = extensions[j]
+        local_result = PartiallyLabeledFlag{T}[]
         # Original seed vertices cannot acquire new labels during extension.
         maxLabels = min(maxPredicates[1], seed.n + size(G) - size(seed))
         F = _generation_unwrap(T, G)
         if seed.n == 0
-            _generation_labelings!(result, PartiallyLabeledFlag(F, 0), seed, maxLabels)
+            _generation_labelings!(local_result, PartiallyLabeledFlag(F, 0), seed, maxLabels)
         else
             group = label(F; removeIsolated=false)[3]
-            _generation_seed_labelings!(result, F, Int[], group, seed, maxLabels)
+            _generation_seed_labelings!(local_result, F, Int[], group, seed, maxLabels)
         end
+        labeled[j] = local_result
+    end
+    for flags in labeled
+        append!(result, flags)
     end
     # Preserve the seed as the first entry and the underlying vertex layers.
     return unique!(result)
