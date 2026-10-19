@@ -385,24 +385,24 @@ function label(F::T; prune=true, removeIsolated=true) where {T}
     return permute(F, p), autGp, autG, p
 end
 
+_generation_accept_all(F) = true
+_can_generate_unlabeled(::Type, initial_flag, maxPredicates) = false
+
 function generateAll(
     ::Type{F},
     maxVertices::Int,
     maxEdges::Int;
-    withProperty=(F::F) -> true,
+    withProperty=_generation_accept_all,
     initial_flag=one(F),
+    kwargs...,
 ) where {F}
     return generateAll(
-        F, maxVertices, [maxEdges]; withProperty=withProperty, initial_flag=initial_flag
+        F, maxVertices, [maxEdges]; withProperty=withProperty, initial_flag=initial_flag,
+        kwargs...,
     )
 end
 
 #TODO: Quite a bit slower than nauty/traces, how are they doing it?
-"""
-    generateAll(::Type{F}, maxVertices::Int, maxPredicates::Vector{Int}; withProperty = (F::T) -> true) where {F}
-
-Generates all Flags of type `F` with up to `maxVertices` vertices and up to `maxPredicates` non-zero predicate values. 'maxPredicates' is a vector, for the case that there are multiple predicates. If a function `withProperty:F->{true, false}` is given, keeps adding edges to flags as long as the property holds.
-"""
 # function generateAll(
 #     ::Type{T},
 #     maxVertices::Int,
@@ -1003,17 +1003,43 @@ function process_edgeMarkedFlags(
     return newFlags
 end
 
+"""
+    generateAll(::Type{T}, maxVertices::Int, maxPredicates::Vector;
+                initial_flag=one(T), use_unlabeled=true, withProperty=F -> true,
+                withPropertyMarked=F -> true)
+
+Generate flags of type `T` with up to `maxVertices` vertices and predicate counts
+bounded by `maxPredicates`, extending `initial_flag`. The seed itself is always
+included. `withProperty` filters each completed vertex layer;
+`withPropertyMarked` prunes intermediate edge-marked states.
+
+For partially labeled graphs and constant-weight codes (including induced
+versions), generation first enumerates underlying objects, then inequivalent
+ordered labelings compatible with the seed. `maxPredicates` is then
+`[maxLabels, maxEdges]`. Existing seed labels stay fixed, and only vertices
+outside the seed can acquire additional labels.
+
+Set `use_unlabeled=false` to use the original incremental generator. Custom
+`withProperty` or `withPropertyMarked` callbacks and unsupported flag types
+always use that generator, since pruning can depend on intermediate states.
+"""
 @memoize function generateAll(
     ::Type{T},
     maxVertices::Int,
     maxPredicates::Vector;
-    withProperty=(F::T) -> true,
+    withProperty=_generation_accept_all,
     # withPropertyMarked=(F::EdgeMarkedFlag{T, predicateType(T)}) -> true,
-    withPropertyMarked=(F) -> true,
+    withPropertyMarked=_generation_accept_all,
     # withInducedProperty=(F::T) -> true,
     limit::Int=100_000,
     initial_flag=one(T),
+    use_unlabeled::Bool=true,
 ) where {T}
+    if use_unlabeled && withProperty === _generation_accept_all &&
+        withPropertyMarked === _generation_accept_all &&
+        _can_generate_unlabeled(T, initial_flag, maxPredicates)
+        return _generate_partially_labeled(T, maxVertices, maxPredicates, initial_flag, limit)
+    end
     generatedGraphs = Vector{T}[Vector([initial_flag])]
     # @show maxPredicates
     for i in (size(initial_flag) + 1):maxVertices

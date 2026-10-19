@@ -53,6 +53,10 @@ end
         _include_sandbox("src/CoefficientSampling.jl")
     end
 
+    @testset "Generation" begin
+        _include_sandbox("src/Generation.jl")
+    end
+
     @testset "Razborov Sampling" begin
         _include_sandbox("src/RazborovSampling.jl")
     end
