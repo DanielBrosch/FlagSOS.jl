@@ -140,7 +140,7 @@ function computeUnreducedRazborovBasis(
     end
     # @info "Splitting $(length(flags)) flags..."
 
-    filter!(f -> isAllowed(M, f), flags)
+    flags = filter(f -> isAllowed(M, f), flags)
 
     maxLabelsSlacks = needsSlacks ? maxLabels : maxLabels - 2
 

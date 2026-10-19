@@ -309,7 +309,7 @@ function addInequality_Lasserre!(
 
     display(Fs)
 
-    filter!(x -> x.n == numLabels(gl), Fs)
+    Fs = filter(x -> x.n == numLabels(gl), Fs)
     display(Fs)
 
     for F in Fs
@@ -348,7 +348,7 @@ function addEquality!(
         [numLabels(gl), genMaxEdges],
     )
 
-    filter!(x -> x.n == numLabels(gl), Fs)
+    Fs = filter(x -> x.n == numLabels(gl), Fs)
 
     for F in Fs
         if isAllowed(m, F)

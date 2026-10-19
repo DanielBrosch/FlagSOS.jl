@@ -47,7 +47,7 @@ function addGenerators!(m::BinomialSquares{T,N,D}, maxVerts, maxEdges) where {T,
             [[[i], floor(maxEdges/2)], [[i], floor(maxEdges/2)]];
             withProperty=sameColors,
         )
-        filter!(x -> length(x.Fs[1].c) == i, pairs)
+        pairs = filter(x -> length(x.Fs[1].c) == i, pairs)
         filter!(x -> hash(x.Fs[1]) <= hash(x.Fs[2]), pairs)
         m.basis = vcat(m.basis, pairs)
     end

@@ -1022,8 +1022,14 @@ outside the seed can acquire additional labels.
 Set `use_unlabeled=false` to use the original incremental generator. Custom
 `withProperty` or `withPropertyMarked` callbacks and unsupported flag types
 always use that generator, since pruning can depend on intermediate states.
+
+Results are cached by argument values, including the bounds and seed. Treat
+cached inputs and outputs as read-only; use `copy(generateAll(...))` before
+modifying the returned vector.
 """
-@memoize function generateAll(
+# The default IdDict compares array identities, so freshly constructed bounds
+# and even the default one(T) seed would miss the cache on every call.
+@memoize Dict function generateAll(
     ::Type{T},
     maxVertices::Int,
     maxPredicates::Vector;

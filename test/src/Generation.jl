@@ -13,6 +13,63 @@ function compare_generation(T, n, limits; initial_flag=one(T), kwargs...)
     return actual
 end
 
+@testset "Generation memoization" begin
+    P = PartiallyLabeledFlag{IG}
+    FlagSOS.Memoization.empty_cache!(generateAll)
+    try
+        for use_unlabeled in (false, true)
+            limits = [2, 100]
+            seed = P(IG(Graph(Bool[0 1; 1 0])), 1)
+            first_result = generateAll(P, 4, limits; initial_flag=seed, use_unlabeled)
+            @test generateAll(P, 4, limits; initial_flag=seed, use_unlabeled) === first_result
+            @test generateAll(P, 4, copy(limits); initial_flag=seed, use_unlabeled) === first_result
+            @test generateAll(P, 4, copy(limits); initial_flag=deepcopy(seed), use_unlabeled) === first_result
+
+            # Both the vector literal and the default seed are newly allocated.
+            @test generateAll(P, 3, [2, 100]; use_unlabeled) ===
+                  generateAll(P, 3, [2, 100]; use_unlabeled)
+            @test generateAll(IG, 3, 100; use_unlabeled) ===
+                  generateAll(IG, 3, 100; use_unlabeled)
+
+            other_seed = P(IG(Graph(falses(2, 2))), 1)
+            other = generateAll(P, 4, [2, 100]; initial_flag=other_seed, use_unlabeled)
+            @test first(other) == other_seed
+            @test other !== first_result
+            @test generateAll(P, 4, [1, 100]; initial_flag=seed, use_unlabeled) !== first_result
+            @test generateAll(P, 3, [2, 100]; initial_flag=seed, use_unlabeled) !== first_result
+        end
+
+        calls = Ref(0)
+        property = F -> (calls[] += 1; true)
+        first_result = generateAll(P, 3, [2, 100]; withProperty=property)
+        first_calls = calls[]
+        @test first_calls > 0
+        @test generateAll(P, 3, [2, 100]; withProperty=property) === first_result
+        @test calls[] == first_calls
+        @test generateAll(P, 3, [2, 100]; withProperty=F -> false) !== first_result
+        @test generateAll(P, 3, [2, 100]; withPropertyMarked=F -> false) !==
+              generateAll(P, 3, [2, 100])
+        @test generateAll(P, 3, [2, 100]; use_unlabeled=false) !==
+              generateAll(P, 3, [2, 100]; use_unlabeled=true)
+
+        # Model builders select labels without filtering the shared cache entry.
+        cached = generateAll(P, 2, [1, 1])
+        expected = copy(cached)
+        model = FlagModel{IG}()
+        unit = 1 * P(IG(Graph(falses(1, 1))), 1)
+        redirect_stdout(devnull) do
+            addEquality!(model, unit, 1; maxVertices=2)
+        end
+        @test cached == expected
+        redirect_stdout(devnull) do
+            addInequality_Lasserre!(model, unit, 2; maxVertices=3)
+        end
+        @test cached == expected
+    finally
+        FlagSOS.Memoization.empty_cache!(generateAll)
+    end
+end
+
 @testset "Unlabeled-first generation" begin
     @testset "Graphs and nontrivial seeds" begin
         edge = Graph(Bool[0 1; 1 0])
