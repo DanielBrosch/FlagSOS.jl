@@ -72,6 +72,31 @@ function computeSDP!(m::FlagModel, reservedVerts::Int)
         @info "Computing SDP for submodel $i / $(length(m.subModels)):"
         computeSDP!(sm, reservedVerts)
     end
+    _homogenize_sdp!(m)
+end
+
+# Induced densities of different orders must be lifted before their
+# coefficients can be compared. This also handles submodels computed directly
+# by callers, so both model builders invoke it as well as computeSDP!.
+function _homogenize_sdp!(m::FlagModel{T}) where {T}
+    isInducedFlag(T) || return nothing
+    lvl = maximum((size(G) for sm in m.subModels for G in keys(sm.sdpData)); init=0)
+    for sm in m.subModels
+        all(size(G) == lvl for G in keys(sm.sdpData)) && continue
+        data = Dict()
+        for (G, blocks) in sm.sdpData
+            lifted = size(G) == lvl ? 1 * G : add_verts(m, G, lvl)
+            for (H, c) in lifted.coeff
+                target = get!(data, H, Dict())
+                for (mu, block) in blocks
+                    contribution = c * block
+                    target[mu] = haskey(target, mu) ? target[mu] + contribution : contribution
+                end
+            end
+        end
+        sm.sdpData = data
+    end
+    return nothing
 end
 
 function isAllowed(m::FlagModel{T,N,D}, F::T) where {T<:Flag,N,D}
@@ -347,8 +372,7 @@ function addEquality!(
     genMaxEdges = Int(floor((maxEdges - countTotalEdges(gl))))
     genMaxVertices = Int(floor((maxVertices - size(gl))))
 
-    qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0) # correct coefficients, removal happens when multiplying partially labeled flags
-    # qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, numLabels(gl))
+    qM = EqualityModule{T,PartiallyLabeledFlag{T},N,D}(gl, 0; parent=m)
 
     @show PartiallyLabeledFlag{T},
     genMaxVertices + numLabels(gl),
@@ -385,7 +409,7 @@ function addEquality!(
     genMaxEdges = Int(floor((maxEdges - countTotalEdges(gl))))
     genMaxVertices = Int(floor((maxVertices - size(gl))))
 
-    qM = EqualityModule{T,T,N,D}(gl)
+    qM = EqualityModule{T,T,N,D}(gl; parent=m)
 
     Fs = generateAll(T, genMaxVertices, genMaxEdges)
 
@@ -514,6 +538,7 @@ end
 function buildJuMPModel(
     m::FlagModel{T,N,D}, replaceBlocks=Dict(), jumpModel=Model(), addBoundVars=false
 ) where {T<:Flag,N,D}
+    _homogenize_sdp!(m)
     variables = Dict()
     blocks = []
     constraints = []
@@ -673,7 +698,7 @@ function modelBlockSizes(m::FlagModel)
 end
 
 function buildStandardModel(m::FlagModel{T,N,D}) where {T<:Flag,N,D}
-    #TODO: Quotient when using InducedFlags
+    _homogenize_sdp!(m)
     obj = labelCanonically(m.objective)
     vars = union([collect(keys(sM.sdpData)) for sM in m.subModels]...)
 

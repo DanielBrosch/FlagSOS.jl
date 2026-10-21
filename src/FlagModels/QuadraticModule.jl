@@ -158,23 +158,28 @@ end
 """
     EqualityModule{T<:Flag, U<:Flag, N, D} <: AbstractFlagModel{T, N, D}
 
-Implements quadratic modules for equalities. Meant to be used as submodel of a `CompositeFlagModel`. Multiplies all elements of `basis`, a vector of all relevant Flags of type `U` with `equality`, converts the result to type `T`, and sets it to zero in the resulting optimization problem.
+Implements quadratic modules for equalities. Meant to be used as submodel of a `FlagModel`. Multiplies all elements of `basis`, a vector of all relevant Flags of type `U` with `equality`, converts the result to type `T`, and sets it to zero in the resulting optimization problem.
+
+The optional constructor keyword `parent` supplies the containing `FlagModel`
+for forbidden-flag filtering and product caching. Induced columns are computed
+at a common vertex order; the containing model lifts them further if needed.
 """
 mutable struct EqualityModule{T<:Flag,U<:Flag,N,D} <: AbstractFlagModel{T,N,D}
     sdpData::Any
     basis::Vector{U}
     equality::QuantumFlag{U}
     reservedVerts::Int
+    parentModel::Any
 
     function EqualityModule{T,U}(
-        equality::QuantumFlag{U}, reservedVerts::Int=0
+        equality::QuantumFlag{U}, reservedVerts::Int=0; parent=nothing
     ) where {T<:Flag,U<:Flag}
-        return new{T,U,:limit,Int}(Dict(), U[], equality, reservedVerts)
+        return new{T,U,:limit,Int}(Dict(), U[], equality, reservedVerts, parent)
     end
     function EqualityModule{T,U,N,D}(
-        equality::QuantumFlag{U}, reservedVerts::Int=0
+        equality::QuantumFlag{U}, reservedVerts::Int=0; parent=nothing
     ) where {T<:Flag,U<:Flag,N,D}
-        return new{T,U,N,D}(Dict(), U[], equality, reservedVerts)
+        return new{T,U,N,D}(Dict(), U[], equality, reservedVerts, parent)
     end
 end
 
@@ -207,23 +212,27 @@ function computeSDP!(
     m::EqualityModule{T,U,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D}
     m.sdpData = Dict()
-    # @assert !isInducedFlag(T) "TODO:"
-    # @assert !(T <: InducedFlag) "TODO:"
-    # @assert N == :limit "TODO"
+    isempty(m.basis) && return nothing
+    isempty(m.equality.coeff) && return nothing
+    population = N == :limit ? N : N - reservedVerts
+    # Asking the sampler for a common outer order retains finite-population
+    # collisions while expressing every column in the same density basis.
+    product_options = if isInducedFlag(U)
+        (n_outer=maximum(free_verts, m.basis) + size(m.equality),)
+    else
+        NamedTuple()
+    end
     for (i, G) in enumerate(m.basis)
         for (G2, c) in m.equality.coeff
-            # GG2 = G * G2
-            GG2s = D(1) * glueFinite(N == :limit ? N : N - reservedVerts, G, G2)
+            GG2s = D(1) * glueFinite(
+                population, G, G2; base_model=m.parentModel, product_options...
+            )
             for (GG2, c2) in GG2s.coeff
                 GG2 === nothing && continue
                 if GG2 isa PartiallyLabeledFlag{T}
-                    tmpG = D(c2) * labelCanonically((GG2).F)
-                elseif true#GG2 isa T 
-                    tmpG = D(c2) * labelCanonically(GG2)#[1]
+                    tmpG = D(c2) * labelCanonically(unlabel(GG2))
                 else
-                    @show GG2
-                    @show typeof(GG2)
-                    error("Unhandled case")
+                    tmpG = D(c2) * labelCanonically(GG2)
                 end
                 for (H, c2) in tmpG.coeff
                     if !haskey(m.sdpData, H)

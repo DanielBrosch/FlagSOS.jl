@@ -62,4 +62,8 @@ end
     @testset "Razborov Sampling" begin
         _include_sandbox("src/RazborovSampling.jl")
     end
+
+    @testset "Finite equalities" begin
+        _include_sandbox("src/FiniteEqualities.jl")
+    end
 end
