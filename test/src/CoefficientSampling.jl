@@ -112,6 +112,68 @@ end
         end
     end
 
+    @testset "Only requested factor sizes" begin
+        for (n, outer, base, sizes, balanced) in (
+            (4, 4, empty_type, (1, 3), false),
+            (4, 5, vertex, (2, 3), false),
+            (4, 4, vertex, (3, 2), false),
+            (4, 4, vertex, (1, 2), false),
+            (5, 5, path, (4, 4), true),
+            (4, 5, edge, (2, 4), false),
+        ), N in (:limit, 5, 20)
+            indices, outer_flags, products = FlagSOS.sample_coefficients(
+                IG, n, base; n_outer=outer, N=N, only_balanced=balanced, factor_sizes=sizes,
+            )
+            all_indices, expected_outer, all_products = reference_sample(
+                n, base; n_outer=outer, N=N, only_balanced=balanced,
+            )
+            expected = filter(all_products) do entry
+                F, G = entry.first
+                minmax(size(F), size(G)) == minmax(sizes...)
+            end
+            @test products == expected
+            @test indices == filter(F -> size(F) in sizes, all_indices)
+            @test outer_flags == expected_outer
+        end
+        @test_throws AssertionError FlagSOS.sample_coefficients(
+            IG, 4, vertex; only_balanced=false, factor_sizes=(0, 4),
+        )
+        @test_throws AssertionError FlagSOS.sample_coefficients(
+            IG, 4, vertex; only_balanced=false, factor_sizes=(3, 3),
+        )
+        @test_throws AssertionError FlagSOS.sample_coefficients(
+            IG, 4, empty_type; factor_sizes=(1, 3),
+        )
+    end
+
+    @testset "Product caches separate size splits and share swapped factors" begin
+        # Both splits have the same degree and are unbalanced, but need distinct
+        # cache entries even when lifted to the same outer order.
+        for N in (:limit, 20)
+            model = FlagModel{IG,N,Rational{Int}}()
+            expected = reference_sample(3, empty_type; n_outer=4, N=N, only_balanced=false)[3]
+            for (F, G) in ((PF(empty_type, 0), PF(path, 0)), (PF(vertex, 0), PF(edge, 0)))
+                pair = (labelCanonically(F), labelCanonically(G))
+                @test FlagSOS.glueFinite(N, F, G; n_outer=4, base_model=model) == expected[pair]
+                @test FlagSOS.glueFinite(N, G, F; n_outer=4, base_model=model) == expected[pair]
+            end
+            @test length(model.glue_cache) == 2
+            @test all(
+                minmax(size(F), size(G)) == key[7]
+                for (key, products) in model.glue_cache for (F, G) in keys(products)
+            )
+        end
+    end
+
+    @testset "Already homogeneous densities need no sampling" begin
+        model = FlagModel{IG,20,Rational{Int}}()
+        for F in (empty_type, path, PF(vertex, 1), PF(path, 1))
+            @test add_verts(model, F, size(F)) === F
+            @test add_verts(model, 2//3 * F, size(F)) == 2//3 * F
+        end
+        @test isempty(model.glue_cache)
+    end
+
     @testset "All extension types" begin
         for (n, outer, base) in (
             (0, 0, empty_type),

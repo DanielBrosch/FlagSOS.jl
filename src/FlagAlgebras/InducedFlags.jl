@@ -223,9 +223,9 @@ function glueFinite(
     @assert type(G) == t
 
     lvl = size(F) + size(G) - F.n
-
-    # @show N, F, G, p, T, UpToIso
-    # global test = N, F, G, p, T, UpToIso
+    # Share products of the requested sizes across multipliers, rather than
+    # sampling every smaller degree and every other split of the same degree.
+    factor_sizes = minmax(size(F), size(G))
 
     glueDict = if base_model === nothing
         sample_coefficients(
@@ -235,13 +235,14 @@ function glueFinite(
             n_outer=n_outer,
             N=N,
             only_balanced=size(F) == size(G),
+            factor_sizes=factor_sizes,
             base_model=base_model,
         )[3]
     else
         # @show (InducedFlag{T,UpToIso}, lvl, t, size(F) == size(G))
         # Finite products and density lifts (:limit) share the model cache.
         # Use the actual population, including any reserved-vertex adjustment.
-        get!(base_model.glue_cache, (InducedFlag{T,UpToIso}, lvl, t, size(F) == size(G), n_outer, N)) do
+        get!(base_model.glue_cache, (InducedFlag{T,UpToIso}, lvl, t, size(F) == size(G), n_outer, N, factor_sizes)) do
             sample_coefficients(
                 InducedFlag{T,UpToIso},
                 lvl,
@@ -249,6 +250,7 @@ function glueFinite(
                 n_outer=n_outer,
                 N=N,
                 only_balanced=size(F) == size(G),
+                factor_sizes=factor_sizes,
                 base_model=base_model,
             )[3]
         end
@@ -664,14 +666,17 @@ function _sample_flag_products!(
     only_balanced::Bool,
     sampling_weights,
     petal_labels,
-    unlabel_factor::Rational{Int},
+    unlabel_factor::Rational{Int};
+    factor_sizes=nothing,
 ) where {FT<:PartiallyLabeledFlag}
     type_size = G.n
     n_outer = size(G)
     non_type_verts = (type_size+1):n_outer
     max_petal_size = n - type_size
     half_size = div(max_petal_size, 2)
-    petal_sizes = only_balanced ? (half_size:half_size) : (0:max_petal_size)
+    petal_sizes = factor_sizes === nothing ?
+        (only_balanced ? (half_size:half_size) : (0:max_petal_size)) :
+        unique((factor_sizes[1] - type_size, factor_sizes[2] - type_size))
 
     # Classify each subset once, independently of its partner. Pair counting
     # below needs only these class indices and the size of the intersection.
@@ -696,9 +701,13 @@ function _sample_flag_products!(
         petals[a] = subsets
     end
 
-    first_sizes = only_balanced ? (half_size:half_size) : (0:half_size)
+    first_sizes = factor_sizes === nothing ?
+        (only_balanced ? (half_size:half_size) : (0:half_size)) :
+        ((factor_sizes[1] - type_size):(factor_sizes[1] - type_size))
     for a in first_sizes
-        second_sizes = only_balanced ? (a:a) : (a:(max_petal_size-a))
+        second_sizes = factor_sizes === nothing ?
+            (only_balanced ? (a:a) : (a:(max_petal_size-a))) :
+            ((factor_sizes[2] - type_size):(factor_sizes[2] - type_size))
         for b in second_sizes
             counts = Dict{NTuple{3,Int},Int}()
             for (i, (S1, f1)) in enumerate(petals[a])
@@ -737,7 +746,7 @@ end
 
 """
     sample_coefficients(InducedFlag{T,UpToIso}, n, type;
-                        n_outer=n, N=:limit, only_balanced=true, ...)
+                        n_outer=n, N=:limit, only_balanced=true, factor_sizes=nothing, ...)
 
 Sample products of flags with the given fixed `type`. Return
 `(idx_flags, glue_flags, coefficients)`, where `coefficients[(F, G)]` is a
@@ -746,6 +755,9 @@ quantum flag on `n_outer` vertices retaining all labels of `type`.
 Balanced products have `size(F) == size(G) == (n + size(type)) / 2`.
 Otherwise include all pairs with `size(F) + size(G) - size(type) <= n`.
 Finite `N` includes overlaps between the free vertices of the two factors.
+If `factor_sizes=(a,b)` is supplied, include only products with those factor
+orders (in both orientations). These must satisfy the degree and balance
+conditions above. This also restricts `idx_flags` to the requested orders.
 """
 function sample_coefficients(
     ::Type{InducedFlag{T,UpToIso}},
@@ -761,13 +773,22 @@ function sample_coefficients(
     ),
     N=:limit,
     only_balanced=true,
+    factor_sizes::Union{Nothing,Tuple{Int,Int}}=nothing,
 ) where {T<:Flag,UpToIso}
     @assert UpToIso
     k = size(type)
     @assert k <= n <= n_outer
     only_balanced && @assert iseven(n - k)
+    if factor_sizes !== nothing
+        factor_sizes = minmax(factor_sizes...)
+        a, b = factor_sizes
+        @assert k <= a <= b && a + b - k <= n
+        only_balanced && @assert a == b == k + div(n - k, 2)
+    end
 
-    idx_flags = only_balanced ? filter(F -> size(F) == k + div(n - k, 2), all_flags) : all_flags
+    idx_flags = factor_sizes === nothing ?
+        (only_balanced ? filter(F -> size(F) == k + div(n - k, 2), all_flags) : all_flags) :
+        filter(F -> size(F) in factor_sizes, all_flags)
     glue_flags = filter(F -> size(F) == n_outer, all_flags)
     FT = PartiallyLabeledFlag{InducedFlag{T,UpToIso}}
     res = Dict{Tuple{FT,FT},QuantumFlag{FT,Rational{Int}}}()
@@ -775,7 +796,10 @@ function sample_coefficients(
     petal_labels = Dict{FT,FT}()
 
     for G in glue_flags
-        _sample_flag_products!(res, G, G, n, N, only_balanced, sampling_weights, petal_labels, 1 // 1)
+        _sample_flag_products!(
+            res, G, G, n, N, only_balanced, sampling_weights, petal_labels, 1 // 1;
+            factor_sizes=factor_sizes,
+        )
     end
     return idx_flags, glue_flags, res
 end

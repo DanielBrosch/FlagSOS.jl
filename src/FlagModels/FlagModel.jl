@@ -436,6 +436,8 @@ function add_verts(m::FlagModel, G::T, n::Int) where {T}
 end
 
 function add_verts(m::FlagModel, G::InducedFlag{T,UpToIso}, n::Int) where {T,UpToIso}
+    # Match the rooted overload: an already homogeneous density needs no lift.
+    size(G) == n && return G
     # vert = permute(one(InducedFlag{T, UpToIso}), 1:1)
     # res = 1 * G
     # @info "Adding up to $n verts to $G "
