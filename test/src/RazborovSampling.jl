@@ -19,8 +19,10 @@ end
 
 # Apply the existing quadratic-module multiplication to fixed-type SDP data,
 # independently of the new default path through its Razborov base model.
-function fixed_quadratic!(q::QuadraticModule{T,U,B,N,D}, reserved=0) where {T<:InducedFlag,U,B,N,D}
-    computeSDP!(q.baseModel, reserved + q.reservedVerts; use_downwards=false)
+function fixed_quadratic!(
+    q::QuadraticModule{T,U,B,N,D}, reserved=0; use_downwards=false,
+) where {T<:InducedFlag,U,B,N,D}
+    computeSDP!(q.baseModel, reserved + q.reservedVerts; use_downwards)
     result = Dict()
     population = N == :limit ? N : N - reserved
     for (G, data) in q.baseModel.sdpData
@@ -98,6 +100,53 @@ is_downwards_key(key) = first(key) === :sample_coefficients_downwards
             @test block.sdpData == reference.sdpData
         end
         @test Set(key[5] for key in keys(model.glue_cache)) == Set((20, 18))
+    end
+
+    @testset "Cached inequality images, lifting, and coefficient types" begin
+        vertex = IG(Graph(falses(1, 1)))
+        unit = PartiallyLabeledFlag(vertex, 1)
+        edge = PartiallyLabeledFlag(IG(Graph(Bool[0 1; 1 0])), 1)
+        triangle = IG(Graph(Bool[0 1 1; 1 0 1; 1 1 0]))
+        for D in (Rat, Rational{BigInt}, Float64), N in (20, :limit), reserved in (0, 2)
+            model = FlagModel{IG,N,D}()
+            addForbiddenFlag!(model, triangle)
+            inequality = D(3) * unit - D(7) * edge
+            q = quiet(() -> addInequality_Razborov!(model, inequality, 4))
+            q.reservedVerts = 1
+            # Deliberately retain both orders to exercise actual lifting inside
+            # the image cache, instead of only the already homogeneous case.
+            q.inequality = inequality
+            reference = deepcopy(q)
+            quiet(() -> fixed_quadratic!(reference, reserved; use_downwards=true))
+            quiet(() -> computeSDP!(q, reserved))
+            @test q.baseModel.sdpData == reference.baseModel.sdpData
+            @test keys(q.sdpData) == keys(reference.sdpData)
+            for (F, blocks) in reference.sdpData
+                @test keys(q.sdpData[F]) == keys(blocks)
+                for (mu, block) in blocks
+                    if D == Float64
+                        @test q.sdpData[F][mu] ≈ block
+                    else
+                        @test q.sdpData[F][mu] == block
+                    end
+                end
+            end
+            cached_products = deepcopy(model.glue_cache)
+            first_result = deepcopy(q.sdpData)
+            quiet(() -> computeSDP!(q, reserved))
+            @test q.sdpData == first_result
+            @test model.glue_cache == cached_products
+            @test q.baseModel.sdpData == reference.baseModel.sdpData
+        end
+
+        # A zero identity must cancel after the different orders are lifted and
+        # the root labels are averaged; no zero-only SDP blocks should remain.
+        model = FlagModel{IG,20,Rat}()
+        q = quiet(() -> addInequality_Razborov!(model, 3//1*unit - 7//1*edge, 4))
+        nonedge = PartiallyLabeledFlag(IG(Graph(falses(2, 2))), 1)
+        q.inequality = 1//1*edge + 1//1*nonedge - 1//1*unit
+        quiet(() -> computeSDP!(q, 0))
+        @test isempty(q.sdpData)
     end
 
     @testset "Non-induced models retain their existing path" begin

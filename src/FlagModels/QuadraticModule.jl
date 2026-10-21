@@ -44,41 +44,99 @@ function roundResults(
     return roundResults(m.baseModel, jumpModel, variables, blocks, constraints)
 end
 
+# Products reuse the same outer flags for many multipliers. Convert, unlabel,
+# and (if necessary) lift each outer flag once per module, retaining its exact
+# averaging factor. Accumulate coefficients directly instead of repeatedly
+# copying growing quantum-flag dictionaries with `sum`.
+function _quadratic_product(
+    G::U, inequality::QuantumFlag{U,C}, population, parent,
+    images::Dict{U,QuantumFlag{T,Rational{Int}}}, lift_order,
+) where {T,U,C}
+    R = promote_type(C, Rational{Int})
+    product = QuantumFlag{U,R}()
+    for (H, c) in inequality.coeff
+        iszero(c) && continue
+        for (F, d) in glueFinite(population, G, H; base_model=parent).coeff
+            product.coeff[F] = get(product.coeff, F, zero(R)) + c * d
+        end
+    end
+
+    result = QuantumFlag{T,R}()
+    for (F, c) in product.coeff
+        iszero(c) && continue
+        image = get!(images, F) do
+            converted = QuantumFlag{T}(1 // 1 * F)
+            if lift_order !== nothing
+                converted = add_verts(parent, converted, lift_order)
+            end
+            labelCanonically(converted)
+        end
+        for (H, d) in image.coeff
+            result.coeff[H] = get(result.coeff, H, zero(R)) + c * d
+        end
+    end
+    filter!(p -> !iszero(p.second), result.coeff)
+    return result
+end
+
+# A function barrier specializes updates even when the surrounding SDP
+# dictionary has abstract key/value types.
+function _add_quadratic_block!(target, coefficient, block)
+    target .+= coefficient .* block
+    return target
+end
+
+function _add_quadratic_block!(target::SparseMatrixCSC, coefficient, block::SparseMatrixCSC)
+    axes(target) == axes(block) || throw(DimensionMismatch("Incompatible SDP block sizes"))
+    rows, entries = rowvals(block), nonzeros(block)
+    # Sparse broadcast may copy the growing destination to handle aliasing.
+    # Visit only the source entries; previously accumulated entries stay put.
+    for col in axes(block, 2), p in nzrange(block, col)
+        value = coefficient * entries[p]
+        iszero(value) && continue
+        row = rows[p]
+        target[row, col] += value
+    end
+    return target
+end
+
 function computeSDP!(
     m::QuadraticModule{T,U,B,N,D}, reservedVerts::Int
 ) where {T<:Flag,U<:Flag,N,D,B<:AbstractFlagModel{U,N,D}}
     @info "computing ineq module for $(m.inequality)"
     computeSDP!(m.baseModel, reservedVerts + m.reservedVerts)
 
-    # @assert N == :limit "TODO"
+    population = N == :limit ? N : N - reservedVerts
+    cache_images = isInducedFlag(T) && isInducedFlag(U) && is_up_to_iso(U)
+    images = Dict{U,QuantumFlag{T,Rational{Int}}}()
+    lift_order = N != :limit && m.baseModel isa RazborovModel && isInducedFlag(T) ?
+        m.baseModel.lvl + free_verts(m.inequality) : nothing
     m.sdpData = Dict()
     for (G, data) in m.baseModel.sdpData
-        if N == :limit
-            tmp = QuantumFlag{T}(glueFinite(N, G, m.inequality; base_model=m.baseModel.parentModel))
+        if cache_images
+            GH = _quadratic_product(
+                G, m.inequality, population, m.baseModel.parentModel, images, lift_order,
+            )
         else
-            tmp = QuantumFlag{T}(glueFinite(N - reservedVerts, G, m.inequality; base_model=m.baseModel.parentModel))
-            # @show typeof(G), typeof(m.inequality), typeof(tmp)
-            if m.baseModel isa RazborovModel && isInducedFlag(T)
-                tmp = add_verts(m.baseModel.parentModel, tmp, m.baseModel.lvl + free_verts(m.inequality))
-                # @show m.baseModel.lvl + free_verts(m.inequality), tmp
+            tmp = QuantumFlag{T}(glueFinite(
+                population, G, m.inequality; base_model=m.baseModel.parentModel,
+            ))
+            if lift_order !== nothing
+                tmp = add_verts(m.baseModel.parentModel, tmp, lift_order)
             end
+            GH = labelCanonically(isInducedFlag(T) ? tmp : removeIsolated(tmp))
         end
-        if isInducedFlag(T)
-            noLabel = tmp
-        else
-            noLabel = removeIsolated(tmp)
-            # noLabel = removeIsolated(QuantumFlag{T}(G * m.inequality))
-        end
-        GH = labelCanonically(noLabel)
         for (gh, cgh) in GH.coeff
-            if !haskey(m.sdpData, gh)
-                m.sdpData[gh] = Dict()
+            blocks = get!(m.sdpData, gh) do
+                Dict()
             end
             for (mu, blk) in data
-                if !haskey(m.sdpData[gh], mu)
-                    m.sdpData[gh][mu] = cgh * blk
+                if !haskey(blocks, mu)
+                    blocks[mu] = cgh * blk
+                elseif cache_images
+                    _add_quadratic_block!(blocks[mu], cgh, blk)
                 else
-                    m.sdpData[gh][mu] += cgh * blk
+                    blocks[mu] += cgh * blk
                 end
             end
         end
