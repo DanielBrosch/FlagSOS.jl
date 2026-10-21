@@ -8,384 +8,335 @@ using Memoization
 
 include("ParallelGeneration.jl")
 
-# function refine!(F::T, coloring::Vector{Int}, alpha)::Vector{UInt} where {T<:Flag}
-#     # Q .= 0
-
-# end
-
-# function individualize!(coloring::Vector{Int}, v::Int)::Vector{Int}
-#     return coloring
-# end
-
-function refine!(coloring::Vector{Int}, F, v::Int)::Vector{UInt}
-    n = size(F)
-    alpha = BitVector(undef, n)
-    vertDistinguish = zeros(UInt, n)
-    alpha .= false
-    if v == 0
-        alpha[1] = true
-    else
-        alpha[coloring[v]] = true
-        # individualize!(coloring, v)
-        for i in 1:n
-            if coloring[i] >= coloring[v] && i != v
-                coloring[i] += 1
-            end
-        end
-    end
-
-    # nodeInv = refine!(coloring)
-    Q = zeros(UInt, n, n)
-    curCell::BitVector = BitVector(undef, n)
-    @inbounds while maximum(coloring) < n
-        W::Int = 0
-        for i in 1:length(alpha)
-            if alpha[i]
-                W = i
-                break
-            end
-        end
-        if W == 0
-            break
-        end
-        # W::Int = findfirst(alpha)
-        # WCellInd .= coloring .== W
-        WCellInd::BitVector = coloring .== W
-        alpha[W] = false
-
-        cell::Int = 1
-        newCells = Dict{UInt,Int}()
-        while cell <= maximum(coloring)
-            vertDistinguish .= 0
-            # curCell .= coloring .== cell
-            for i in 1:n
-                curCell[i] = coloring[i] == cell
-            end
-
-            empty!(newCells)
-
-            for v in findall(curCell)#findall(x->x==cell, coloring)
-                d::UInt = distinguish(F, v, WCellInd)
-                vertDistinguish[v] = d
-                # union!(newCells, [d])
-                newCells[d] = get(newCells, d, 0) + 1
-            end
-
-            # To make it invariant of initial vertex labeling, sort the hashes
-            # newCells = Dict(d=>i+cell-1 for (i,d) in enumerate(sort!([u for u in unique(vertDistinguish) if u != 0])))
-
-            # newCellSizes = Dict(d=>count(x->x==d, vertDistinguish) for d in keys(newCells))
-
-            numNewCells = length(newCells) - 1
-
-            for i in eachindex(coloring)
-                if coloring[i] > cell
-                    coloring[i] += numNewCells
-                end
-            end
-
-            # coloring[coloring .> cell] .+= numNewCells
-            for i in length(alpha):-1:(cell + numNewCells + 1)
-                alpha[i] = alpha[i - numNewCells]
-            end
-            # @views alpha[(cell + numNewCells + 1):end] .= alpha[(cell + 1):(end - numNewCells)]
-
-            alpha[(cell + 1):(cell + numNewCells)] .= true
-
-            newCellsCol::Vector{Pair{UInt,Int}} = collect(newCells)
-            sort!(newCellsCol; by=x -> x[1])
-
-            # sorting newCellsCol by hashes breaks things?!? But I need to sort!
-
-            for v in 1:n
-                !curCell[v] && continue
-                # findall(curCell)#findall(x->x==cell, coloring)
-                # coloring[v] = newCells[vertDistinguish[v]]
-
-                d::UInt = vertDistinguish[v]
-                firstPos::Int = 0
-                for i in 1:length(newCellsCol)
-                    if newCellsCol[i][1] == d
-                        firstPos = i
-                        break
-                    end
-                end
-                @assert firstPos > 0
-
-                # findfirst(x -> x[1] == d, newCellsCol)
-                coloring[v] = firstPos + cell - 1
-                Q[coloring[v], W > cell ? W + numNewCells : W] = d
-
-                # Q = hash(Q, vertDistinguish[v])
-            end
-
-            if !alpha[cell]
-                alpha[cell] = true
-
-                maxCellSize = 0
-                maxCellInd = 0
-                for (i, (d, s)) in enumerate(newCellsCol)
-                    if s > maxCellSize
-                        maxCellSize = s
-                        maxCellInd = i
-                    end
-                end
-
-                # Remove biggest new cell
-                alpha[maxCellInd + cell - 1] = false
-            end
-
-            cell += length(newCellsCol)
-        end
-    end
-
-    cl = maximum(coloring)
-    nodeInvariant = hash(Q, hash([count(x -> x == i, coloring) for i in 1:cl]))
-
-    if maximum(coloring) == n
-        # append permuted Flag
-        # return UInt[nodeInvariant, hash(permute(F, coloring))]
-        # return nodeInvariant, hash(permute(F, coloring))
-        return UInt[nodeInvariant, hash(permute(F, coloring))]
-        # return hash(nodeInvariant, hash(permute(F, coloring)))
-    end
-    return UInt[nodeInvariant]
-    # return nodeInv
+# Cells occupy consecutive positions in `vertices`. Only cell starts have a
+# nonzero entry in `cell_end`; their positions stay valid when another cell splits.
+mutable struct _LabelPartition
+    vertices::Vector{Int}
+    cell_end::Vector{Int}
+    ncells::Int
 end
 
-function investigateNode(
-    F,
-    coloring::Vector{Int},
-    nodeInv::Vector{UInt},
-    n,
-    nInv1,
-    nInvStar,
-    autG,
-    v1,
-    vStar,
-    curBranch,
-    covered,
-    prune,
-)::Int
-    # @info "investigate node at $coloring, $nodeInv"
-
-    first = length(nInv1) == 0
-
-    if maximum(coloring) == n
-
-        # check for automorphisms
-        if !first
-            p2 = coloring
-            autom1 = v1[p2]
-            changed = false
-            if F == permute(F, autom1)
-                changed = addGen!(autG, autom1)
-            end
-            autom2 = vStar[p2]
-            if F == permute(F, autom2)
-                changed |= addGen!(autG, autom2)
-            end
-
-            # if changed, check for automorphism pruning higher up the tree
-            if changed
-                # @info "Added onto stabilizer, new order is $(order(autG))"
-                stabilizer!(autG, curBranch)
-                for i in 1:length(curBranch)
-                    H = stabilizer!(autG, curBranch[1:(i - 1)])
-
-                    @assert H !== nothing
-
-                    o = covered[i]
-                    orbit!(H, o)
-                    if prune && curBranch[i] in o
-                        # cut this branch multiple levels up
-                        difLevel = length(curBranch) - i
-                        resize!(curBranch, i)
-                        resize!(covered, i)
-                        # covered = covered[1:i]
-                        # @info "Pruning $difLevel levels from level $(length(curBranch)) via automorphism."
-                        return difLevel
-                    end
-                end
-            end
+function _LabelPartition(colors::Vector{Int})
+    vertices = sortperm(colors)
+    cell_end = zeros(Int, length(colors))
+    ncells = 0
+    first = 1
+    while first <= length(colors)
+        last = first
+        while last < length(colors) && colors[vertices[last + 1]] == colors[vertices[first]]
+            last += 1
         end
+        cell_end[first] = last
+        ncells += 1
+        first = last + 1
+    end
+    return _LabelPartition(vertices, cell_end, ncells)
+end
 
-        # improve v1 and vStar
-        # if first #|| nodeInv < nInv1
-        if first || nodeInv < nInv1
-            for i in 1:n
-                v1[coloring[i]] = i
-            end
-            resize!(nInv1, length(nodeInv))
-            nInv1 .= nodeInv
-            # nInv1 = nodeInv
+Base.copy(p::_LabelPartition) = _LabelPartition(copy(p.vertices), copy(p.cell_end), p.ncells)
+
+struct _LabelWorkspace
+    active::BitVector
+    splitter::BitVector
+    values::Vector{UInt}
+end
+
+_LabelWorkspace(n::Int) = _LabelWorkspace(falses(n), falses(n), zeros(UInt, n))
+
+function _individualize!(p::_LabelPartition, cell::Int, vertex::Int)
+    last = p.cell_end[cell]
+    @assert cell < last
+    pos = cell
+    while p.vertices[pos] != vertex
+        pos += 1
+    end
+    p.vertices[cell], p.vertices[pos] = p.vertices[pos], p.vertices[cell]
+    p.cell_end[cell] = cell
+    p.cell_end[cell + 1] = last
+    p.ncells += 1
+    return nothing
+end
+
+function _refine!(p::_LabelPartition, F, work::_LabelWorkspace, individualized::Int=0)
+    n = length(p.vertices)
+    active, splitter, values = work.active, work.splitter, work.values
+    fill!(active, false)
+    if individualized == 0
+        # Every initial color class can distinguish vertices in another class.
+        cell = 1
+        while cell <= n
+            active[cell] = true
+            cell = p.cell_end[cell] + 1
         end
-        if first || nodeInv > nInvStar
-            for i in 1:n
-                vStar[coloring[i]] = i
-            end
-            resize!(nInvStar, length(nodeInv))
-            nInvStar .= nodeInv
-            # nInvStar = nodeInv
-        end
-        first = false
     else
-        # pruning
-        # if !(first ||
-        #      length(nodeInv) <= length(nInvStar) ||
-        #      length(nodeInv) <= length(nInv1))
-        #     @show F
-        #     display(F)
-        #     @show typeof(F)
-        #     global errorFlag = deepcopy(F)
-        #     @show first
-        #     @show nodeInv
-        #     @show nInvStar
-        #     @show nInv1
-        # end
-
-        # assertion wrong! nodeInv may be longer than nInvStar! We want the lexicographically largest hash vector, not smallest.
-        # @assert first ||
-        #         length(nodeInv) <= length(nInvStar) ||
-        #         length(nodeInv) <= length(nInv1)
-        # @assert first ||
-        #         nodeInv[1:min(length(nodeInv), length(nInvStar))] >= nInvStar[1:min(length(nodeInv), length(nInvStar))] ||
-        #         length(nodeInv) <= length(nInv1)
-
-        @views if prune &&
-            !first &&
-            !(
-                nodeInv[1:min(length(nodeInv), length(nInv1))] ==
-                nInv1[1:min(length(nodeInv), length(nInv1))]
-            ) &&
-            !(
-                nodeInv[1:min(length(nodeInv), length(nInvStar))] >=
-                nInvStar[1:min(length(nodeInv), length(nInvStar))]
-            )
-            return 0
-        end
-        firstBigCell = Int[]
-        for i in 1:n
-            c = findall(x -> x == i, coloring)
-            if length(c) > 1
-                firstBigCell = c
-                break
-            end
-        end
-
-        push!(covered, Int[])
-        for i in firstBigCell
-            if prune && i in covered[end]
-                # @info "Prune $(vcat(curBranch,[i])) via automorphism"
-                continue
-            end
-            newC::Vector{Int} = copy(coloring)
-            newNodeInv::Vector{UInt} = refine!(newC, F, i)
-            push!(curBranch, i)
-            catNodeInv::Vector{UInt} = vcat(nodeInv, newNodeInv)
-            t = investigateNode(
-                F,
-                newC,
-                catNodeInv,
-                n,
-                nInv1,
-                nInvStar,
-                autG,
-                v1,
-                vStar,
-                curBranch,
-                covered,
-                prune,
-            )
-
-            if t > 0
-                return t - 1
-            end
-            pop!(curBranch)
-
-            # union!(covered[end], [i])
-            if prune || !(i in covered[end])
-                push!(covered[end], i)
-            end
-            H = stabilizer!(autG, curBranch)
-            @assert H !== nothing
-            orbit!(H, covered[end])
-        end
-        pop!(covered)
+        # The parent is already refined. Both parts of the individualized cell
+        # are new splitters; neither can be inferred from the other for an oracle.
+        active[individualized] = true
+        active[individualized + 1] = true
     end
 
+    # A hash of the ordered refinement trace replaces the dense quotient matrix.
+    # Hash collisions here only weaken pruning, since leaves are compared below.
+    invariant = hash(p.ncells)
+    while p.ncells < n
+        split = findfirst(active)
+        split === nothing && break
+        active[split] = false
+        fill!(splitter, false)
+        for pos in split:p.cell_end[split]
+            splitter[p.vertices[pos]] = true
+        end
+        invariant = hash((split, p.cell_end[split] - split + 1), invariant)
+
+        cell = 1
+        while cell <= n
+            last = p.cell_end[cell]
+            if cell == last
+                cell += 1
+                continue
+            end
+            for pos in cell:last
+                vertex = p.vertices[pos]
+                values[vertex] = distinguish(F, vertex, splitter)
+            end
+            sort!(@view(p.vertices[cell:last]); by=v -> values[v])
+            splits = values[p.vertices[cell]] != values[p.vertices[last]]
+            first = cell
+            while first <= last
+                stop = first
+                value = values[p.vertices[first]]
+                while stop < last && values[p.vertices[stop + 1]] == value
+                    stop += 1
+                end
+                p.cell_end[first] = stop
+                invariant = hash((first, stop - first + 1, value), invariant)
+                if splits
+                    # The graph-specific "all but the largest part" shortcut
+                    # requires additivity, which `distinguish` does not promise.
+                    active[first] = true
+                    first != cell && (p.ncells += 1)
+                end
+                first = stop + 1
+            end
+            cell = last + 1
+        end
+    end
+    return hash(p.ncells, invariant)
+end
+
+# Retain the coloring-based helper. Colors need not be consecutive; their order
+# is preserved. A nonzero vertex individualizes a nonsingleton cell first.
+function refine!(coloring::Vector{Int}, F, vertex::Int)::Vector{UInt}
+    length(coloring) == size(F) || throw(DimensionMismatch("one color is required per vertex"))
+    p = _LabelPartition(coloring)
+    cell = 0
+    if vertex != 0
+        checkbounds(coloring, vertex)
+        cell = 1
+        while !(vertex in @view(p.vertices[cell:p.cell_end[cell]]))
+            cell = p.cell_end[cell] + 1
+        end
+        cell == p.cell_end[cell] && throw(ArgumentError("cannot individualize a singleton cell"))
+        _individualize!(p, cell, vertex)
+    end
+    # This entry point also accepts unrefined input, so activate every cell.
+    invariant = _refine!(p, F, _LabelWorkspace(length(coloring)))
+    cell, color = 1, 1
+    while cell <= length(coloring)
+        for pos in cell:p.cell_end[cell]
+            coloring[p.vertices[pos]] = color
+        end
+        color += 1
+        cell = p.cell_end[cell] + 1
+    end
+    return p.ncells == length(coloring) ?
+           UInt[invariant, hash(permute(F, coloring))] : UInt[invariant]
+end
+
+mutable struct _LabelSearch{T,K,C}
+    F::T
+    canonical_key::C
+    best_key::K
+    first_flag::T
+    best_flag::T
+    first_inverse::Vector{Int}
+    best_inverse::Vector{Int}
+    first_invariant::Vector{UInt}
+    best_invariant::Vector{UInt}
+    invariant::Vector{UInt}
+    branch::Vector{Int}
+    covered::Vector{Vector{Int}}
+    group::Group
+    work::_LabelWorkspace
+    prune::Bool
+end
+
+# Compare only the shared prefix: an unfinished branch can still improve a leaf
+# when its trace extends that leaf's trace.
+function _compare_prefix(a::Vector{UInt}, b::Vector{UInt})
+    for i in 1:min(length(a), length(b))
+        a[i] < b[i] && return -1
+        a[i] > b[i] && return 1
+    end
     return 0
 end
 
-# Custom implementation of nauty, but still sloooow
-# Allows us to label near-arbitrary combinatoric objects
-function label(F::T; prune=true, removeIsolated=true) where {T}
-    # @show F 
-    # display(F)
-    # @show isolatedVertices(F)
+function _automorphism_cutoff!(search::_LabelSearch)
+    for depth in eachindex(search.branch)
+        H = stabilizer!(search.group, search.branch[1:(depth - 1)])
+        orbit!(H, search.covered[depth])
+        search.branch[depth] in search.covered[depth] && return depth
+    end
+    return 0
+end
 
-    if size(F) > 0 && removeIsolated
-        isoV = isolatedVertices(F)
-        # @show typeof(isoV)
-        if any(isoV)
-            # @show F 
-            # @show isolatedVertices(F)
-            # @show isoV
-            # @show typeof(isoV)
-            # @show typeof(map(!,isoV))
+function _record_leaf!(search::_LabelSearch, partition::_LabelPartition)
+    permutation = invperm(partition.vertices)
+    candidate = permute(search.F, permutation)
+    key = search.canonical_key(candidate)
+    if isempty(search.first_inverse)
+        search.first_flag = candidate
+        search.best_flag = candidate
+        search.best_key = key
+        append!(search.first_inverse, partition.vertices)
+        append!(search.best_inverse, partition.vertices)
+        append!(search.first_invariant, search.invariant)
+        append!(search.best_invariant, search.invariant)
+        return 0
+    end
 
-            # F = T(subFlag(F, map(!,isoV)))
-            return label(
-                subFlag(F, map(!, isoV)); prune=prune, removeIsolated=removeIsolated
-            )
+    changed = false
+    if candidate == search.first_flag
+        changed = addGen!(search.group, search.first_inverse[permutation])
+    end
+    if candidate == search.best_flag && search.best_inverse != search.first_inverse
+        changed |= addGen!(search.group, search.best_inverse[permutation])
+    end
+
+    same_trace = search.invariant == search.best_invariant
+    if same_trace && isequal(key, search.best_key) && candidate != search.best_flag
+        throw(ArgumentError(
+            "canonicalKey ties for unequal labeled objects; supply a canonicalKey " *
+            "that distinguishes them (for example an exact ordered encoding)",
+        ))
+    end
+    if search.invariant > search.best_invariant ||
+       (same_trace && isless(search.best_key, key))
+        search.best_flag = candidate
+        search.best_key = key
+        search.best_inverse .= partition.vertices
+        resize!(search.best_invariant, length(search.invariant))
+        search.best_invariant .= search.invariant
+    end
+    return changed && search.prune ? _automorphism_cutoff!(search) : 0
+end
+
+function _target_cell(p::_LabelPartition)
+    target, smallest = 0, typemax(Int)
+    cell = 1
+    while cell <= length(p.vertices)
+        len = p.cell_end[cell] - cell + 1
+        if 1 < len < smallest
+            target, smallest = cell, len
+            len == 2 && break
+        end
+        cell = p.cell_end[cell] + 1
+    end
+    return target
+end
+
+function _search_label!(search::_LabelSearch, partition::_LabelPartition)::Int
+    n = length(partition.vertices)
+    partition.ncells == n && return _record_leaf!(search, partition)
+
+    # Keep the first leaf's path available to discover the full automorphism
+    # group, as well as every branch that can improve the canonical leaf.
+    if search.prune && !isempty(search.first_inverse) &&
+       _compare_prefix(search.invariant, search.first_invariant) != 0 &&
+       _compare_prefix(search.invariant, search.best_invariant) < 0
+        return 0
+    end
+
+    cell = _target_cell(partition)
+    depth = length(search.branch)
+    covered = Int[]
+    push!(search.covered, covered)
+    cutoff = 0
+    for pos in cell:partition.cell_end[cell]
+        vertex = partition.vertices[pos]
+        search.prune && vertex in covered && continue
+        child = copy(partition)
+        _individualize!(child, cell, vertex)
+        push!(search.branch, vertex)
+        push!(search.invariant, _refine!(child, search.F, search.work, cell))
+        cutoff = _search_label!(search, child)
+        pop!(search.invariant)
+        pop!(search.branch)
+        # Each frame owns its stack entries, including during a backjump.
+        cutoff != 0 && cutoff <= depth && break
+        cutoff = 0
+        if search.prune
+            push!(covered, vertex)
+            H = stabilizer!(search.group, search.branch)
+            orbit!(H, covered)
         end
     end
-
-    n::Int = size(F)
-
-    if n == 0
-        return F, Group(n), Group(n), []
-    end
-
-    nInv1::Vector{UInt} = UInt[]
-    nInvStar::Vector{UInt} = UInt[]
-    # p1 = Int[]
-    # pStar = Int[]
-
-    autG::Group = Group(n)
-
-    # first = true
-
-    v1::Vector{Int} = zeros(Int, n)
-    vStar::Vector{Int} = zeros(Int, n)
-
-    curBranch::Vector{Int} = Int[]
-    covered::Vector{Vector{Int}} = Vector{Int}[]
-
-    # To avoid allocations in refine!
-    # alpha = BitVector(undef, n)
-    # vertDistinguish = zeros(UInt, n)
-
-    # Q = zeros(UInt, n, n)
-    # WCellInd = BitVector(undef, n)
-    # curCell = BitVector(undef, n)
-    # newCells = Dict{UInt,Int}()
-
-    col::Vector{Int} = Int[vertexColor(F, v) for v in 1:n]
-    # alpha[1] = true
-    refine!(col, F, 0)
-
-    investigateNode(
-        F, col, UInt[], n, nInv1, nInvStar, autG, v1, vStar, curBranch, covered, prune
-    )
-
-    p = zeros(Int, n)
-    p[vStar] .= 1:n
-    # p = Int[findfirst(x -> x == i, vStar) for i in 1:n]
-    # @assert p == p2
-    autGp = permute!(deepcopy(autG), p)
-    return permute(F, p), autGp, autG, p
+    pop!(search.covered)
+    return cutoff
 end
+
+"""
+    label(F; prune=true, removeIsolated=true, canonicalKey=hash)
+
+Return `(canonical, canonical_group, original_group, permutation)`, where
+`canonical == permute(F, permutation)` and the two groups act on the canonical
+and original vertex sets, respectively. `permutation[v]` is the new label of `v`.
+If isolated vertices are removed, all four results refer to the reduced object.
+
+The individualization/refinement search uses only `size`, `vertexColor`,
+`distinguish`, `permute`, and equality, plus `isolatedVertices` and `subFlag` when
+removing isolated vertices. Vertex colors must be ordered integers preserved by
+isomorphisms. The `UInt` returned by `distinguish(F, v, W)` must be invariant under
+simultaneous relabeling of `F`, `v`, and `W`; it need not be additive or complete.
+
+Refinement traces order the search leaves; `canonicalKey` breaks ties. Its values
+must have a total order and agree for equal labeled objects. The default uses
+`hash`; a tie between unequal objects raises an error instead of silently making
+the result depend on input labels. An exact ordered encoding can be supplied for
+objects with deliberately weak hashes. Canonical representatives may change with
+the implementation or Julia's hashing, so they are not a persistent file format.
+
+Set `prune=false` to explore the complete refinement tree, retaining the same
+canonicalization rule and automorphism computation. Search buffers belong to each
+call, so independent calls can run concurrently.
+"""
+function label(F; prune=true, removeIsolated=true, canonicalKey=hash)
+    n = size(F)
+    if n > 0 && removeIsolated
+        isolated = isolatedVertices(F)
+        if any(isolated)
+            return label(subFlag(F, .!isolated); prune, removeIsolated, canonicalKey)
+        end
+    end
+    n == 0 && return F, Group(0), Group(0), Int[]
+
+    partition = _LabelPartition(Int[vertexColor(F, v) for v in 1:n])
+    work = _LabelWorkspace(n)
+    invariant = _refine!(partition, F, work)
+    if partition.ncells == n
+        permutation = invperm(partition.vertices)
+        return permute(F, permutation), Group(n), Group(n), permutation
+    end
+    search = _LabelSearch(
+        F, canonicalKey, canonicalKey(F), F, F, Int[], Int[], UInt[], UInt[],
+        UInt[invariant], Int[], Vector{Int}[], Group(n), work, prune,
+    )
+    _search_label!(search, partition)
+    permutation = invperm(search.best_inverse)
+    canonical_group = permute!(deepcopy(search.group), permutation)
+    return search.best_flag, canonical_group, search.group, permutation
+end
+
 
 _generation_accept_all(F) = true
 _can_generate_unlabeled(::Type, initial_flag, maxPredicates) = false

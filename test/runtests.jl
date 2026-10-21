@@ -53,7 +53,12 @@ end
         _include_sandbox("src/CoefficientSampling.jl")
     end
 
+    @testset "Canonical labeling" begin
+        _include_sandbox("src/CanonicalLabeling.jl")
+    end
+
     @testset "Generation" begin
+        _include_sandbox("src/GenerationCounts.jl")
         _include_sandbox("src/Generation.jl")
         _include_sandbox("src/ParallelGeneration.jl")
         _include_sandbox("src/ModelGeneration.jl")

@@ -443,16 +443,24 @@ end
 """
     vertexColor(::T, ::Int) where {T<:Flag}
 
-Returns the color of vertices in colored Flags. The default is the case of a vertex-transitive Flags-type, where all vertices have color `1`.
+Return an integer color preserved by isomorphisms. Colors are ordered but need
+not be consecutive. The default gives every vertex color `1`.
 """
 function vertexColor(::T, ::Int) where {T<:Flag}
     return 1
 end
 
 """
-distinguish(F::T, v::Int, W::BitVector)::UInt where {T<:Flag}
+    distinguish(F::T, v::Int, W::BitVector)::UInt where {T<:Flag}
 
-Given a Flag `F`, a vertex `v` and a subset of vertices indicated by `W`, distinguish `v` by analyzing it's relationship to the vertices `W`. This may, for example, be the number of edges between `v` and the cell `W`, or the number of triangles with `v` and one/two vertices of `W`. The type of result does not matter, as it does get hashed after.
+Return a `UInt` signature of the relationship between vertex `v` and the subset
+indicated by `W`. For example, hash the number of neighbors in `W`, or counts of
+triangles containing `v` and vertices of `W`.
+
+The signature must be unchanged by simultaneous relabeling of `F`, `v`, and `W`.
+It may collide and need not be additive over disjoint subsets; weaker signatures
+only require more individualization in `label`. Do not mutate `F` or `W`: the
+labeling search reuses its splitter mask between oracle calls.
 """
 function distinguish(F::T, v::Int, W::BitVector)::UInt where {T<:Flag}
     error("distinguish is not defined for Flag type $T")

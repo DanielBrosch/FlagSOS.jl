@@ -197,10 +197,19 @@ function findUnknownPredicates(
 
     for e in combinations(1:size(F), 2)
         if (F.A[e[1], e[2]] == 0) && !any(issubset(e, f) for f in fixed)
-            needsMoreColors && push!(res, ColoredEdgePredicate(e..., -hC))
-            for c in 1:hC
-                c == 0 && continue
-                push!(res, ColoredEdgePredicate(e..., c))
+            if !B && N >= 0
+                # A fixed palette distinguishes color names, including colors
+                # absent from F. Introducing only hC+1 misses, e.g., a lone
+                # edge of color 2. The incremental rule applies to colorblind
+                # palettes (and the unbounded-color convention) below.
+                for c in 1:N
+                    push!(res, ColoredEdgePredicate(e..., c))
+                end
+            else
+                needsMoreColors && push!(res, ColoredEdgePredicate(e..., -hC))
+                for c in 1:hC
+                    push!(res, ColoredEdgePredicate(e..., c))
+                end
             end
         end
     end
